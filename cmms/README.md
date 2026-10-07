@@ -112,4 +112,4 @@ You would have to build these yourself: spare-parts/stock integration · labour 
 
 ## Licence
 
-MIT — use it, change it, sell it. No warranty.
+MIT — use it, change it. No warranty.
