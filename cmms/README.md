@@ -112,4 +112,4 @@ You would have to build these yourself: spare-parts/stock integration · labour 
 
 ## Licence
 
-MIT — use it, change it. No warranty.
+**PolyForm Noncommercial License 1.0.0** — free for any noncommercial purpose: factories running it for themselves, schools, hospitals, government, hobby projects. You may copy it, change it and pass it on. **You may not sell it or use it in a commercial product or service.** No warranty. See [LICENSE.md](../LICENSE.md).
