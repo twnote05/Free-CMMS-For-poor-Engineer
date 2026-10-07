@@ -2,16 +2,19 @@
 
 **English** · [ไทย](README.th.md)
 
-Two maintenance systems for small factories, running entirely on **Google Sheets + Apps Script**. No server, no monthly bill, no IT department.
+Tools a small factory can actually run: **no server, no monthly bill, no IT department.**
 
-Both are in daily production use at a ~50-person UPVC/SPC flooring plant. All company data has been removed; what is published is the skeleton you configure for your own site.
+All of it is in daily production use at a ~50-person UPVC/SPC flooring plant. Company data has been removed; what is published is the skeleton you configure for your own site.
 
 | | What it does | Status |
 |---|---|---|
 | **[cmms/](cmms/)** | Work orders, preventive maintenance, daily checklists, machine parameters, KPIs | Ready |
 | **[stock/](stock/)** | Spare parts, tools and blades — FIFO batches, real cost per issue | Ready |
+| **[wi-generator/](wi-generator/)** | 16 kinds of factory document — work instructions, time study, FMEA, control charts — print A4/A3 and export to Excel | Ready |
 
-Pick one or run both. They are **separate Apps Script projects**: each has its own `.clasp.json` and its own deployment. The only thing they share is the `Users` sheet — see **[SHARED-USERS.md](SHARED-USERS.md)** before you run both.
+`cmms/` and `stock/` are the Google Sheets systems: **separate Apps Script projects**, each with its own `.clasp.json` and deployment. The only thing they share is the `Users` sheet — see **[SHARED-USERS.md](SHARED-USERS.md)** before you run both.
+
+`wi-generator/` is unrelated to those two: one HTML file you double-click. Nothing to deploy, nothing to connect.
 
 ---
 
@@ -19,7 +22,8 @@ Pick one or run both. They are **separate Apps Script projects**: each has its o
 
 - **Just want the maintenance system?** → [cmms/README.md](cmms/README.md)
 - **Just want the stock system?** → [stock/README.md](stock/README.md) (Thai only)
-- **Running both?** → read [SHARED-USERS.md](SHARED-USERS.md) first, then set up CMMS, then Stock
+- **Running both sheet systems?** → read [SHARED-USERS.md](SHARED-USERS.md) first, then set up CMMS, then Stock
+- **Just need to write documents?** → [wi-generator/README.md](wi-generator/README.md) — download one file, no setup
 
 ```bash
 git clone https://github.com/twnote05/Free-CMMS-For-poor-Engineer.git

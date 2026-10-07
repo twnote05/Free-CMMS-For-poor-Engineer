@@ -1,0 +1,2994 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>โปรแกรมสร้างเอกสารสำหรับวิศวกรโรงงาน</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  color-scheme:light;
+  --bg:#F5F7FA; --surface:#FFFFFF; --surface-2:#F1F4F8; --surface-3:#E7EDF5;
+  --txt:#111720; --txt2:#5A6573; --txt3:#8A94A2;
+  --line:#E3E8EF; --line-2:#D3DAE4;
+  --accent:#2563EB; --accent-2:#1D4FD8; --accent-soft:#E8F0FE; --on-accent:#fff;
+  --danger:#DC2626; --danger-soft:#FDECEC;
+  --r:14px; --r-sm:10px; --r-xs:7px;
+  --sh:0 1px 2px rgba(16,24,40,.05), 0 8px 24px rgba(16,24,40,.06);
+  --sh-lg:0 12px 40px rgba(16,24,40,.18);
+  --ring:0 0 0 3px rgba(37,99,235,.25);
+  --font:'Noto Sans Thai',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  /* ชื่อเดิมที่กฎอื่นยังเรียกอยู่ ไม่ต้องไล่แก้ทุกจุด */
+  --card:var(--surface); --blue:var(--accent);
+}
+/* โหมดมืดตามเครื่อง เว้นแต่ผู้ใช้กดเลือกโหมดสว่างไว้เอง */
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+  color-scheme:dark;
+  --bg:#0D1117; --surface:#161B22; --surface-2:#1C232D; --surface-3:#262D38;
+  --txt:#E6EDF3; --txt2:#9BA7B4; --txt3:#6E7B8A;
+  --line:#232B36; --line-2:#2E3744;
+  --accent:#4D8DFF; --accent-2:#6BA1FF; --accent-soft:#152337; --on-accent:#08111F;
+  --danger:#FF7B72; --danger-soft:#2D1618;
+  --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.45);
+  --sh-lg:0 16px 48px rgba(0,0,0,.6);
+  --ring:0 0 0 3px rgba(77,141,255,.35);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0D1117; --surface:#161B22; --surface-2:#1C232D; --surface-3:#262D38;
+  --txt:#E6EDF3; --txt2:#9BA7B4; --txt3:#6E7B8A;
+  --line:#232B36; --line-2:#2E3744;
+  --accent:#4D8DFF; --accent-2:#6BA1FF; --accent-soft:#152337; --on-accent:#08111F;
+  --danger:#FF7B72; --danger-soft:#2D1618;
+  --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.45);
+  --sh-lg:0 16px 48px rgba(0,0,0,.6);
+  --ring:0 0 0 3px rgba(77,141,255,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--font);font-size:14px;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:1680px;margin:0 auto;padding:18px;display:grid;
+  grid-template-columns:448px minmax(0,1fr);gap:20px;align-items:start}
+@media(max-width:1150px){.wrap{grid-template-columns:minmax(0,1fr);padding:12px;gap:14px}}
+#stagewrap{overflow:hidden}
+
+/* ---------- แถบหัวโปรแกรม ---------- */
+.appbar{display:flex;align-items:center;gap:11px;margin:0 0 16px}
+.mark{flex:none;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;
+  background:linear-gradient(140deg,var(--accent),var(--accent-2));color:var(--on-accent);
+  font-weight:700;font-size:13px;letter-spacing:.5px;box-shadow:var(--sh)}
+.brandtxt{min-width:0;line-height:1.28}
+.brandtxt b{display:block;font-size:15px;letter-spacing:-.1px}
+.brandtxt span{color:var(--txt3);font-size:11.5px}
+.themebtn{flex:none;margin-left:auto;width:36px;height:36px;border-radius:10px;border:1px solid var(--line);
+  background:var(--surface);color:var(--txt2);font-size:15px;cursor:pointer;line-height:1;
+  transition:background .15s,border-color .15s}
+.themebtn:hover{background:var(--surface-2);border-color:var(--line-2)}
+
+h1{font-size:21px;margin:0 0 3px;letter-spacing:-.3px;font-weight:700}
+.sub{color:var(--txt2);font-size:13px;margin:0 0 16px;line-height:1.45}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--sh);padding:15px 16px;margin-bottom:13px}
+.card h2{font-size:11px;margin:0 0 12px;color:var(--txt3);font-weight:700;
+  letter-spacing:.6px;text-transform:uppercase}
+label{display:block;font-size:12px;color:var(--txt2);margin-bottom:5px;font-weight:500}
+input,textarea,select{width:100%;font-family:var(--font);font-size:13px;padding:9px 11px;
+  border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--surface);color:var(--txt);
+  transition:border-color .15s,box-shadow .15s}
+input::placeholder,textarea::placeholder{color:var(--txt3)}
+textarea{resize:vertical;line-height:1.5}
+input:focus,textarea:focus,select:focus{outline:0;border-color:var(--accent);box-shadow:var(--ring)}
+input[type=file]{padding:7px 9px;font-size:12px;color:var(--txt2)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+.f{margin-bottom:11px}
+.f:last-child{margin-bottom:0}
+.posx{margin-top:7px}
+.hint{font-size:11.5px;color:var(--txt3);margin:6px 0 0;line-height:1.5}
+
+/* ---------- ช่องลากรูปเข้ามาวาง ---------- */
+.drop{border:1.5px dashed var(--line-2);border-radius:var(--r);padding:26px 18px;text-align:center;
+  cursor:pointer;background:var(--surface);margin-bottom:13px;
+  transition:border-color .15s,background .15s,transform .12s}
+.drop:hover{border-color:var(--accent);background:var(--accent-soft)}
+.drop.over{border-color:var(--accent);background:var(--accent-soft);transform:scale(1.01)}
+.drop b{display:block;font-size:14px;margin-bottom:2px}
+.drop span{color:var(--txt2);font-size:12px}
+
+/* ---------- การ์ดขั้นตอน ---------- */
+.step{display:flex;gap:12px;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r);box-shadow:var(--sh);padding:11px;margin-bottom:10px}
+.step img{width:138px;height:98px;object-fit:cover;border-radius:var(--r-sm);border:1px solid var(--line)}
+.step>div{min-width:0;flex:1}
+.no{display:inline-grid;place-items:center;width:23px;height:23px;border-radius:50%;
+  background:var(--accent);color:var(--on-accent);font-size:11px;font-weight:700;margin-right:7px}
+.mini{display:flex;gap:5px;margin-top:7px}
+.mini button{flex:1;font-size:11px;padding:5px 0;border:1px solid var(--line);border-radius:var(--r-xs);
+  background:var(--surface-2);color:var(--txt2);cursor:pointer;font-family:var(--font);
+  transition:background .15s,color .15s}
+.mini button:hover{background:var(--surface-3);color:var(--txt)}
+.mini .del{background:var(--danger-soft);color:var(--danger);border-color:transparent}
+.copydn{font-size:11px;border:1px solid var(--line);background:var(--surface-2);border-radius:var(--r-xs);
+  padding:5px 10px;cursor:pointer;font-family:var(--font);margin-top:7px;color:var(--txt2)}
+.copydn:hover{background:var(--surface-3);color:var(--txt)}
+
+/* ---------- แถบปุ่มลอยด้านล่าง ---------- */
+.bar{position:sticky;bottom:12px;z-index:20;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r);box-shadow:var(--sh-lg);padding:11px 12px;display:flex;gap:9px;
+  align-items:center;margin-top:16px;flex-wrap:wrap}
+@supports (backdrop-filter:blur(1px)){
+  .bar{background:color-mix(in srgb,var(--surface) 86%,transparent);
+    backdrop-filter:blur(14px) saturate(1.4)}
+}
+.bar select{width:auto;padding:8px 10px;font-size:12.5px}
+button.primary{background:var(--accent);color:var(--on-accent);border:0;border-radius:var(--r-sm);
+  padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);
+  transition:background .15s,transform .1s}
+button.primary:hover:not(:disabled){background:var(--accent-2)}
+button.primary:active:not(:disabled){transform:translateY(1px)}
+button.ghost{background:var(--surface-2);color:var(--txt);border:1px solid var(--line);
+  border-radius:var(--r-sm);padding:10px 15px;font-size:13px;cursor:pointer;font-family:var(--font);
+  transition:background .15s}
+button.ghost:hover:not(:disabled){background:var(--surface-3)}
+button:disabled{opacity:.42;cursor:default}
+button:focus-visible,.themebtn:focus-visible,.tabs button:focus-visible{outline:0;box-shadow:var(--ring)}
+#msg{font-size:12px;color:var(--txt2);font-variant-numeric:tabular-nums}
+
+/* ===================== เอกสารที่พิมพ์จริง ===================== */
+#stage{transform-origin:top left}
+.page{width:297mm;height:209.6mm;padding:8mm;background:#fff;box-shadow:var(--sh);
+  margin:0 0 10px;overflow:hidden;color:#000;font-size:11pt}
+.page.a3{width:420mm;height:296.6mm;font-size:13pt}
+.page.portrait{width:209.6mm;height:297mm}
+.page.a3.portrait{width:296.6mm;height:420mm}
+.pgbody{height:100%;display:flex;flex-direction:column}
+.pgbody>*{flex:0 0 auto}
+.page table{border-collapse:collapse;width:100%;table-layout:fixed}
+.page td,.page th{border:1px solid #000;padding:3px 5px;vertical-align:top}
+.page th{background:#F2F2F2;text-align:center;font-weight:600}
+.hdtab{margin-bottom:3px}
+.hdtab td{font-size:.85em}
+.hdtab .logo{padding:2px;vertical-align:middle}
+.hdtab .logo img{display:block;margin:0 auto;max-width:100%;max-height:17mm;object-fit:contain}
+.c{text-align:center}.b{font-weight:700}
+.meta{font-size:.85em;padding:1px 0}
+.meta .ppe{height:9mm;vertical-align:middle;margin:0 2px}
+.ppebox{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.ppechip{display:flex;align-items:center;gap:6px;border:1px solid var(--line-2);border-radius:var(--r-sm);
+  padding:6px 10px;cursor:pointer;background:var(--surface);font-size:11.5px;color:var(--txt2);
+  user-select:none;transition:border-color .15s,background .15s}
+.ppechip:hover{border-color:var(--accent)}
+.ppechip img{width:24px;height:24px}
+.ppechip.on{border-color:var(--accent);background:var(--accent-soft);color:var(--txt);font-weight:600}
+.ppechip .x{color:var(--danger);font-weight:700;padding:0 2px}
+.sign td{height:26mm;vertical-align:bottom;text-align:center;font-size:.9em;padding-bottom:4px}
+.cover-title{font-size:2.4em;font-weight:700;text-align:center;margin:auto 0 6px}
+.cover-sub{font-size:1.5em;text-align:center;margin-bottom:4px}
+.cover-code{font-size:1em;text-align:center;color:#333;margin-bottom:auto}
+.stepimg{display:block;margin:0 auto;max-width:100%}
+.empty{color:var(--txt3);text-align:center;padding:64px 24px;background:var(--surface);
+  border:1px dashed var(--line-2);border-radius:var(--r)}
+
+/* ---------- หน้าต่างซ้อน (เลือกภาพจากวิดีโอ / แต่งรูป) ---------- */
+.modal{position:fixed;inset:0;background:rgba(9,13,20,.6);display:flex;align-items:center;
+  justify-content:center;z-index:100;padding:16px}
+@supports (backdrop-filter:blur(1px)){.modal{backdrop-filter:blur(6px)}}
+.modal[hidden]{display:none}
+.modal .box{background:var(--surface);border:1px solid var(--line);border-radius:18px;
+  width:min(1080px,96vw);max-height:92vh;overflow:auto;padding:18px;box-shadow:var(--sh-lg)}
+.modal h3{margin:0 0 4px;font-size:16px;letter-spacing:-.2px}
+.modal .foot{display:flex;gap:9px;align-items:center;margin-top:12px;flex-wrap:wrap}
+.frames{display:grid;grid-template-columns:repeat(auto-fill,minmax(152px,1fr));gap:9px;margin-top:12px}
+.frame{border:2px solid var(--line);border-radius:var(--r-sm);overflow:hidden;cursor:pointer;
+  position:relative;transition:border-color .15s}
+.frame:hover{border-color:var(--line-2)}
+.frame.on{border-color:var(--accent);box-shadow:var(--ring)}
+.frame img{width:100%;display:block;aspect-ratio:4/3;object-fit:cover}
+.frame span{position:absolute;left:5px;bottom:5px;background:rgba(0,0,0,.66);color:#fff;
+  font-size:10px;padding:2px 6px;border-radius:5px}
+.tools{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}
+.tools button{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:8px 13px;font-size:13px;cursor:pointer;font-family:var(--font);color:var(--txt)}
+.tools button:hover{background:var(--surface-3)}
+.tools button.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+#edcv{max-width:100%;border:1px solid var(--line);border-radius:var(--r-sm);cursor:crosshair;
+  touch-action:none;background:var(--surface-2)}
+.bar2{height:6px;background:#EFEFF4;border-radius:3px;overflow:hidden;flex:1;min-width:120px}
+.bar2 i{display:block;height:100%;background:var(--blue);width:0}
+
+/* ---------- แท็บเลือกประเภทเอกสาร ---------- */
+.docnav{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--sh);padding:11px 12px 12px;margin-bottom:14px}
+.navgrp{font-size:10.5px;color:var(--txt3);font-weight:700;letter-spacing:.6px;
+  text-transform:uppercase;margin:0 0 7px;padding:0 2px}
+.navgrp+.tabs{margin-bottom:0}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+.tabs button{flex:1;min-width:88px;background:var(--surface-2);border:1px solid transparent;
+  border-radius:var(--r-sm);padding:9px 8px;font-size:12px;font-weight:600;cursor:pointer;
+  font-family:var(--font);color:var(--txt2);line-height:1.35;
+  transition:background .15s,color .15s,box-shadow .15s}
+.tabs button small{display:block;font-size:10px;font-weight:400;color:var(--txt3);margin-top:1px}
+.tabs button:hover:not(.on){background:var(--surface-3);color:var(--txt)}
+.tabs button.on{background:var(--accent);color:var(--on-accent);box-shadow:var(--sh)}
+.tabs button.on small{color:var(--on-accent);opacity:.75}
+
+/* ---------- Q-Point ---------- */
+.qptab td,.qptab th{font-size:.9em}
+.qpimg{display:block;margin:0 auto;max-width:100%}
+
+/* ---------- OPL ---------- */
+.opl-kind{display:flex;gap:14px;font-size:.9em;padding:3px 5px;border:1px solid #000;border-top:0}
+.opl-kind span{display:inline-flex;align-items:center;gap:4px}
+.opl-box{width:13px;height:13px;border:1.4px solid #000;display:inline-block;text-align:center;
+  line-height:11px;font-weight:700}
+.opl-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid #000;border-top:0}
+/* ต้องเจาะจงกว่ากฎ .pgbody>* ไม่งั้นช่องรูปจะไม่ยอมหดให้พอดีหน้า */
+.pgbody>.opl-grid{flex:1 1 auto;min-height:0;overflow:hidden}
+.opl-cell{border-right:1px solid #000;border-bottom:1px solid #000;padding:5px;display:flex;
+  flex-direction:column;min-height:0;overflow:hidden}
+.opl-cell img{max-width:100%;max-height:100%;object-fit:contain;margin:0 auto;flex:1 1 auto;min-height:0}
+.opl-cap{font-size:.85em;margin-top:4px}
+.opl-no{font-weight:700;font-size:.85em}
+.opl-train td{font-size:.8em;height:7mm}
+
+/* ---------- ป้ายความปลอดภัย ---------- */
+.signgrid{display:grid;gap:4mm;flex:1;align-content:start}
+.sign-card{border:2px solid #000;border-radius:3mm;padding:3mm;display:flex;flex-direction:column;
+  align-items:center;text-align:center;overflow:hidden;background:#fff}
+.sign-shape{position:relative;width:52mm;height:52mm;display:grid;place-items:center;flex:none}
+.sign-shape.small{width:34mm;height:34mm}
+.sign-shape svg{position:absolute;inset:0;width:100%;height:100%}
+.sign-shape img{max-width:52%;max-height:52%;object-fit:contain;z-index:1}
+.sign-shape .ph{font-size:16mm;font-weight:800;z-index:1}
+/* ---------- ผังงาน / เลย์เอาต์ (รูปจาก Visio ฯลฯ) ---------- */
+.pgbody>.diagwrap{flex:1 1 auto;min-height:0;display:grid;gap:3mm;margin-top:3px}
+.diagbox{border:1px solid #000;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.diagbox img{flex:1 1 auto;min-height:0;width:100%;object-fit:contain;padding:2mm}
+.diagcap{border-top:1px solid #000;padding:2px 5px;font-size:.85em}
+.rulenote{font-size:.8em;line-height:1.35;padding:2px 4px;color:#000}
+.diagempty{flex:1;display:grid;place-items:center;color:#999;font-size:.9em}
+
+/* ---------- ตารางเอกสาร IE ---------- */
+.tabs.ie button{flex:none;min-width:0;padding:7px 11px;font-size:11.5px}
+.rowgrid{width:100%;border-collapse:separate;border-spacing:0;font-size:11.5px;background:var(--surface)}
+.rowgrid th{background:var(--surface-2);padding:7px 5px;border-bottom:1px solid var(--line);
+  font-weight:600;color:var(--txt2);font-size:10.5px;position:sticky;top:0;z-index:1;white-space:nowrap}
+.rowgrid td{border-bottom:1px solid var(--line);padding:0}
+.rowgrid tr:last-child td{border-bottom:0}
+.rowgrid tr:hover td{background:var(--surface-2)}
+.rowgrid input,.rowgrid select{border:0;border-radius:0;padding:7px 6px;font-size:11.5px;
+  background:transparent;color:var(--txt)}
+.rowgrid input:focus,.rowgrid select:focus{outline:2px solid var(--accent);outline-offset:-2px;
+  box-shadow:none;background:var(--surface)}
+.rowgrid .calc{padding:7px 6px;text-align:right;color:var(--txt2);background:var(--surface-2);
+  font-variant-numeric:tabular-nums;font-weight:500}
+.rowgrid .rm{color:var(--danger);cursor:pointer;text-align:center;font-weight:700;width:24px;
+  opacity:.55;transition:opacity .15s}
+.rowgrid tr:hover .rm{opacity:1}
+.gridwrap{overflow:auto;max-height:52vh;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r);box-shadow:var(--sh);margin-bottom:10px}
+.gridwrap::-webkit-scrollbar,.skwrap::-webkit-scrollbar{width:10px;height:10px}
+.gridwrap::-webkit-scrollbar-thumb,.skwrap::-webkit-scrollbar-thumb{background:var(--line-2);
+  border-radius:6px;border:3px solid var(--surface)}
+.sumbox{display:flex;flex-wrap:wrap;gap:7px 16px;font-size:12px;background:var(--accent-soft);
+  border-radius:var(--r-sm);padding:10px 12px;margin-top:10px;line-height:1.5}
+.sumbox b{font-variant-numeric:tabular-nums}
+
+.ietab{width:100%;border-collapse:collapse;table-layout:fixed}
+.ietab th,.ietab td{border:1px solid #000;padding:2px 4px;font-size:.78em;vertical-align:top}
+.ietab th{background:#F2F2F2;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.ietab td.n{text-align:right;font-variant-numeric:tabular-nums}
+.ietab td.c{text-align:center}
+.ietab tr.hi td{background:#FDE8E6;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.ietab tr.mid td{background:#FFF4DC;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+/* ตาราง Action Priority ไว้เปิดดูอ้างอิงตอนให้คะแนน */
+.aptab{border-collapse:collapse;font-size:11px;margin-top:8px;width:100%}
+.aptab th,.aptab td{border:1px solid var(--line);padding:3px 4px;text-align:center;color:#12161C}
+.aptab th{color:var(--txt2);background:var(--surface-2)}
+.aptab .H{background:#FBD5D0;font-weight:700}
+.aptab .M{background:#FDE8B8;font-weight:600}
+.aptab .L{background:#D7EFDD}
+.iesum{font-size:.8em;border:1px solid #000;border-top:0;padding:3px 5px;display:flex;
+  flex-wrap:wrap;gap:3px 16px}
+.iepar{font-size:.8em;padding:2px 0}
+.chartbox{border:1px solid #000;border-top:0;padding:4px}
+.chartbox svg{width:100%;display:block}
+
+/* ---------- Skill Matrix ---------- */
+.skwrap{overflow:auto;max-height:52vh;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r);box-shadow:var(--sh);padding:10px;margin-bottom:10px}
+.sktab{border-collapse:separate;border-spacing:0;font-size:11.5px}
+.sktab th,.sktab td{border-bottom:1px solid var(--line);padding:5px 6px;white-space:nowrap}
+.sktab th{background:var(--surface-2);color:var(--txt2);font-weight:600;font-size:10.5px;
+  position:sticky;top:0;z-index:1}
+.sktab input{border:0;font-size:11.5px;padding:4px;width:114px;background:transparent;color:var(--txt)}
+.sktab input:focus{box-shadow:none;outline:2px solid var(--accent);outline-offset:-2px}
+.sktab .lv{cursor:pointer;text-align:center;width:36px;border-radius:var(--r-xs)}
+.sktab .lv:hover{background:var(--accent-soft)}
+.skhead input{width:86px}
+.skdel{color:var(--danger);cursor:pointer;font-weight:700;padding:0 2px}
+.skills-edit{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
+.skchip{display:flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--line-2);
+  border-radius:var(--r-sm);padding:5px 9px;font-size:11.5px}
+.skchip input{border:0;font-size:11.5px;width:100px;padding:2px;background:transparent;color:var(--txt)}
+.skchip input:focus{box-shadow:none;outline:0}
+
+.mx{border-collapse:collapse;width:100%;table-layout:auto}
+.mx th,.mx td{border:1px solid #000;padding:2px 4px;font-size:.78em}
+.mx th{background:#F2F2F2;-webkit-print-color-adjust:exact;print-color-adjust:exact;text-align:center}
+.mx th.vert{padding:3px 2px;font-weight:600;vertical-align:bottom}
+/* ต้องครอบข้อความด้วย div ไม่งั้นความสูงตายตัวของช่องจะตัดชื่อทักษะที่ยาว */
+.mx th.vert>div{writing-mode:vertical-rl;transform:rotate(180deg);margin:0 auto;
+  min-height:20mm;max-height:44mm;line-height:1.15}
+.mx td.lv{text-align:center;width:9mm}
+.mx td.nm{white-space:nowrap}
+.mx tr.risk td{background:#FDE8E6;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.mx tfoot td{background:#F7F7F9;font-size:.72em;text-align:center;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sklegend{display:flex;flex-wrap:wrap;gap:3px 14px;font-size:.78em;border:1px solid #000;
+  border-top:0;padding:3px 5px;align-items:center}
+.sklegend svg{vertical-align:middle;margin-right:2px}
+
+.sign-logo{align-self:flex-start;max-height:9mm;max-width:38mm;object-fit:contain;margin-bottom:1mm}
+.sign-th{font-weight:700;margin-top:2mm;line-height:1.2}
+.sign-en{font-size:.8em;color:#333;line-height:1.2}
+.sign-band{width:100%;margin-top:auto;padding:1.5mm 0;color:#fff;font-weight:700;font-size:.85em;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+
+@media print{
+  @page{margin:0}
+  html,body{background:#fff;margin:0;padding:0}
+  .noprint{display:none!important}
+  .wrap{display:block;max-width:none;padding:0;gap:0}
+  /* ต้องล้างความสูงที่ย่อไว้สำหรับดูบนจอ ไม่งั้น Chrome ตัดเนื้อหาเหลือไม่กี่แผ่น */
+  #stagewrap{height:auto!important;overflow:visible!important}
+  #stage{transform:none!important;width:100%}
+  /* ใช้ความกว้างเต็มแผ่นแทนค่ามิลลิเมตรตายตัว กันไม่ให้ Chrome ย่อหน้าให้พอดีเอง */
+  .page{width:100%!important;box-shadow:none;margin:0;break-after:page;page-break-after:always;
+    break-inside:avoid;page-break-inside:avoid}
+  .page:last-child{break-after:auto;page-break-after:auto}
+  /* พิมพ์พื้นสีหัวตารางออกมาด้วย ไม่ต้องไปติ๊ก Background graphics เอง */
+  .page th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+<style id="pagecss">@page{size:A4 landscape}</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<!-- ============================ ฝั่งกรอกข้อมูล ============================ -->
+<div class="noprint">
+  <header class="appbar">
+    <div class="mark" aria-hidden="true">WI</div>
+    <div class="brandtxt">
+      <b>โปรแกรมสร้างเอกสารสำหรับวิศวกรโรงงาน</b>
+      <span>ทำงานง่ายๆสไตล์วิศวกรโรงงานจอมขี้เกียจ</span>
+    </div>
+    <button class="themebtn" id="theme" aria-label="สลับโหมดสว่าง / มืด">🌗</button>
+  </header>
+  <h1 id="h1">สร้างเอกสารวิธีปฏิบัติงาน (WI)</h1>
+  <p class="sub" id="sub">ใส่รูป + พิมพ์ข้อความ → หน้าเอกสาร เลขหน้า และขนาดรูป จัดให้อัตโนมัติ</p>
+
+  <nav class="docnav">
+  <div class="navgrp">เอกสารงานมาตรฐาน</div>
+  <div class="tabs" id="tabs">
+    <button data-t="WI" class="on">📄 WI<br><small>วิธีปฏิบัติงาน</small></button>
+    <button data-t="QP">🔍 Q-Point<br><small>จุดควบคุมคุณภาพ</small></button>
+    <button data-t="OPL">💡 OPL<br><small>บทเรียนหนึ่งจุด</small></button>
+    <button data-t="SIGN">⚠️ ป้าย<br><small>ห้าม/เตือน/บังคับ</small></button>
+    <button data-t="DIAG">🗺️ ผังงาน<br><small>Flow/VSM/Layout</small></button>
+  </div>
+  <div class="navgrp">เอกสารวิศวกรรมอุตสาหการ (IE)</div>
+  <div class="tabs ie" id="tabsIE">
+    <button data-t="ROUTE">Routing Sheet</button>
+    <button data-t="BOM">BOM</button>
+    <button data-t="TIME">Time Study</button>
+    <button data-t="CAP">Capacity</button>
+    <button data-t="LINE">Line Balancing</button>
+    <button data-t="CHECK">Check Sheet</button>
+    <button data-t="QC">QC Chart (X̄-R)</button>
+    <button data-t="FMEA">FMEA</button>
+    <button data-t="SMED">Setup / SMED</button>
+    <button data-t="EQUIP">ทะเบียนอุปกรณ์</button>
+    <button data-t="SKILL">Skill Matrix (OJT)</button>
+  </div>
+  </nav>
+
+  <div class="card">
+    <h2>หัวเอกสาร (ขึ้นซ้ำทุกหน้าให้อัตโนมัติ)</h2>
+    <div class="f"><label>โลโก้บริษัท (อัปครั้งเดียว โปรแกรมจำไว้ให้)</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="logoFile" type="file" accept="image/*" style="flex:1">
+        <img id="logoPrev" style="height:34px;max-width:110px;object-fit:contain;display:none">
+        <button class="copydn" id="logoDel" style="margin:0;display:none">ลบ</button>
+      </div>
+    </div>
+    <div class="f"><label>เรื่อง</label><input id="subject" placeholder="เช่น วิธีการเปลี่ยนใบมีดเครื่องตัด"></div>
+    <div class="grid3">
+      <div class="f"><label>เอกสารหมายเลข</label><input id="docno"></div>
+      <div class="f"><label>แก้ไขครั้งที่</label><input id="rev" value="0"></div>
+      <div class="f"><label>วันที่เริ่มใช้</label><input id="date" type="date"></div>
+    </div>
+    <div class="grid2">
+      <div class="f"><label>แผนก/หน่วยงาน</label><input id="dept"></div>
+      <div class="f"><label>ผู้รับผิดชอบ</label><input id="owner"></div>
+    </div>
+    <div class="f"><label>วัตถุประสงค์</label><input id="purpose"></div>
+    <div class="f"><label>อุปกรณ์เครื่องมือ</label><input id="tools"
+        placeholder="เช่น ประแจ, ไขควง หรือ อุปกรณ์ป้องกันอันตรายจากการทำงาน"></div>
+    <label>อุปกรณ์ป้องกันภัยส่วนบุคคล (PPE) — คลิกเลือกเพื่อแสดงในเอกสาร / คลิกชื่อเพื่อแก้ / × เพื่อลบ</label>
+    <div class="ppebox" id="ppebox"></div>
+    <div class="f" style="display:flex;gap:8px;align-items:center">
+      <input id="ppeFile" type="file" accept="image/*" multiple style="flex:1">
+      <span class="hint" style="margin:0;white-space:nowrap">เพิ่มไอคอนเข้าคลัง</span>
+    </div>
+    <div class="f"><label>ผู้ปฏิบัติ</label><input id="worker"></div>
+    <p class="hint">ช่อง "ผู้ปฏิบัติ" เติมให้ทุกขั้นตอนอัตโนมัติ ไม่ต้องพิมพ์ซ้ำ</p>
+  </div>
+
+  <div class="card only-QP" hidden>
+    <h2>ข้อมูลจุดผลิต (Q-Point)</h2>
+    <div class="grid3">
+      <div class="f"><label>Process</label><input id="qpProcess"></div>
+      <div class="f"><label>Station</label><input id="qpStation" value=""></div>
+      <div class="f"><label>Machine</label><input id="qpMachine" value=""></div>
+    </div>
+  </div>
+
+  <div class="card only-OPL" hidden>
+    <h2>ข้อมูล OPL</h2>
+    <div class="f"><label>ประเภทบทเรียน</label>
+      <select id="oplKind">
+        <option value="basic">ความรู้พื้นฐาน (Basic Knowledge)</option>
+        <option value="trouble">ตัวอย่างปัญหา (Trouble Case)</option>
+        <option value="kaizen">ตัวอย่างการปรับปรุง (Improvement)</option>
+      </select>
+    </div>
+    <div class="grid2">
+      <div class="f"><label>ผู้สอน</label><input id="oplTrainer" value=""></div>
+      <div class="f"><label>จำนวนช่องลงชื่อผู้รับการสอน</label>
+        <select id="oplRows"><option>8</option><option selected>12</option><option>16</option></select></div>
+    </div>
+    <p class="hint">OPL มาตรฐานคือ <b>1 หน้าจบ</b> ใส่ได้ไม่เกิน 4 ช่อง ถ้าเกินจะตัดให้อัตโนมัติ</p>
+  </div>
+
+  <div class="card only-SIGN" hidden>
+    <h2>ป้ายความปลอดภัย</h2>
+    <div class="grid2">
+      <div class="f"><label>ขนาดป้าย</label>
+        <select id="signSize">
+          <option value="1">เต็มหน้า (1 ป้าย/แผ่น)</option>
+          <option value="2" selected>ครึ่งหน้า (2 ป้าย/แผ่น)</option>
+          <option value="4">1/4 หน้า (4 ป้าย/แผ่น)</option>
+        </select></div>
+      <div class="f"><label>แนวกระดาษ</label>
+        <select id="signOrient"><option value="portrait" selected>แนวตั้ง</option>
+          <option value="landscape">แนวนอน</option></select></div>
+    </div>
+    <p class="hint">รูปสัญลักษณ์ใช้รูปที่อัปเข้ามาในแต่ละป้าย (หรือเว้นว่างก็ได้) สีและรูปทรงเป็นไปตาม ISO 3864</p>
+  </div>
+
+  <div class="card" id="parCard" hidden>
+    <h2 id="parTitle">พารามิเตอร์</h2>
+    <div id="parBody" class="grid2"></div>
+  </div>
+
+  <div class="card only-SKILL" hidden>
+    <h2>ตารางทักษะพนักงาน (Skill Matrix)</h2>
+    <div class="grid2">
+      <div class="f"><label>ผู้ประเมิน</label><input id="skBy" value=""></div>
+      <div class="f"><label>เกณฑ์เสี่ยง : ต้องมีคนทำได้เองอย่างน้อย</label>
+        <select id="skMin"><option>1</option><option selected>2</option><option>3</option></select></div>
+    </div>
+    <label>ทักษะ / งานที่ต้องประเมิน — แก้ชื่อได้ กด × เพื่อลบ</label>
+    <div class="skills-edit" id="skList"></div>
+    <button class="ghost" id="skAddSkill">+ เพิ่มทักษะ</button>
+    <p class="hint" style="margin-top:8px">ทักษะเยอะ ๆ ให้เลือกกระดาษ <b>A3 แนวนอน</b> ที่แถบล่าง</p>
+  </div>
+
+  <div class="card only-DIAG" hidden>
+    <h2>ผังงาน / เลย์เอาต์</h2>
+    <p class="hint" style="margin-top:0">วาดผังในโปรแกรมที่ถนัด (Visio, draw.io, AutoCAD) แล้ว
+      <b>บันทึกเป็นรูป</b> มาวางที่นี่ ระบบจะจัดลงหน้ากระดาษพร้อมหัวเอกสารและเลขหน้าให้</p>
+    <div class="f"><label>ชนิดผัง</label>
+      <select id="diagKind">
+        <option>PROCESS FLOW CHART (ผังการไหลของกระบวนการ)</option>
+        <option>VALUE STREAM MAPPING (VSM)</option>
+        <option>PLANT LAYOUT (ผังโรงงาน)</option>
+        <option>SPAGHETTI DIAGRAM (ผังการเคลื่อนที่)</option>
+        <option value="__other">อื่น ๆ (พิมพ์เอง)</option>
+      </select>
+      <input id="diagTitle" placeholder="พิมพ์ชื่อผัง" hidden style="margin-top:6px">
+    </div>
+    <div class="grid2">
+      <div class="f"><label>จำนวนผังต่อหน้า</label>
+        <select id="diagPer"><option value="1" selected>1 ผัง (เต็มหน้า)</option>
+          <option value="2">2 ผัง</option></select></div>
+      <div class="f"><label>ช่องลงนามท้ายเอกสาร</label>
+        <select id="diagSign"><option value="1" selected>ใส่</option><option value="0">ไม่ใส่</option></select></div>
+    </div>
+    <p class="hint">ผังใหญ่ ๆ แนะนำเลือกกระดาษ <b>A3 แนวนอน</b> ที่แถบล่าง</p>
+  </div>
+
+  <!-- ป้ายกับ Q-Point ไม่มีช่องลงนามบนกระดาษ จึงไม่ต้องโชว์ช่องกรอกให้เสียเวลา -->
+  <div class="card hide-SIGN hide-QP">
+    <h2>ผู้ลงนาม</h2>
+    <div class="grid3">
+      <div class="f"><label>ผู้จัดทำ</label><input id="sign1" placeholder="ชื่อ"></div>
+      <div class="f"><label>ผู้ทบทวน</label><input id="sign2" placeholder="ชื่อ"></div>
+      <div class="f"><label>ผู้อนุมัติ</label><input id="sign3" placeholder="ชื่อ"></div>
+    </div>
+    <div class="grid3">
+      <div class="f"><select id="pos1"></select><input id="posx1" class="posx" placeholder="พิมพ์ตำแหน่ง" hidden></div>
+      <div class="f"><select id="pos2"></select><input id="posx2" class="posx" placeholder="พิมพ์ตำแหน่ง" hidden></div>
+      <div class="f"><select id="pos3"></select><input id="posx3" class="posx" placeholder="พิมพ์ตำแหน่ง" hidden></div>
+    </div>
+  </div>
+
+  <div class="drop" id="drop">
+    <b>📷 ลากรูป <u>หรือวิดีโอ</u> มาวาง หรือคลิกเพื่อเลือก</b>
+    <span>รูป: ลำดับรูป = ลำดับขั้นตอน &nbsp;·&nbsp; วิดีโอ: ระบบดึงภาพช็อตสำคัญออกมาให้เลือก</span>
+    <input id="picker" type="file" accept="image/*,video/*" multiple hidden>
+  </div>
+
+  <div id="steps" style="margin-top:10px"></div>
+
+  <div class="bar">
+    <select id="paper" style="width:auto">
+      <option value="A4">A4 แนวนอน</option>
+      <option value="A3">A3 แนวนอน</option>
+    </select>
+    <span id="msg">ยังไม่มีขั้นตอน</span>
+    <button class="ghost" id="clear" style="margin-left:auto">ล้าง</button>
+    <button class="ghost" id="xls">⬇️ Excel</button>
+    <button class="primary" id="print">🖨️ พิมพ์</button>
+  </div>
+</div>
+
+<!-- ============================ เอกสาร ============================ -->
+<div id="stagewrap"><div id="stage"></div></div>
+
+</div>
+
+<!-- ============== เลือกภาพจากวิดีโอ ============== -->
+<div class="modal noprint" id="vdModal" hidden><div class="box">
+  <h3 id="vdTitle">ดึงภาพจากวิดีโอ</h3>
+  <div class="foot">
+    <label style="margin:0">ความไวในการตัดภาพ</label>
+    <select id="vdSens" style="width:auto">
+      <option value="fine">ละเอียด (ได้ภาพเยอะ)</option>
+      <option value="normal" selected>ปกติ</option>
+      <option value="coarse">หยาบ (ได้ภาพน้อย)</option>
+    </select>
+    <div class="bar2"><i id="vdBar"></i></div>
+  </div>
+  <p id="vdNote" class="hint" style="margin:8px 0 0"></p>
+  <div class="frames" id="vdFrames"></div>
+  <div class="foot">
+    <button class="ghost" id="vdAll">เลือก/ไม่เลือก ทั้งหมด</button>
+    <button class="ghost" id="vdCancel" style="margin-left:auto">ยกเลิก</button>
+    <button class="primary" id="vdAdd">เพิ่มเป็นขั้นตอน</button>
+  </div>
+</div></div>
+
+<!-- ============== แต่งรูป ============== -->
+<div class="modal noprint" id="edModal" hidden><div class="box">
+  <h3>แต่งรูป</h3>
+  <p class="hint" style="margin:0 0 8px">เลือกเครื่องมือ แล้วลากบนรูป — ลูกศรลากจากท้ายไปหัวลูกศร</p>
+  <div class="tools">
+    <button id="ed_arrow">➜ ลูกศรชี้</button>
+    <button id="ed_rect">▭ กรอบแดง</button>
+    <button id="ed_blur">▨ เบลอปิดข้อมูล</button>
+    <button id="edUndo">↶ เลิกทำ</button>
+  </div>
+  <canvas id="edcv"></canvas>
+  <div class="foot">
+    <button class="ghost" id="edCancel" style="margin-left:auto">ยกเลิก</button>
+    <button class="primary" id="edSave">บันทึกรูป</button>
+  </div>
+</div></div>
+
+<script>
+/* =======================================================================
+   โปรแกรมสร้างเอกสารสำหรับวิศวกรโรงงาน  —  ไฟล์เดียวจบ ไม่ต้องติดตั้งอะไร
+   16 ประเภทเอกสาร : WI, Q-Point, OPL, ป้ายความปลอดภัย, ผังงาน, Skill Matrix
+                     และเอกสาร IE อีก 10 ชนิด (Routing ... Equipment)
+   - ฟอร์ม Master อยู่ในโปรแกรมเอง (อ้างอิงรูปแบบ FM-WI ของแผนก)
+   - แบ่งหน้า A4/A3 + ใส่เลขหน้า "หน้า x/y" ให้อัตโนมัติ ทั้งบนจอ ตอนพิมพ์ และใน Excel
+   - ย่อรูปให้พอดีช่องเอง ไม่ต้องจัดรูปเอง
+   - Export .xlsx ได้ทุกประเภทให้ DCC เก็บ/แก้ไขต่อ (เป็นเซลล์จริง ไม่ใช่รูปเอกสาร)
+   - สูตรคำนวณอ้างอิงมาตรฐาน IE สากล ดูรายละเอียดที่คอมเมนต์ของแต่ละตาราง
+   ======================================================================= */
+
+/* =======================================================================
+   ตั้งค่าให้เป็นของบริษัทคุณ — แก้แค่ก้อนนี้ก้อนเดียว ที่เหลือไม่ต้องแตะ
+   โลโก้บริษัทกับไอคอน PPE อัปโหลดจากหน้าโปรแกรมได้เลย ไม่ต้องมาแก้โค้ด
+   ======================================================================= */
+const CONFIG = {
+
+  /* ค่าตั้งต้นที่เติมไว้ในช่องกรอกให้ — ตอนใช้งานพิมพ์ทับได้ตลอด
+     ใส่ของที่แผนกใช้บ่อยที่สุด จะได้ไม่ต้องพิมพ์ซ้ำทุกครั้ง */
+  fields: {
+    docno:     'WI-MT-01',                // รหัสเอกสาร
+    dept:      'ฝ่ายซ่อมบำรุง',            // แผนก/หน่วยงาน
+    owner:     'ช่างเทคนิค/ซ่อมบำรุง',      // ผู้รับผิดชอบ
+    purpose:   'เพื่อการใช้งานได้ถูกวิธี',   // วัตถุประสงค์
+    worker:    'ช่างเทคนิค',               // ผู้ปฏิบัติ
+    qpProcess: 'UV Coating',              // ชื่อ Process ของ Q-Point
+  },
+
+  /* ตำแหน่งที่เลือกได้ในช่องผู้ลงนาม — เรียงตามผังองค์กรของโรงงาน */
+  positions: ['ช่างเทคนิค', 'หัวหน้างาน', 'วิศวกร', 'หัวหน้าแผนก', 'ผู้จัดการฝ่าย',
+    'รองผจก.โรงงาน', 'ผจก.โรงงาน', 'ตัวแทนฝ่ายบริหาร (QMR)', 'ผู้อำนวยการ'],
+
+  /* ตำแหน่งที่เลือกไว้ให้เลย เรียงตาม ผู้จัดทำ / ผู้ทบทวน / ผู้อนุมัติ */
+  defaultPos: ['วิศวกร', 'รองผจก.โรงงาน', 'ผจก.โรงงาน'],
+};
+
+/* คอลัมน์ตาราง: pct = สัดส่วนตอนพิมพ์, xl = ความกว้างคอลัมน์ใน Excel */
+const COLS = [
+  { head: 'ขั้นตอน',                  pct: 6,  xl: 8  },
+  { head: 'รายละเอียด',               pct: 28, xl: 42 },
+  { head: 'รูปภาพประกอบ',             pct: 32, xl: 48 },
+  { head: 'ผู้ปฏิบัติ',                pct: 10, xl: 15 },
+  { head: 'จุดควบคุม / เอกสารอ้างอิง', pct: 14, xl: 22 },
+  { head: 'ข้อควรระวัง',              pct: 10, xl: 16 },
+];
+/* กรอบรูปสูงสุดในเอกสาร (pixel ที่ 96dpi) — กันรูปเดียวกินทั้งหน้า */
+const IMG_BOX = { A4: { w: 430, h: 170 }, A3: { w: 640, h: 240 } };
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const nl = s => esc(s).replace(/\n/g, '<br>');
+
+/* คลังไอคอน PPE ของผู้ใช้เอง
+   อัปโหลดไอคอนมาตรฐานของบริษัทครั้งเดียว โปรแกรมย่อเหลือ 128px แล้วเก็บไว้ในเครื่อง
+   ใช้ซ้ำได้ทุกเอกสาร ไม่ต้องอัปใหม่                                            */
+const PPE_ICON_PX = 128;
+let ppeLib = [];                  // [{id,label,url}]
+try { ppeLib = JSON.parse(localStorage.getItem('wi_ppe_lib') || '[]'); } catch (_) { }
+const savePPE = () => { try { localStorage.setItem('wi_ppe_lib', JSON.stringify(ppeLib)); } catch (_) { } };
+
+/** ย่อไอคอนให้เล็กก่อนเก็บ เพื่อไม่ให้พื้นที่เก็บในเครื่องเต็ม (คงสัดส่วนเดิม พื้นหลังโปร่งใส) */
+function shrinkIcon(file) {
+  return new Promise((ok, no) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const im = new Image();
+      im.onload = () => {
+        const k = Math.min(PPE_ICON_PX / im.width, PPE_ICON_PX / im.height, 1);
+        const w = Math.round(im.width * k), h = Math.round(im.height * k);
+        const cv = Object.assign(document.createElement('canvas'), { width: w, height: h });
+        cv.getContext('2d').drawImage(im, 0, 0, w, h);
+        ok(cv.toDataURL('image/png'));
+      };
+      im.onerror = no; im.src = r.result;
+    };
+    r.onerror = no; r.readAsDataURL(file);
+  });
+}
+const POSITIONS = CONFIG.positions, DEFAULT_POS = CONFIG.defaultPos;
+
+function initPositions() {
+  [1, 2, 3].forEach(i => {
+    const sel = $('pos' + i);
+    sel.innerHTML = '<option value="">— เลือกตำแหน่ง —</option>'
+      + POSITIONS.map(x => `<option${x === DEFAULT_POS[i - 1] ? ' selected' : ''}>${x}</option>`).join('')
+      + '<option value="__other">อื่น ๆ (พิมพ์เอง)</option>';
+    sel.onchange = () => { $('posx' + i).hidden = sel.value !== '__other'; paginate(); };
+    $('posx' + i).oninput = paginate;
+  });
+}
+const posOf = i => $('pos' + i).value === '__other' ? $('posx' + i).value.trim() : $('pos' + i).value;
+
+const ppeOn = new Set();          // ไอคอนที่เลือกใช้ในเอกสารนี้
+
+function ppeIcons() {
+  return ppeLib.filter(x => ppeOn.has(x.id)).map(x => x.url);
+}
+function renderPPE() {
+  $('ppebox').innerHTML = ppeLib.length
+    ? ppeLib.map(x => `<div class="ppechip${ppeOn.has(x.id) ? ' on' : ''}" data-ppe="${x.id}">
+         <img src="${x.url}" alt=""><span data-lab="${x.id}" title="คลิกที่ชื่อเพื่อแก้">${esc(x.label)}</span>
+         <span class="x" data-del="${x.id}">×</span></div>`).join('')
+    : '<span class="hint" style="margin:0">ยังไม่มีไอคอน — อัปโหลดรูปไอคอน PPE ของบริษัทด้านล่าง '
+      + '(อัปครั้งเดียว โปรแกรมจำไว้ให้ ใช้ได้ทุกเอกสาร)</span>';
+}
+$('ppebox').addEventListener('click', e => {
+  const del = e.target.dataset.del, lab = e.target.dataset.lab;
+  if (del) {                                   // ลบไอคอนออกจากคลัง
+    ppeLib = ppeLib.filter(x => x.id !== del); ppeOn.delete(del); savePPE();
+  } else if (lab) {                            // แก้ชื่อไอคอน
+    const it = ppeLib.find(x => x.id === lab);
+    const name = prompt('ชื่อไอคอน', it.label);
+    if (name === null) return;
+    it.label = name.trim() || it.label; savePPE();
+  } else {
+    const chip = e.target.closest('[data-ppe]'); if (!chip) return;
+    const id = chip.dataset.ppe;
+    ppeOn.has(id) ? ppeOn.delete(id) : ppeOn.add(id);
+  }
+  renderPPE(); paginate();
+});
+$('ppeFile').onchange = async e => {
+  const files = [...e.target.files]; e.target.value = '';
+  for (const f of files) {
+    const url = await shrinkIcon(f);
+    ppeLib.push({ id: 'p' + Date.now() + ppeLib.length, label: f.name.replace(/\.[^.]+$/, ''), url });
+  }
+  savePPE(); renderPPE(); paginate();
+};
+
+let items = [];   // [{file,url,desc,ctl,warn}]
+// โลโก้เก็บไว้ในเครื่อง ไม่ต้องอัปซ้ำ (บางเครื่องเปิดไฟล์แล้วใช้ localStorage ไม่ได้ ต้องกันไว้)
+let logoData = '';
+try { logoData = localStorage.getItem('wi_logo') || ''; } catch (_) { }
+
+function showLogo() {
+  $('logoPrev').src = logoData;
+  $('logoPrev').style.display = $('logoDel').style.display = logoData ? '' : 'none';
+}
+$('logoFile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    logoData = r.result;
+    try { localStorage.setItem('wi_logo', logoData); } catch (_) { /* รูปใหญ่เกินก็ใช้ได้ แค่ไม่จำ */ }
+    showLogo(); paginate();
+  };
+  r.readAsDataURL(f);
+};
+$('logoDel').onclick = () => {
+  logoData = '';
+  try { localStorage.removeItem('wi_logo'); } catch (_) { }
+  $('logoFile').value = ''; showLogo(); paginate();
+};
+
+function header() {
+  const d = $('date').value;
+  return {
+    subject: $('subject').value.trim() || '(ยังไม่ได้ใส่ชื่อเรื่อง)',
+    docno: $('docno').value.trim(), rev: $('rev').value.trim(),
+    date: d ? new Date(d + 'T00:00').toLocaleDateString('th-TH',
+          { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+    dept: $('dept').value.trim(), owner: $('owner').value.trim(),
+    purpose: $('purpose').value.trim(), tools: $('tools').value.trim(),
+    worker: $('worker').value.trim(), logo: logoData, ppe: ppeIcons(),
+    signs: [1, 2, 3].map(i => ({ name: $('sign' + i).value.trim(), pos: posOf(i) })),
+  };
+}
+
+/* ---------------------- รับรูป ---------------------- */
+const drop = $('drop');
+drop.onclick = () => $('picker').click();
+$('picker').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev,
+  e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev,
+  e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => addFiles(e.dataTransfer.files));
+
+function addFiles(list) {
+  const files = [...list];
+  files.filter(f => f.type.startsWith('image/'))
+    .forEach(f => items.push({ file: f, url: URL.createObjectURL(f), desc: '', ctl: '', warn: '' }));
+  render();
+  const vid = files.find(f => f.type.startsWith('video/'));
+  if (vid) pickFromVideo(vid);            // วิดีโอทีละไฟล์ (ทีละงาน)
+}
+
+/* ---------------------- รายการขั้นตอน ---------------------- */
+function render() {
+  if (docType === 'SKILL') {
+    if (!skill.people.length) skill.people.push({ name: '', pos: '', lv: [] });
+    renderSkillEditor();
+    $('msg').textContent = skill.people.length + ' คน · ' + skill.skills.length + ' ทักษะ';
+    $('xls').disabled = false; $('print').disabled = false;
+    $('parCard').hidden = true;
+    paginate();
+    return;
+  }
+  if (TABLES[docType]) {                    // เอกสาร IE ใช้ตารางกรอกข้อมูลแทนการ์ดรูป
+    renderGrid();
+    $('msg').textContent = curRows().length + ' แถว';
+    $('xls').disabled = false; $('print').disabled = false;
+    paginate();
+    return;
+  }
+  $('parCard').hidden = true;
+  $('steps').innerHTML = items.map((it, i) => `
+    <div class="step">
+      <div>
+        <img src="${it.url}" alt="">
+        <div class="mini">
+          <button data-up="${i}" title="เลื่อนขึ้น">↑</button>
+          <button data-dn="${i}" title="เลื่อนลง">↓</button>
+          <button data-edit="${i}" title="แต่งรูป">✎</button>
+          <button data-del="${i}" class="del" title="ลบ">ลบ</button>
+        </div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="margin-bottom:4px"><span class="no">${i + 1}</span><b>${
+          { WI: 'ขั้นตอนที่ ', QP: 'จุดตรวจที่ ', OPL: 'ช่องที่ ', SIGN: 'ป้ายที่ ' }[docType] + (i + 1)}</b></div>
+        ${stepFields(it, i)}
+      </div>
+    </div>`).join('');
+  $('msg').textContent = items.length
+    ? items.length + (docType === 'WI' ? ' ขั้นตอน' : ' รายการ') : 'ยังไม่มีรายการ';
+  $('xls').disabled = $('print').disabled = !items.length;
+  paginate();
+}
+
+$('steps').addEventListener('input', e => {
+  const d = e.target.dataset;
+  const map = ['desc', 'ctl', 'warn', 'std', 'method', 'freq', 'fix', 'en', 'kind'];
+  const key = map.find(k => d[k] !== undefined);
+  if (!key) return;
+  items[+d[key]][key] = e.target.value;
+  paginate();
+});
+$('steps').addEventListener('change', e => {      // <select> ของป้ายไม่ส่ง event input
+  const d = e.target.dataset;
+  if (d.kind !== undefined) { items[+d.kind].kind = e.target.value; render(); }
+});
+$('steps').addEventListener('click', e => {
+  const d = e.target.dataset;
+  const i = +(d.up ?? d.dn ?? d.del ?? d.copy ?? d.edit);
+  if (d.edit !== undefined) return openEditor(i);
+  if (d.up !== undefined) { if (i > 0) [items[i - 1], items[i]] = [items[i], items[i - 1]]; }
+  else if (d.dn !== undefined) { if (i < items.length - 1) [items[i + 1], items[i]] = [items[i], items[i + 1]]; }
+  else if (d.del !== undefined) items.splice(i, 1);
+  else if (d.copy !== undefined) { items[i].ctl = items[i - 1].ctl; items[i].warn = items[i - 1].warn; }
+  else return;
+  render();
+});
+$('clear').onclick = () => { items = []; render(); };
+document.querySelectorAll('.card input').forEach(el => el.addEventListener('input', paginate));
+function setPageCss() {
+  const orient = (docType === 'SIGN' && $('signOrient').value === 'portrait') ? 'portrait' : 'landscape';
+  $('pagecss').textContent = '@page{size:' + $('paper').value + ' ' + orient + '}';
+}
+$('paper').onchange = () => { setPageCss(); paginate(); };
+$('diagKind').onchange = () => {
+  $('diagTitle').hidden = $('diagKind').value !== '__other';
+  paginate();
+};
+['signSize', 'signOrient', 'oplKind', 'oplRows', 'oplTrainer', 'diagPer', 'diagSign', 'diagTitle',
+ 'qpProcess', 'qpStation', 'qpMachine'].forEach(id => {
+  const el = $(id); if (el) el.addEventListener('input', () => { setPageCss(); paginate(); });
+});
+addEventListener('resize', fitStage);
+
+/* ---------------------- ชิ้นส่วนเอกสาร ---------------------- */
+function newPage(h, size, title) {
+  const p = document.createElement('div');
+  p.className = 'page' + (size === 'A3' ? ' a3' : '');
+  p.innerHTML = '<div class="pgbody">' + headTable(h, title || 'วิธีปฏิบัติงาน') + '</div>';
+  $('stage').appendChild(p);
+  return p.firstChild;      // .pgbody
+}
+
+
+/* =======================================================================
+   ประเภทเอกสาร: WI / Q-Point / OPL / ป้ายความปลอดภัย
+   ใช้รายการรูป (items) ชุดเดียวกัน แต่ช่องกรอกและหน้าเอกสารต่างกัน
+   ======================================================================= */
+let docType = 'WI';
+
+const DOC_INFO = {
+  WI:   { h1: 'สร้างเอกสารวิธีปฏิบัติงาน (WI)',
+          sub: 'ใส่รูป + พิมพ์ข้อความ → หน้าเอกสาร เลขหน้า และขนาดรูป จัดให้อัตโนมัติ',
+          drop: 'รูป: ลำดับรูป = ลำดับขั้นตอน · วิดีโอ: ระบบดึงภาพช็อตสำคัญออกมาให้เลือก' },
+  QP:   { h1: 'สร้างเอกสารจุดควบคุมคุณภาพ (Q-Point)',
+          sub: 'ใส่รูปจุดตรวจ + เกณฑ์มาตรฐาน → จัดหน้าและเลขหน้าให้อัตโนมัติ',
+          drop: 'รูปจุดตรวจ / ตัวอย่างงาน OK-NG' },
+  OPL:  { h1: 'สร้างบทเรียนหนึ่งจุด (OPL)',
+          sub: 'สอนได้ใน 5-10 นาที จบใน 1 หน้า พร้อมช่องลงชื่อผู้รับการสอน',
+          drop: 'รูปประกอบบทเรียน (ไม่เกิน 4 รูป)' },
+  DIAG: { h1: 'จัดผังงาน / เลย์เอาต์ ลงหน้ากระดาษ',
+          sub: 'วาดผังจากโปรแกรมอื่นแล้วอัปรูปมาวาง — ได้หัวเอกสาร เลขหน้า และช่องลงนามให้อัตโนมัติ',
+          drop: 'รูปผังที่ export มาจาก Visio / draw.io / AutoCAD (PNG, JPG)' },
+  SIGN: { h1: 'สร้างป้ายความปลอดภัย',
+          sub: 'ป้ายห้าม / เตือน / บังคับ / ภาวะปลอดภัย / อุปกรณ์ดับเพลิง ตามรูปทรงและสีมาตรฐาน ISO 3864',
+          drop: 'รูปสัญลักษณ์ของแต่ละป้าย (ไม่ใส่ก็ได้)' },
+};
+
+/* ชนิดป้ายตาม ISO 3864 — รูปทรงและสีคือส่วนที่เป็นมาตรฐาน */
+const SIGN_KIND = {
+  ban:   { label: 'ห้าม',            en: 'PROHIBITION', color: '#D7182A', band: '#D7182A', fg: '#000' },
+  warn:  { label: 'เตือน / ระวัง',   en: 'WARNING',     color: '#F5C400', band: '#F5C400', fg: '#000' },
+  must:  { label: 'บังคับ',          en: 'MANDATORY',   color: '#0063B0', band: '#0063B0', fg: '#fff' },
+  safe:  { label: 'ภาวะปลอดภัย',     en: 'SAFE CONDITION', color: '#00843D', band: '#00843D', fg: '#fff' },
+  fire:  { label: 'อุปกรณ์ดับเพลิง', en: 'FIRE EQUIPMENT', color: '#D7182A', band: '#D7182A', fg: '#fff' },
+};
+
+/** รูปทรงป้ายวาดด้วย SVG (วงกลมขีดทับ / สามเหลี่ยม / วงกลมทึบ / สี่เหลี่ยม) */
+function signShapeSvg(kind) {
+  const k = SIGN_KIND[kind];
+  if (kind === 'ban')
+    return `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="#fff" stroke="${k.color}" stroke-width="11"/>
+      <line x1="21" y1="79" x2="79" y2="21" stroke="${k.color}" stroke-width="11"/></svg>`;
+  if (kind === 'warn')
+    return `<svg viewBox="0 0 100 100"><path d="M50 6 96 90H4z" fill="${k.color}" stroke="#000" stroke-width="6"
+      stroke-linejoin="round"/></svg>`;
+  if (kind === 'must')
+    return `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="${k.color}"/></svg>`;
+  return `<svg viewBox="0 0 100 100"><rect x="2" y="12" width="96" height="76" rx="3" fill="${k.color}"/></svg>`;
+}
+
+function switchTab(e) {
+  const b = e.target.closest('[data-t]'); if (!b) return;
+  docType = b.dataset.t;
+  [...$('tabs').children, ...$('tabsIE').children].forEach(x => x.classList.toggle('on', x === b));
+  const info = DOC_INFO[docType]
+    || (TABLES[docType] ? { h1: TABLES[docType].title, sub: 'กรอกข้อมูลในตาราง ระบบคำนวณและจัดหน้าให้', drop: '' }
+                        : { h1: 'ตารางทักษะพนักงาน (Skill Matrix)',
+                            sub: 'คลิกที่ช่องเพื่อเลื่อนระดับทักษะ — ระบบชี้ทักษะเสี่ยงและช่องที่ต้องเข้า OJT ให้',
+                            drop: '' });
+  $('h1').textContent = info.h1; $('sub').textContent = info.sub;
+  $('drop').style.display = (TABLES[docType] || docType === 'SKILL') ? 'none' : '';
+  if (!TABLES[docType]) $('drop').querySelector('span').textContent = info.drop;
+  document.querySelectorAll('[class*="only-"]').forEach(el => {
+    el.hidden = !el.className.split(/\s+/).includes('only-' + docType);
+  });
+  // การ์ดที่ใช้ได้เกือบทุกประเภท บอกเฉพาะประเภทที่ "ไม่" ใช้ จะได้ไม่ต้องไล่เติมทีละอัน
+  document.querySelectorAll('[class*="hide-"]').forEach(el => {
+    el.hidden = el.className.split(/\s+/).includes('hide-' + docType);
+  });
+  $('xls').style.display = '';                 // ทุกประเภทส่งออก Excel ให้ DCC เก็บได้
+  render();
+}
+$('tabs').onclick = switchTab;
+$('tabsIE').onclick = switchTab;
+
+/* ---------------------- ช่องกรอกของแต่ละประเภท ---------------------- */
+function stepFields(it, i) {
+  if (docType === 'QP') return `
+    <textarea data-desc="${i}" rows="2" placeholder="จุดตรวจ (Check Point)">${esc(it.desc)}</textarea>
+    <div class="grid2" style="margin-top:6px">
+      <input data-std="${i}"    value="${esc(it.std || '')}"    placeholder="เกณฑ์มาตรฐาน (Standard)">
+      <input data-method="${i}" value="${esc(it.method || '')}" placeholder="วิธีตรวจ / เครื่องมือ">
+    </div>
+    <div class="grid2" style="margin-top:6px">
+      <input data-freq="${i}" value="${esc(it.freq || '')}" placeholder="ความถี่ เช่น ทุก 1 ชม.">
+      <input data-fix="${i}"  value="${esc(it.fix || '')}"  placeholder="ถ้าพบปัญหาให้ทำอย่างไร">
+    </div>`;
+  if (docType === 'OPL') return `
+    <textarea data-desc="${i}" rows="4" placeholder="คำอธิบายภาพนี้ (สั้น กระชับ)">${esc(it.desc)}</textarea>`;
+  if (docType === 'DIAG') return `
+    <textarea data-desc="${i}" rows="3" placeholder="คำอธิบายใต้ผัง เช่น สายการผลิต Ext3 ก่อนปรับปรุง">${esc(it.desc)}</textarea>`;
+  if (docType === 'SIGN') return `
+    <select data-kind="${i}" style="margin-bottom:6px">
+      ${Object.entries(SIGN_KIND).map(([k, v]) =>
+        `<option value="${k}"${(it.kind || 'warn') === k ? ' selected' : ''}>${v.label} (${v.en})</option>`).join('')}
+    </select>
+    <input data-desc="${i}" value="${esc(it.desc)}" placeholder="ข้อความภาษาไทย เช่น ห้ามสูบบุหรี่">
+    <input data-en="${i}" value="${esc(it.en || '')}" placeholder="English text (ไม่ใส่ก็ได้)" style="margin-top:6px">`;
+  return `
+    <textarea data-desc="${i}" rows="3" placeholder="รายละเอียดขั้นตอน">${esc(it.desc)}</textarea>
+    <div class="grid2" style="margin-top:6px">
+      <input data-ctl="${i}"  value="${esc(it.ctl)}"  placeholder="จุดควบคุม / เอกสารอ้างอิง">
+      <input data-warn="${i}" value="${esc(it.warn)}" placeholder="ข้อควรระวัง">
+    </div>
+    ${i ? `<button class="copydn" data-copy="${i}">↧ ใช้จุดควบคุม/ข้อควรระวัง เหมือนขั้นก่อนหน้า</button>` : ''}`;
+}
+
+/* ---------------------- หัวเอกสารร่วม (ใช้ทุกประเภท) ---------------------- */
+function headTable(h, title, extra) {
+  const logo = h.logo
+    ? `<td class="logo" rowspan="2" style="width:14%"><img src="${h.logo}" alt=""></td>` : '';
+  return `<table class="hdtab">
+    <tr>
+      ${logo}
+      <td class="c b" style="width:${h.logo ? 36 : 50}%">${esc(title)}</td>
+      <td class="c" style="width:28%">เอกสารหมายเลข ${esc(h.docno)}</td>
+      <td class="c" style="width:22%">หน้า <span class="pgno">–</span>/<span class="pgtot">–</span></td>
+    </tr>
+    <tr>
+      <td>เรื่อง : ${esc(h.subject)}</td>
+      <td>${extra || `แผนก/หน่วยงาน : ${esc(h.dept)}<br>ผู้รับผิดชอบ : ${esc(h.owner)}`}</td>
+      <td>วันที่เริ่มใช้ : ${esc(h.date) || '____________'}<br>แก้ไขครั้งที่ ${esc(h.rev)}</td>
+    </tr>
+  </table>`;
+}
+
+function signRow(h) {
+  return `<table class="sign"><tr>
+    ${h.signs.map((sg, i) => `<td>${['ผู้จัดทำ', 'ผู้ทบทวน', 'ผู้อนุมัติ'][i]}<br><br>
+      ….....................................<br>
+      ( ${esc(sg.name) || '.....................................'} )<br>
+      ตำแหน่ง ${esc(sg.pos) || '..........................'}</td>`).join('')}
+  </tr></table>`;
+}
+
+/* =======================================================================
+   Q-Point : ตารางจุดควบคุมคุณภาพ + แถบ Process/Station/Machine
+   ======================================================================= */
+const QP_COLS = [
+  { head: 'ลำดับ', pct: 6 }, { head: 'จุดตรวจ (Check Point)', pct: 22 },
+  { head: 'เกณฑ์มาตรฐาน (Standard)', pct: 20 }, { head: 'รูปภาพ', pct: 24 },
+  { head: 'วิธีตรวจ / ความถี่', pct: 16 }, { head: 'เมื่อพบปัญหา', pct: 12 },
+];
+
+function paginateQP(h, size, stage) {
+  const box = IMG_BOX[size];
+  const info = `<div class="meta" style="margin-bottom:2px">
+      <b>Process :</b> ${esc($('qpProcess').value)} &nbsp;&nbsp;
+      <b>Station :</b> ${esc($('qpStation').value)} &nbsp;&nbsp;
+      <b>Machine :</b> ${esc($('qpMachine').value)}
+      ${h.ppe.map(u => `<img class="ppe" src="${u}" alt="">`).join('')}
+    </div>`;
+  const tbl = '<table class="steptab qptab"><thead><tr>'
+    + QP_COLS.map(c => `<th style="width:${c.pct}%">${c.head}</th>`).join('')
+    + '</tr></thead><tbody></tbody></table>';
+
+  let body = newPage(h, size, 'Q-POINT (จุดควบคุมคุณภาพ)'), tbody;
+  const start = () => { body.insertAdjacentHTML('beforeend', info + tbl);
+                        tbody = body.querySelector('.steptab tbody'); };
+  const over = () => tbody.closest('table').getBoundingClientRect().bottom
+                   > body.getBoundingClientRect().bottom + 0.5;
+  start();
+  items.forEach((it, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="c">${i + 1}</td><td>${nl(it.desc)}</td><td>${nl(it.std || '')}</td>
+      <td class="c">${it.url ? `<img class="qpimg" src="${it.url}" style="max-height:${box.h}px">` : ''}</td>
+      <td>${nl(it.method || '')}${it.freq ? '<br>ความถี่ : ' + esc(it.freq) : ''}</td>
+      <td>${nl(it.fix || '')}</td>`;
+    tbody.appendChild(tr);
+    if (over() && tbody.rows.length > 1) {
+      tbody.removeChild(tr);
+      body = newPage(h, size, 'Q-POINT (จุดควบคุมคุณภาพ)'); start(); tbody.appendChild(tr);
+    }
+  });
+}
+
+/* =======================================================================
+   OPL : บทเรียนหนึ่งจุด 1 หน้าจบ (รูป 1-4 ช่อง + ตารางลงชื่อผู้รับการสอน)
+   ======================================================================= */
+function paginateOPL(h, size, stage) {
+  const body = newPage(h, size, 'ONE POINT LESSON (บทเรียนหนึ่งจุด)');
+  const kind = $('oplKind').value;
+  const kinds = [['basic', 'ความรู้พื้นฐาน'], ['trouble', 'ตัวอย่างปัญหา'], ['kaizen', 'ตัวอย่างการปรับปรุง']];
+  body.insertAdjacentHTML('beforeend',
+    `<div class="opl-kind">
+       <b>ประเภท :</b>
+       ${kinds.map(([k, t]) =>
+        `<span><i class="opl-box">${k === kind ? '✓' : ''}</i> ${t}</span>`).join('')}
+       <span style="margin-left:auto"><b>ผู้สอน :</b> ${esc($('oplTrainer').value) || '____________'}</span>
+     </div>`);
+
+  const use = items.slice(0, 4);
+  const cells = use.map((it, i) => `<div class="opl-cell">
+      <div class="opl-no">${i + 1}.</div>
+      ${it.url ? `<img src="${it.url}" alt="">` : ''}
+      <div class="opl-cap">${nl(it.desc)}</div>
+    </div>`).join('');
+  body.insertAdjacentHTML('beforeend',
+    `<div class="opl-grid" style="${use.length <= 1 ? 'grid-template-columns:1fr' : ''}">${cells}</div>`);
+
+  const n = +$('oplRows').value, per = 4;
+  let rows = '';
+  for (let r = 0; r < n / per; r++) {
+    rows += '<tr>' + [...Array(per)].map(() =>
+      '<td style="width:9%">ชื่อ</td><td style="width:16%"></td>').join('') + '</tr>';
+  }
+  body.insertAdjacentHTML('beforeend',
+    `<table class="opl-train" style="margin-top:3px">
+       <thead><tr><th colspan="${per * 2}">ผู้รับการสอน / Trainee (ลงชื่อ)</th></tr></thead>
+       <tbody>${rows}</tbody></table>` + signRow(h));
+}
+
+/* =======================================================================
+   ผังงาน / เลย์เอาต์ : เอารูปที่วาดจากโปรแกรมอื่นมาวางเต็มหน้า
+   ครอบคลุม Process Flow Chart / VSM / Plant Layout / Spaghetti Diagram
+   ======================================================================= */
+function paginateDIAG(h, size, stage) {
+  const per = +$('diagPer').value;
+  const kind = $('diagKind').value;
+  const title = kind === '__other' ? ($('diagTitle').value.trim() || 'DIAGRAM') : kind;
+  const list = items.length ? items : [{ url: '', desc: '' }];
+  let body;
+  for (let pi = 0; pi * per < list.length; pi++) {
+    body = newPage(h, size, title);
+    const wrap = document.createElement('div');
+    wrap.className = 'diagwrap';
+    wrap.style.gridTemplateRows = 'repeat(' + per + ',1fr)';
+    body.appendChild(wrap);
+    list.slice(pi * per, pi * per + per).forEach((it, k) => {
+      wrap.insertAdjacentHTML('beforeend', `<div class="diagbox">
+          ${it.url ? `<img src="${it.url}" alt="">`
+                   : '<div class="diagempty">ยังไม่มีรูปผัง</div>'}
+          ${it.desc ? `<div class="diagcap"><b>${pi * per + k + 1}.</b> ${nl(it.desc)}</div>` : ''}
+        </div>`);
+    });
+  }
+  if (body && $('diagSign').value === '1') body.insertAdjacentHTML('beforeend', signRow(h));
+}
+
+/* =======================================================================
+   ป้ายความปลอดภัย : หลายป้ายต่อแผ่น ตามขนาดที่เลือก
+   ======================================================================= */
+function paginateSIGN(h, size, stage) {
+  const per = +$('signSize').value;
+  const portrait = $('signOrient').value === 'portrait';
+  const cols = per === 1 ? 1 : per === 2 ? (portrait ? 1 : 2) : 2;
+  const rows = per / cols;
+
+  for (let pi = 0; pi * per < Math.max(items.length, 1); pi++) {
+    const page = document.createElement('div');
+    page.className = 'page' + (size === 'A3' ? ' a3' : '') + (portrait ? ' portrait' : '');
+    page.innerHTML = '<div class="pgbody"></div>';
+    stage.appendChild(page);
+    const body = page.firstChild;
+    const grid = document.createElement('div');
+    grid.className = 'signgrid';
+    grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+    grid.style.gridTemplateRows = `repeat(${rows},1fr)`;
+    body.appendChild(grid);
+
+    items.slice(pi * per, pi * per + per).forEach(it => {
+      const k = SIGN_KIND[it.kind || 'warn'];
+      grid.insertAdjacentHTML('beforeend', `<div class="sign-card">
+          ${h.logo ? `<img class="sign-logo" src="${h.logo}" alt="">` : ''}
+          <div class="sign-shape${per > 2 ? ' small' : ''}">
+            ${signShapeSvg(it.kind || 'warn')}
+            ${it.url ? `<img src="${it.url}" alt="">`
+                     : `<span class="ph" style="color:${(it.kind || 'warn') === 'warn' || (it.kind || 'warn') === 'ban' ? '#000' : '#fff'}">!</span>`}
+          </div>
+          <div class="sign-th" style="font-size:${per === 1 ? 2.6 : per === 2 ? 1.9 : 1.3}em">${nl(it.desc)}</div>
+          ${it.en ? `<div class="sign-en">${nl(it.en)}</div>` : ''}
+          <div class="sign-band" style="background:${k.band};color:${k.fg}">${k.label} / ${k.en}</div>
+        </div>`);
+    });
+    // ป้ายไม่มีเลขหน้าในกล่อง แต่ยังต้องมี element ให้ตัวเติมเลขหน้าไม่พัง
+    body.insertAdjacentHTML('beforeend',
+      '<span class="pgno" hidden></span><span class="pgtot" hidden></span>');
+  }
+}
+
+
+/* =======================================================================
+   เอกสาร IE : ใช้เครื่องมือตารางกลางตัวเดียว
+   แต่ละเอกสารนิยามแค่ "คอลัมน์ + สูตร + สรุปท้ายตาราง (+กราฟ)"
+   t: text | num | sel | calc      f: สูตรคำนวณ (rec, pars, idx, all)
+   ======================================================================= */
+const N = v => { const x = parseFloat(v); return isFinite(x) ? x : 0; };
+const F = (v, d) => (isFinite(v) ? v : 0).toFixed(d === undefined ? 2 : d);
+const avgOf = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+/* ค่าตัวเลขของหลายช่องในแถวเดียว ข้ามช่องที่ยังไม่ได้กรอก */
+const nums = (r, ks) => ks.map(k => r[k]).filter(v => v !== '' && v != null).map(N);
+/* ส่วนเบี่ยงเบนมาตรฐานของกลุ่มตัวอย่าง (หารด้วย n-1) */
+const sdOf = a => { if (a.length < 2) return 0; const m = avgOf(a);
+  return Math.sqrt(a.reduce((x, v) => x + (v - m) * (v - m), 0) / (a.length - 1)); };
+const OBS = ['c1', 'c2', 'c3', 'c4', 'c5'];                         // ช่องจับเวลาของ Time Study
+const XCOL = ['x1','x2','x3','x4','x5','x6','x7','x8','x9','x10'];  // ช่องวัดของแผนภูมิควบคุม
+/* ช่องวัดที่เปิดใช้จริง ตามขนาดกลุ่มตัวอย่างที่ตั้งไว้ (2-10 ตามตาราง SPC) */
+const xKeys = ps => XCOL.slice(0, Math.min(10, Math.max(2, Math.round(N(ps && ps.nsub)) || 5)));
+/* ค่า z ของระดับความเชื่อมั่นที่ใช้ในงานศึกษาเวลา */
+const ZCONF = { 90: 1.645, 95: 1.960, 99: 2.576 };
+/* จำนวนที่ต้องเบิกจริงเมื่อเผื่อของเสีย : ผลิตดี q ชิ้น ต้องตั้งต้น q / (1 - %ของเสีย) */
+const bomQty = (r, ps) => {
+  const sc = N(r.scrap);
+  return N(r.qty) * (N(ps.lot) || 1) * (sc > 0 && sc < 100 ? 100 / (100 - sc) : 1);
+};
+/* คอลัมน์ที่แสดงจริง — บางตารางซ่อนช่องที่เกินขนาดกลุ่มตัวอย่าง */
+const visCols = (t, ps) => t.cols.filter(c => !c.only || c.only(ps));
+
+/* ค่าคงที่แผนภูมิควบคุม X̄-R ตามขนาดกลุ่มตัวอย่าง n (ตาราง SPC มาตรฐาน) : [A2, D3, D4, d2] */
+const SPC = { 2:[1.880,0,3.267,1.128], 3:[1.023,0,2.574,1.693], 4:[0.729,0,2.282,2.059],
+              5:[0.577,0,2.114,2.326], 6:[0.483,0,2.004,2.534], 7:[0.419,0.076,1.924,2.704],
+              8:[0.373,0.136,1.864,2.847], 9:[0.337,0.184,1.816,2.970], 10:[0.308,0.223,1.777,3.078] };
+
+/* ตาราง Action Priority ของ AIAG-VDA (ฉบับปี 2019) — ให้น้ำหนัก S ก่อน แล้ว O แล้ว D
+   ในแต่ละช่องเรียงตามช่วง D คือ [7-10, 5-6, 2-4, 1]
+   ถ้าโรงงานใช้เกณฑ์ของตัวเอง แก้ได้ที่ตารางนี้ที่เดียว */
+const AP_S = [[9, 10], [7, 8], [4, 6], [2, 3], [1, 1]];
+const AP_O = [[8, 10], [6, 7], [4, 5], [2, 3], [1, 1]];
+const AP_D = [[7, 10], [5, 6], [2, 4], [1, 1]];
+const AP_TABLE = {
+  '9-10': { '8-10': 'HHHH', '6-7': 'HHHH', '4-5': 'HHHM', '2-3': 'HMLL', '1': 'LLLL' },
+  '7-8':  { '8-10': 'HHHH', '6-7': 'HHHM', '4-5': 'HMMM', '2-3': 'MMLL', '1': 'LLLL' },
+  '4-6':  { '8-10': 'HHMM', '6-7': 'MMML', '4-5': 'MLLL', '2-3': 'LLLL', '1': 'LLLL' },
+  '2-3':  { '8-10': 'MMLL', '6-7': 'LLLL', '4-5': 'LLLL', '2-3': 'LLLL', '1': 'LLLL' },
+  '1':    { '8-10': 'LLLL', '6-7': 'LLLL', '4-5': 'LLLL', '2-3': 'LLLL', '1': 'LLLL' },
+};
+const apIdx = (v, bands) => {
+  const x = Math.min(10, Math.max(1, Math.round(N(v))));
+  return bands.findIndex(b => x >= b[0] && x <= b[1]);
+};
+const apKey = b => (b[0] === b[1] ? String(b[0]) : b.join('-'));
+/** ตารางอ้างอิง Action Priority ไว้เปิดดูตอนให้คะแนน (ไม่ขึ้นบนเอกสารที่พิมพ์) */
+function apRefHtml() {
+  let rows = '';
+  AP_S.forEach(sb => AP_O.forEach((ob, oi) => {
+    rows += '<tr>' + (oi === 0 ? `<th rowspan="${AP_O.length}">S ${apKey(sb)}</th>` : '')
+      + `<th>O ${apKey(ob)}</th>`
+      + [...AP_TABLE[apKey(sb)][apKey(ob)]].map(c => `<td class="${c}">${c}</td>`).join('') + '</tr>';
+  }));
+  return `<div class="f" style="grid-column:1/-1"><details>
+      <summary style="cursor:pointer;font-size:12px;color:var(--txt2)">
+        ดูตาราง Action Priority ที่โปรแกรมใช้ (AIAG-VDA)</summary>
+      <table class="aptab"><tr><th></th><th></th>
+        ${AP_D.map(b => `<th>D ${apKey(b)}</th>`).join('')}</tr>${rows}</table>
+      <p class="hint" style="margin-top:6px">H = ต้องมีมาตรการก่อนปล่อยผลิต · M = ควรมีมาตรการ ·
+        L = บันทึกไว้เป็นหลักฐาน<br>
+        เปิดช่องติดตามผลแล้วคอลัมน์จะเยอะ แนะนำสั่งพิมพ์เป็น <b>A3 แนวนอน</b><br>
+        ถ้าคู่มือฉบับที่โรงงานถือครองต่างจากตารางนี้ แก้ได้ที่ตัวแปร <b>AP_TABLE</b> ในไฟล์ HTML</p>
+    </details></div>`;
+}
+
+/** ระดับความเร่งด่วนในการแก้ไข : H = ต้องแก้ก่อนปล่อยผลิต, M = ควรแก้, L = บันทึกไว้ */
+function apOf(sv, oc, dt) {
+  const ok = v => v !== '' && v != null && isFinite(N(v)) && N(v) >= 1;
+  if (!ok(sv) || !ok(oc) || !ok(dt)) return '-';
+  return AP_TABLE[apKey(AP_S[apIdx(sv, AP_S)])][apKey(AP_O[apIdx(oc, AP_O)])][apIdx(dt, AP_D)];
+}
+/** ช่องติดตามผลจะโผล่เมื่อเปิดสวิตช์เท่านั้น ฟอร์มรอบแรกจะได้ไม่รก */
+const AP_OPT = ps => String(ps.opt) === '1';
+
+const TABLES = {
+  ROUTE: {
+    title: 'ROUTING SHEET (ใบลำดับขั้นตอนการผลิต)',
+    cols: [
+      { k: 'op',   h: 'ขั้นตอนการผลิต (Operation)', w: 22, t: 'text' },
+      { k: 'mc',   h: 'เครื่องจักร / สถานี',        w: 15, t: 'text' },
+      { k: 'jig',  h: 'Jig / Fixture / เครื่องมือ', w: 14, t: 'text' },
+      { k: 'ct',   h: 'เวลา/ชิ้น (วิ)',             w: 9,  t: 'num' },
+      { k: 'man',  h: 'จำนวนคน',                    w: 7,  t: 'num' },
+      { k: 'cum',  h: 'เวลาสะสม (วิ)', w: 10, t: 'calc',
+        f: (r, ps, i, all) => all.slice(0, i + 1).reduce((a, x) => a + N(x.ct), 0), dec: 0 },
+      { k: 'note', h: 'หมายเหตุ', w: 15, t: 'text' },
+    ],
+    sum: (cs, ps) => [['เวลารวมทั้งสาย', F(cs.reduce((a, r) => a + N(r.ct), 0), 0) + ' วินาที'],
+                      ['จำนวนขั้นตอน', cs.length],
+                      ['กำลังคนรวม', F(cs.reduce((a, r) => a + N(r.man), 0), 0) + ' คน']],
+  },
+
+  BOM: {
+    title: 'BILL OF MATERIALS (รายการวัตถุดิบ)',
+    pars: [{ id: 'lot', l: 'จำนวนผลิต (หน่วย)', v: 1 }],
+    cols: [
+      { k: 'code', h: 'รหัสวัสดุ',          w: 12, t: 'text' },
+      { k: 'name', h: 'ชื่อวัสดุ / ชิ้นส่วน', w: 20, t: 'text' },
+      { k: 'spec', h: 'ขนาด / สเปค',        w: 13, t: 'text' },
+      { k: 'unit', h: 'หน่วย',              w: 6,  t: 'text' },
+      { k: 'qty',  h: 'จำนวน/1 หน่วยผลิต',  w: 9,  t: 'num' },
+      { k: 'scrap',h: 'เผื่อของเสีย %',     w: 8,  t: 'num' },
+      { k: 'need', h: 'ต้องเบิกทั้งล็อต', w: 9, t: 'calc', f: bomQty, dec: 2 },
+      { k: 'price',h: 'ราคา/หน่วย',         w: 8,  t: 'num' },
+      { k: 'cost', h: 'รวมเงิน', w: 10, t: 'calc', f: (r, ps) => bomQty(r, ps) * N(r.price), dec: 2 },
+    ],
+    hi: r => { const sc = N(r.scrap); return sc >= 100 || sc < 0; },
+    sum: (cs, ps) => {
+      const lot = N(ps.lot) || 1;
+      const all = cs.reduce((a, r) => a + bomQty(r, ps) * N(r.price), 0);      // รวมส่วนเผื่อแล้ว
+      const net = cs.reduce((a, r) => a + N(r.qty) * lot * N(r.price), 0);     // เฉพาะที่ใช้จริง
+      const bad = cs.filter(r => N(r.scrap) >= 100 || N(r.scrap) < 0).length;
+      return [['ต้นทุนวัตถุดิบรวม (เผื่อของเสียแล้ว)', F(all, 2) + ' บาท'],
+              ['ส่วนที่เผื่อของเสีย', F(all - net, 2) + ' บาท' +
+                 (net > 0 ? ' (' + F((all - net) / net * 100, 1) + ' %)' : '')],
+              ['ต้นทุน/หน่วยผลิต', F(all / lot, 2) + ' บาท'],
+              ['จำนวนรายการ', cs.length]]
+             .concat(bad ? [['⚠ ค่าผิด', bad + ' แถวใส่ % ของเสียนอกช่วง 0-99']] : []);
+    },
+  },
+
+  TIME: {
+    title: 'TIME STUDY SHEET (ใบศึกษาเวลาการทำงาน)',
+    pars: [{ id: 'rating', l: 'Rating เริ่มต้น (%)', v: 100 },
+           { id: 'allow',  l: 'Allowance (% ของ Normal Time)', v: 13 },
+           { id: 'conf',   l: 'ความเชื่อมั่น (90/95/99 %)', v: 95 },
+           { id: 'prec',   l: 'ความคลาดเคลื่อนที่ยอมรับ ±%', v: 5 }],
+    stopwatch: true,
+    cols: [
+      { k: 'el', h: 'องค์ประกอบงาน (Element)', w: 22, t: 'text' },
+      { k: 'c1', h: '1', w: 6, t: 'num' }, { k: 'c2', h: '2', w: 6, t: 'num' },
+      { k: 'c3', h: '3', w: 6, t: 'num' }, { k: 'c4', h: '4', w: 6, t: 'num' },
+      { k: 'c5', h: '5', w: 6, t: 'num' },
+      { k: 'avg', h: 'เฉลี่ย (วิ)', w: 9, t: 'calc', f: r => avgOf(nums(r, OBS)) },
+      { k: 'rt', h: 'Rating %', w: 8, t: 'num' },
+      { k: 'nt', h: 'Normal Time', w: 10, t: 'calc',
+        f: (r, ps) => avgOf(nums(r, OBS)) * (N(r.rt) || N(ps.rating)) / 100 },
+      { k: 'st', h: 'Standard Time', w: 10, t: 'calc',
+        f: (r, ps) => avgOf(nums(r, OBS)) * (N(r.rt) || N(ps.rating)) / 100 * (1 + N(ps.allow) / 100) },
+      /* จำนวนรอบที่ต้องจับให้ได้ความแม่นยำตามที่ตั้งไว้ : n = (z·s / (e·x̄))² */
+      { k: 'nreq', h: 'รอบที่ควรจับ', w: 9, t: 'calc', dec: 0,
+        f: (r, ps) => {
+          const a = nums(r, OBS), m = avgOf(a);
+          if (a.length < 2 || m <= 0) return 0;
+          const z = ZCONF[Math.round(N(ps.conf))] || ZCONF[95];
+          const e = (N(ps.prec) || 5) / 100;
+          return Math.ceil(Math.pow(z * sdOf(a) / (e * m), 2));
+        } },
+    ],
+    /* จับมาน้อยกว่าที่ควร = ค่าที่ได้ยังเชื่อไม่ได้ ให้ไฮไลต์เตือน */
+    hi: (r, ps) => {
+      const a = nums(r, OBS);
+      return a.length >= 2 && TABLES.TIME.cols.find(c => c.k === 'nreq').f(r, ps) > a.length;
+    },
+    sum: (cs, ps) => {
+      const st = cs.reduce((a, r) => a + TABLES.TIME.cols.find(c => c.k === 'st').f(r, ps), 0);
+      const short = cs.filter(r => TABLES.TIME.hi(r, ps)).length;
+      return [['Standard Time รวม', F(st) + ' วินาที (' + F(st / 60) + ' นาที)'],
+              ['Allowance ที่ใช้', ps.allow + ' % ของ Normal Time'],
+              ['สูตร', 'NT = เวลาเฉลี่ย x Rating ,  ST = NT x (1 + Allowance)'],
+              ['ความแม่นยำที่ตั้งไว้', '±' + ps.prec + ' % ที่ความเชื่อมั่น ' + ps.conf + ' %'],
+              ['จำนวนรอบที่จับ', short ? '⚠ ยังไม่พอ ' + short + ' องค์ประกอบ (ดูช่อง "รอบที่ควรจับ")'
+                                       : 'เพียงพอทุกองค์ประกอบ'],
+              ['กำลังผลิตที่ได้', st > 0 ? F(3600 / st, 0) + ' ชิ้น/ชม.' : '-']];
+    },
+  },
+
+  CAP: {
+    title: 'CAPACITY CALCULATION (การคำนวณกำลังการผลิต)',
+    pars: [{ id: 'shift', l: 'เวลาทำงาน (นาที/กะ)', v: 480 },
+           { id: 'stop',  l: 'เวลาหยุดตามแผน (นาที)', v: 60 },
+           { id: 'demand',l: 'ความต้องการ (ชิ้น/กะ)', v: 1000 }],
+    cols: [
+      { k: 'mc',  h: 'เครื่องจักร / สถานี', w: 20, t: 'text' },
+      { k: 'ct',  h: 'Cycle Time (วิ/ชิ้น)', w: 12, t: 'num' },
+      { k: 'cav', h: 'จำนวนเครื่อง', w: 9, t: 'num' },
+      { k: 'eff', h: 'ประสิทธิภาพ %', w: 10, t: 'num' },
+      { k: 'cap', h: 'กำลังผลิต (ชิ้น/กะ)', w: 13, t: 'calc',
+        f: (r, ps) => N(r.ct) > 0
+          ? (N(ps.shift) - N(ps.stop)) * 60 / N(r.ct) * (N(r.cav) || 1) * (N(r.eff) || 100) / 100 : 0, dec: 0 },
+      { k: 'gap', h: 'ส่วนต่างจากความต้องการ', w: 14, t: 'calc',
+        f: (r, ps) => (N(r.ct) > 0
+          ? (N(ps.shift) - N(ps.stop)) * 60 / N(r.ct) * (N(r.cav) || 1) * (N(r.eff) || 100) / 100 : 0)
+          - N(ps.demand), dec: 0 },
+      { k: 'stt', h: 'สถานะ', w: 10, t: 'calc', text: true,
+        f: (r, ps) => {
+          const cap = N(r.ct) > 0
+            ? (N(ps.shift) - N(ps.stop)) * 60 / N(r.ct) * (N(r.cav) || 1) * (N(r.eff) || 100) / 100 : 0;
+          return cap >= N(ps.demand) ? 'พอ' : 'คอขวด';
+        } },
+      { k: 'note', h: 'หมายเหตุ', w: 12, t: 'text' },
+    ],
+    hi: (r, ps) => {
+      const c = TABLES.CAP.cols.find(x => x.k === 'cap').f(r, ps);
+      return c < N(ps.demand);
+    },
+    sum: (cs, ps) => {
+      const caps = cs.map(r => TABLES.CAP.cols.find(x => x.k === 'cap').f(r, ps));
+      const min = caps.length ? Math.min(...caps) : 0;
+      const bi = caps.indexOf(min);
+      return [['กำลังผลิตของสายการผลิต (คอขวด)', F(min, 0) + ' ชิ้น/กะ'],
+              ['จุดคอขวด', bi >= 0 && cs[bi] ? (cs[bi].mc || 'สถานีที่ ' + (bi + 1)) : '-'],
+              ['เทียบความต้องการ', F(min - N(ps.demand), 0) + ' ชิ้น/กะ']];
+    },
+  },
+
+  LINE: {
+    title: 'LINE BALANCING CHART (แผนภูมิปรับสมดุลสายการผลิต)',
+    pars: [{ id: 'shift', l: 'เวลาทำงาน (นาที/กะ)', v: 420 },
+           { id: 'demand',l: 'ความต้องการ (ชิ้น/กะ)', v: 600 }],
+    chart: 'balance',
+    cols: [
+      { k: 'st',  h: 'สถานีงาน', w: 26, t: 'text' },
+      { k: 'time',h: 'เวลาทำงาน (วิ)', w: 14, t: 'num' },
+      { k: 'man', h: 'จำนวนคน', w: 10, t: 'num' },
+      { k: 'per', h: 'เวลา/คน (วิ)', w: 13, t: 'calc',
+        f: r => N(r.time) / (N(r.man) || 1) },
+      { k: 'idle',h: 'เวลารอคอย (วิ)', w: 13, t: 'calc',
+        /* เทียบด้วยเวลาต่อคน แล้วคูณจำนวนคน = เวลาที่คนในสถานีนี้ว่างรวมกัน */
+        f: (r, ps, i, all) => (Math.max(...all.map(x => N(x.time) / (N(x.man) || 1)))
+                               - N(r.time) / (N(r.man) || 1)) * (N(r.man) || 1) },
+      { k: 'note',h: 'หมายเหตุ', w: 24, t: 'text' },
+    ],
+    sum: (cs, ps) => {
+      const tot = cs.reduce((a, r) => a + N(r.time), 0);          // งานรวมทั้งสาย (work content)
+      const men = cs.reduce((a, r) => a + (N(r.man) || 1), 0);    // จำนวนคนรวม
+      const per = cs.map(r => N(r.time) / (N(r.man) || 1));       // รอบเวลาจริงของแต่ละสถานี
+      const bn = per.length ? Math.max(...per) : 0;               // คอขวด = สถานีที่รอบเวลานานสุด
+      const takt = N(ps.demand) > 0 ? N(ps.shift) * 60 / N(ps.demand) : 0;
+      const eff = bn > 0 && men ? tot / (men * bn) * 100 : 0;     // E = งานรวม / (คนรวม x CT)
+      const bi = per.indexOf(bn);
+      return [['Takt Time', F(takt) + ' วิ/ชิ้น'],
+              ['Bottleneck (รอบเวลาสูงสุด)', F(bn) + ' วิ' +
+                 (bi >= 0 && cs[bi] && cs[bi].st ? ' — ' + cs[bi].st : '')],
+              ['เวลารวมทุกสถานี', F(tot) + ' วิ / คนรวม ' + F(men, 0) + ' คน'],
+              ['Line Balance Efficiency', F(eff, 1) + ' %  (Balance Delay ' + F(100 - eff, 1) + ' %)'],
+              ['เวลารอคอยรวม', F(men * bn - tot) + ' วิ'],
+              ['จำนวนคนต่ำสุดตามทฤษฎี', takt > 0 ? Math.ceil(tot / takt - 1e-9) + ' คน' : '-'],
+              ['กำลังผลิตที่สายทำได้', bn > 0 ? F(N(ps.shift) * 60 / bn, 0) + ' ชิ้น/กะ' : '-']];
+    },
+  },
+
+  CHECK: {
+    title: 'CHECK SHEET (แผ่นบันทึกข้อมูลของเสีย)',
+    pars: [{ id: 'lot', l: 'จำนวนที่ตรวจทั้งหมด (ชิ้น)', v: 0 }],
+    cols: [
+      { k: 'type', h: 'ประเภทของเสีย / หัวข้อตรวจ', w: 24, t: 'text' },
+      { k: 'cause',h: 'สาเหตุที่คาดว่าเป็นไปได้', w: 22, t: 'text' },
+      { k: 'tally',h: 'ช่องขีดนับ', w: 26, t: 'text' },
+      { k: 'qty',  h: 'จำนวน (ชิ้น)', w: 10, t: 'num' },
+      { k: 'pct',  h: 'สัดส่วน %', w: 9, t: 'calc',
+        f: (r, ps, i, all) => {
+          const tot = all.reduce((a, x) => a + N(x.qty), 0);
+          return tot > 0 ? N(r.qty) / tot * 100 : 0;
+        }, dec: 1 },
+      { k: 'ppm',  h: 'ของเสีย/ผลิต %', w: 9, t: 'calc',
+        f: (r, ps) => N(ps.lot) > 0 ? N(r.qty) / N(ps.lot) * 100 : 0, dec: 2 },
+    ],
+    sum: (cs, ps) => {
+      const tot = cs.reduce((a, r) => a + N(r.qty), 0);
+      const top = cs.slice().sort((a, b) => N(b.qty) - N(a.qty))[0];
+      return [['ของเสียรวม', F(tot, 0) + ' ชิ้น'],
+              ['อัตราของเสีย', N(ps.lot) > 0 ? F(tot / N(ps.lot) * 100, 2) + ' %' : '-'],
+              ['ปัญหาอันดับ 1', top ? (top.type || '-') + ' (' + F(N(top.qty), 0) + ' ชิ้น)' : '-']];
+    },
+  },
+
+  QC: {
+    title: 'CONTROL CHART X̄ - R (แผนภูมิควบคุมคุณภาพ)',
+    pars: [{ id: 'nsub', l: 'ขนาดกลุ่มตัวอย่าง n (2-10)', v: 5 },
+           { id: 'usl', l: 'ค่าสูงสุดที่ยอมรับ (USL)', v: '' },
+           { id: 'lsl', l: 'ค่าต่ำสุดที่ยอมรับ (LSL)', v: '' }],
+    chart: 'xbar',
+    cols: [
+      { k: 'grp', h: 'กลุ่มที่ / เวลา', w: 12, t: 'text' },
+      /* ช่องวัด x1..x10 — โชว์เท่าที่ตั้ง n ไว้ ไม่ให้ตารางรกโดยใช่เหตุ */
+      ...XCOL.map((k, j) => ({ k, h: k, w: 6, t: 'num', only: ps => xKeys(ps).length > j })),
+      { k: 'xb', h: 'X̄', w: 11, t: 'calc', dec: 3, f: (r, ps) => avgOf(nums(r, xKeys(ps))) },
+      { k: 'r', h: 'R (พิสัย)', w: 11, t: 'calc', dec: 3,
+        f: (r, ps) => { const a = nums(r, xKeys(ps));
+                        return a.length ? Math.max(...a) - Math.min(...a) : 0; } },
+    ],
+    sum: (cs, ps) => {
+      const st = qcStats(cs, ps);
+      if (!st) return [['ยังไม่มีข้อมูลพอ', '-']];
+      const rows = [['X̄̄ (ค่ากลาง)', F(st.xbb, 3)], ['R̄', F(st.rb, 3)],
+              ['UCL / LCL ของ X̄', F(st.uclx, 3) + ' / ' + F(st.lclx, 3)],
+              ['UCL / LCL ของ R', F(st.uclr, 3) + ' / ' + F(st.lclr, 3)],
+              ['ขนาดกลุ่มตัวอย่าง n', st.n + (st.even ? '' : ' (กลุ่มตัวอย่างไม่เท่ากัน — ขีดควบคุมเป็นค่าประมาณ)')],
+              ['จุดที่หลุดขีดควบคุม', st.out + ' จุด'],
+              ['σ̂ (R̄/d₂)', F(st.sigma, 4)],
+              ['สัญญาณเตือนตามกฎ Nelson (X̄)', st.rule.rules.length
+                 ? st.rule.rules.join(' · ') + '  → ' + st.rule.hit.size + ' จุดที่ต้องดู'
+                 : 'ไม่พบ — กระบวนการอยู่ในการควบคุม']];
+      /* ความสามารถของกระบวนการ : Cp = (USL-LSL)/6σ̂ , Cpk = ค่าน้อยกว่าของสองด้าน */
+      const U = ps.usl === '' || ps.usl == null ? null : N(ps.usl);
+      const L = ps.lsl === '' || ps.lsl == null ? null : N(ps.lsl);
+      if (st.sigma > 0 && (U !== null || L !== null)) {
+        const cpu = U !== null ? (U - st.xbb) / (3 * st.sigma) : Infinity;
+        const cpl = L !== null ? (st.xbb - L) / (3 * st.sigma) : Infinity;
+        const cpk = Math.min(cpu, cpl);
+        if (U !== null && L !== null) rows.push(['Cp', F((U - L) / (6 * st.sigma), 2)]);
+        rows.push(['Cpk', F(cpk, 2) + (cpk >= 1.33 ? ' (ผ่านเกณฑ์ ≥1.33)'
+                          : cpk >= 1.00 ? ' (พอใช้ — ควรปรับปรุง)' : ' (ไม่ผ่าน ต้องแก้ไข)')]);
+      }
+      return rows;
+    },
+  },
+
+  FMEA: {
+    title: 'FMEA (การวิเคราะห์ความเสี่ยงของกระบวนการ)',
+    pars: [{ id: 'rpn', l: 'RPN ที่ต้องแก้ไข (ตั้งแต่)', v: 100 },
+           { id: 'opt', l: 'แสดงช่องติดตามผลการแก้ไข (1=แสดง)', v: 0 }],
+    cols: [
+      { k: 'proc', h: 'ขั้นตอน / หน้าที่', w: 9, t: 'text' },
+      { k: 'mode', h: 'ลักษณะข้อบกพร่อง (Failure Mode)', w: 11, t: 'text' },
+      { k: 'eff',  h: 'ผลกระทบ', w: 9, t: 'text' },
+      { k: 's',    h: 'S', w: 3, t: 'num' },
+      { k: 'cause',h: 'สาเหตุ', w: 9, t: 'text' },
+      { k: 'o',    h: 'O', w: 3, t: 'num' },
+      { k: 'ctrl', h: 'การควบคุมปัจจุบัน', w: 9, t: 'text' },
+      { k: 'd',    h: 'D', w: 3, t: 'num' },
+      { k: 'rpn',  h: 'RPN', w: 5, t: 'calc', dec: 0, f: r => N(r.s) * N(r.o) * N(r.d) },
+      { k: 'ap',   h: 'AP', w: 4, t: 'calc', text: true, f: r => apOf(r.s, r.o, r.d) },
+      { k: 'act',  h: 'มาตรการแก้ไข / ป้องกัน', w: 12, t: 'text' },
+      /* ---- ช่วงติดตามผล : เปิดเมื่อลงมือแก้แล้ว จะได้เทียบ AP ก่อน-หลัง ---- */
+      { k: 'own',  h: 'ผู้รับผิดชอบ', w: 7, t: 'text', only: AP_OPT },
+      { k: 'due',  h: 'กำหนดเสร็จ', w: 6, t: 'text', only: AP_OPT },
+      { k: 'stt',  h: 'สถานะ', w: 7, t: 'sel', only: AP_OPT,
+        opts: ['ยังไม่เริ่ม', 'กำลังทำ', 'เสร็จแล้ว'] },
+      { k: 's2',   h: 'S ใหม่', w: 4, t: 'num', only: AP_OPT },
+      { k: 'o2',   h: 'O ใหม่', w: 4, t: 'num', only: AP_OPT },
+      { k: 'd2',   h: 'D ใหม่', w: 4, t: 'num', only: AP_OPT },
+      { k: 'ap2',  h: 'AP ใหม่', w: 5, t: 'calc', text: true, only: AP_OPT,
+        f: r => apOf(r.s2, r.o2, r.d2) },
+    ],
+    /* เรียงตาม AP ไม่ใช่ RPN เพราะมาตรฐานให้น้ำหนักความรุนแรงมาก่อน */
+    hi: r => { const a = apOf(r.s, r.o, r.d); return a === 'H' ? true : a === 'M' ? 'mid' : false; },
+    sum: (cs, ps) => {
+      const ap = cs.map(r => apOf(r.s, r.o, r.d));
+      const cnt = k => ap.filter(v => v === k).length;
+      const rp = cs.map(r => N(r.s) * N(r.o) * N(r.d));
+      const bad = cs.filter(r => [r.s, r.o, r.d].some(v =>
+        v !== '' && v != null && (N(v) < 1 || N(v) > 10 || N(v) % 1 !== 0))).length;
+      const out = [['AP สูง (H) — ต้องมีมาตรการก่อนปล่อยผลิต', cnt('H') + ' รายการ'],
+                   ['AP กลาง (M) — ควรมีมาตรการ', cnt('M') + ' รายการ'],
+                   ['AP ต่ำ (L) — บันทึกไว้เป็นหลักฐาน', cnt('L') + ' รายการ'],
+                   ['RPN สูงสุด / ที่เกินเกณฑ์ ' + ps.rpn,
+                    (rp.length ? F(Math.max(...rp), 0) : '-') + ' / '
+                      + rp.filter(v => v >= N(ps.rpn)).length + ' รายการ'],
+                   ['เกณฑ์ที่ใช้', 'AP ตาม AIAG-VDA (ให้น้ำหนัก S → O → D) · RPN = S×O×D '
+                    + 'เก็บไว้เทียบกับฟอร์มเดิมของลูกค้า']];
+      if (AP_OPT(ps)) {
+        const pair = cs.map(r => [apOf(r.s, r.o, r.d), apOf(r.s2, r.o2, r.d2)])
+                       .filter(([a, b]) => a !== '-' && b !== '-');
+        const rank = { H: 3, M: 2, L: 1 };
+        out.push(['ประเมินใหม่แล้ว', pair.length + ' รายการ']);
+        out.push(['ความเสี่ยงลดลงจริง',
+          pair.filter(([a, b]) => rank[b] < rank[a]).length + ' รายการ']);
+        out.push(['ยังเหลือ AP สูง (H) หลังแก้ไข',
+          cs.map(r => apOf(r.s2, r.o2, r.d2)).filter(v => v === 'H').length + ' รายการ']);
+      }
+      return out.concat(bad ? [['⚠ ค่าผิดสเกล', bad + ' แถวมี S/O/D ไม่ใช่จำนวนเต็ม 1-10']] : []);
+    },
+  },
+
+  SMED: {
+    title: 'SETUP / CHANGEOVER SHEET (การลดเวลาเปลี่ยนรุ่น)',
+    cols: [
+      { k: 'act',  h: 'กิจกรรมในการเปลี่ยนรุ่น', w: 26, t: 'text' },
+      { k: 'type', h: 'ประเภท', w: 11, t: 'sel', opts: ['Internal', 'External'] },
+      { k: 'now',  h: 'เวลาเดิม (นาที)', w: 11, t: 'num' },
+      { k: 'idea', h: 'แนวทางปรับปรุง', w: 24, t: 'text' },
+      { k: 'aft',  h: 'เวลาหลังปรับ (นาที)', w: 12, t: 'num' },
+      { k: 'cut',  h: 'ลดลง (นาที)', w: 10, t: 'calc', f: r => N(r.now) - N(r.aft) },
+      { k: 'own',  h: 'ผู้รับผิดชอบ', w: 12, t: 'text' },
+    ],
+    sum: cs => {
+      /* หลัก SMED : เวลาเปลี่ยนรุ่นที่นับจริง = งาน Internal เท่านั้น (ช่วงที่เครื่องหยุด)
+         งาน External ทำคู่ขนานขณะเครื่องยังเดินอยู่ จึงไม่รวมเป็น downtime */
+      const inn = cs.filter(r => (r.type || 'Internal') === 'Internal');
+      const i1 = inn.reduce((x, r) => x + N(r.now), 0), i2 = inn.reduce((x, r) => x + N(r.aft), 0);
+      const a = cs.reduce((x, r) => x + N(r.now), 0), b = cs.reduce((x, r) => x + N(r.aft), 0);
+      const ex = cs.length - inn.length;
+      return [['เวลาหยุดเครื่องเดิม (Internal)', F(i1) + ' นาที'],
+              ['หลังปรับปรุง (Internal)', F(i2) + ' นาที'],
+              ['ลดลง', F(i1 - i2) + ' นาที (' + (i1 > 0 ? F((i1 - i2) / i1 * 100, 1) : '0') + ' %)'],
+              ['เวลางานรวมทุกกิจกรรม', F(a) + ' -> ' + F(b) + ' นาที'],
+              ['กิจกรรม Internal / External', inn.length + ' / ' + ex + ' รายการ']];
+    },
+  },
+
+  EQUIP: {
+    title: 'EQUIPMENT / JIG & FIXTURE RECORD (ทะเบียนอุปกรณ์และเครื่องมือ)',
+    cols: [
+      { k: 'code', h: 'รหัสอุปกรณ์', w: 12, t: 'text' },
+      { k: 'name', h: 'ชื่ออุปกรณ์ / Jig & Fixture', w: 22, t: 'text' },
+      { k: 'kind', h: 'ประเภท', w: 11, t: 'sel', opts: ['Jig', 'Fixture', 'Gauge', 'Tool', 'Mold'] },
+      { k: 'loc',  h: 'ที่เก็บ / ประจำเครื่อง', w: 15, t: 'text' },
+      { k: 'last', h: 'ตรวจครั้งล่าสุด', w: 11, t: 'text' },
+      { k: 'cyc',  h: 'รอบการตรวจ', w: 10, t: 'text' },
+      { k: 'stt',  h: 'สถานะ', w: 10, t: 'sel', opts: ['พร้อมใช้', 'ซ่อม', 'รอสอบเทียบ', 'ยกเลิกใช้'] },
+      { k: 'note', h: 'หมายเหตุ', w: 9, t: 'text' },
+    ],
+    hi: r => r.stt && r.stt !== 'พร้อมใช้',
+    sum: cs => [['จำนวนอุปกรณ์ทั้งหมด', cs.length + ' รายการ'],
+                ['พร้อมใช้งาน', cs.filter(r => (r.stt || 'พร้อมใช้') === 'พร้อมใช้').length + ' รายการ'],
+                ['ต้องติดตาม', cs.filter(r => r.stt && r.stt !== 'พร้อมใช้').length + ' รายการ']],
+  },
+};
+
+/** สถิติแผนภูมิควบคุม X̄-R */
+function qcStats(cs, ps) {
+  const g = cs.map(r => nums(r, xKeys(ps))).filter(a => a.length >= 2);
+  if (g.length < 2) return null;
+  const n = Math.min(10, Math.max(2, Math.round(avgOf(g.map(a => a.length)))));
+  const xb = g.map(avgOf), rr = g.map(a => Math.max(...a) - Math.min(...a));
+  const xbb = avgOf(xb), rb = avgOf(rr), [A2, D3, D4, d2] = SPC[n];
+  const uclx = xbb + A2 * rb, lclx = xbb - A2 * rb;
+  const out = xb.filter(v => v > uclx || v < lclx).length
+            + rr.filter(v => v > D4 * rb || v < D3 * rb).length;
+  /* ทุกกลุ่มต้องเก็บจำนวนตัวอย่างเท่ากัน ไม่งั้นค่า A2/D3/D4 ที่ใช้เป็นแค่ค่าประมาณ */
+  const even = g.every(a => a.length === g[0].length);
+  return { n, xb, rr, xbb, rb, uclx, lclx, uclr: D4 * rb, lclr: D3 * rb, out,
+           sigma: rb / d2, even,     // sigma-hat = R-bar / d2 ใช้คำนวณ Cp / Cpk
+           rule: runRules(xb, xbb, A2 * rb / 3) };   // 3 ซิกมาของ X̄ = A2 x R̄
+}
+
+/**
+ * กฎ Nelson ข้อ 2-8 : จับสัญญาณผิดปกติที่จุดยัง "ไม่หลุด" ขีดควบคุม
+ * (ข้อ 1 คือจุดหลุด 3 ซิกมา ซึ่งนับไว้ในช่อง out อยู่แล้ว)
+ * ใช้กับแผนภูมิ X̄ ตามที่ใช้กันทั่วไป
+ */
+function runRules(v, cl, sd) {
+  const n = v.length, z = sd > 0 ? v.map(x => (x - cl) / sd) : v.map(() => 0);
+  const hit = new Set(), rules = [];
+  const win = (len, test, name) => {
+    let found = false;
+    for (let i = 0; i + len <= n; i++) if (test(i, len)) {
+      found = true; for (let k = i; k < i + len; k++) hit.add(k);
+    }
+    if (found) rules.push(name);
+  };
+  const seg = (i, l) => z.slice(i, i + l);
+  const raw = (i, l) => v.slice(i, i + l);      // กฎแนวโน้มดูจากค่าจริง ไม่เกี่ยวกับซิกมา
+  const cnt = (i, l, side, thr) => seg(i, l).filter(x => x * side > thr).length;
+  const mono = (a, up) => a.every((x, j) => j === 0 || (up ? x > a[j - 1] : x < a[j - 1]));
+  const zig = (a, up) => a.every((x, j) => j === 0 || (j % 2 === (up ? 1 : 0) ? x > a[j-1] : x < a[j-1]));
+
+  win(9,  (i, l) => cnt(i, l, 1, 0) === l || cnt(i, l, -1, 0) === l, '9 จุดเรียงอยู่ข้างเดียวของเส้นกลาง');
+  win(6,  (i, l) => mono(raw(i, l), true) || mono(raw(i, l), false), '6 จุดไต่ขึ้นหรือไล่ลงต่อเนื่อง');
+  win(14, (i, l) => zig(raw(i, l), true) || zig(raw(i, l), false), '14 จุดสลับขึ้นลงเป็นฟันปลา');
+  win(3,  (i, l) => cnt(i, l, 1, 2) >= 2 || cnt(i, l, -1, 2) >= 2, '2 ใน 3 จุดเลย 2 ซิกมา ข้างเดียวกัน');
+  win(5,  (i, l) => cnt(i, l, 1, 1) >= 4 || cnt(i, l, -1, 1) >= 4, '4 ใน 5 จุดเลย 1 ซิกมา ข้างเดียวกัน');
+  win(15, (i, l) => seg(i, l).every(x => Math.abs(x) < 1), '15 จุดเกาะกลุ่มชิดเส้นกลางผิดปกติ');
+  win(8,  (i, l) => seg(i, l).every(x => Math.abs(x) > 1), '8 จุดติดกันไม่มีจุดไหนอยู่ใน 1 ซิกมา');
+  return { rules, hit };
+}
+
+/* ---------------------- ข้อมูลแถว + พารามิเตอร์ ---------------------- */
+const rowData = {}, parData = {};
+const curRows = () => rowData[docType] || (rowData[docType] = [{}]);
+const curPars = () => {
+  if (!parData[docType]) {
+    parData[docType] = {};
+    (TABLES[docType].pars || []).forEach(p => { parData[docType][p.id] = p.v; });
+  }
+  return parData[docType];
+};
+
+/* ---------------------- ตารางกรอกข้อมูลฝั่งซ้าย ---------------------- */
+function renderGrid() {
+  const t = TABLES[docType], rs = curRows(), ps = curPars();
+  $('parCard').hidden = !(t.pars || t.stopwatch);
+  $('parTitle').textContent = 'พารามิเตอร์ของ ' + t.title.split('(')[0].trim();
+  $('parBody').innerHTML = (t.pars || []).map(p =>
+    `<div class="f"><label>${p.l}</label><input data-par="${p.id}" value="${esc(ps[p.id])}"></div>`).join('')
+    + (t.stopwatch ? `<div class="f" style="grid-column:1/-1">
+         <label>จับเวลาหน้างาน — กดเริ่ม แล้วกด "บันทึกรอบ" ทุกครั้งที่จบ 1 รอบ</label>
+         <div style="display:flex;gap:6px;align-items:center">
+           <b id="swTime" style="font-size:20px;font-variant-numeric:tabular-nums">0.0</b>
+           <button class="ghost" id="swGo">เริ่ม</button>
+           <button class="ghost" id="swLap">บันทึกรอบ</button>
+           <button class="ghost" id="swRst">ล้าง</button>
+           <span class="hint" style="margin:0">ลงช่องรอบของแถวที่เลือก</span>
+         </div></div>` : '')
+    + (docType === 'FMEA' ? apRefHtml() : '');
+
+  const calc = rs.map((r, i) => rowCalc(t, r, ps, i, rs));
+  $('steps').innerHTML = `<div class="gridwrap"><table class="rowgrid">
+      <thead><tr><th style="width:20px">#</th>
+        ${visCols(t, ps).map(c => `<th>${c.h}</th>`).join('')}<th></th></tr></thead>
+      <tbody>${rs.map((r, i) => `<tr>
+        <td class="c" style="text-align:center;color:#98989D">${i + 1}</td>
+        ${visCols(t, ps).map(c => c.t === 'calc'
+          ? `<td class="calc">${c.text ? calc[i][c.k] : F(calc[i][c.k], c.dec)}</td>`
+          : c.t === 'sel'
+            ? `<td><select data-r="${i}" data-k="${c.k}" style="border:0;font-size:11px;padding:4px">
+                 ${c.opts.map(o => `<option${r[c.k] === o ? ' selected' : ''}>${o}</option>`).join('')}</select></td>`
+            : `<td><input data-r="${i}" data-k="${c.k}" ${c.t === 'num' ? 'type="number" step="any"' : ''}
+                 value="${esc(r[c.k] == null ? '' : r[c.k])}"></td>`).join('')}
+        <td class="rm" data-rm="${i}">×</td></tr>`).join('')}
+      </tbody></table></div>
+    <button class="ghost" id="addRow">+ เพิ่มแถว</button>
+    <div class="sumbox">${(t.sum ? t.sum(rs, ps) : []).map(([k, v]) =>
+        `<span>${k} : <b>${v}</b></span>`).join('')}</div>`;
+
+  $('addRow').onclick = () => { rs.push({}); renderGrid(); paginate(); };
+  if (t.stopwatch) initStopwatch();
+}
+
+function rowCalc(t, r, ps, i, all) {
+  const o = {};
+  visCols(t, ps).filter(c => c.t === 'calc').forEach(c => { o[c.k] = c.f(r, ps, i, all); });
+  return o;
+}
+
+$('steps').addEventListener('input', e => {
+  if (!TABLES[docType]) return;
+  const d = e.target.dataset;
+  if (d.par !== undefined) { curPars()[d.par] = e.target.value; renderGrid(); paginate(); }
+  else if (d.r !== undefined) { curRows()[+d.r][d.k] = e.target.value; refreshCalcCells(); paginate(); }
+}, true);
+$('steps').addEventListener('change', e => {
+  if (!TABLES[docType] || e.target.dataset.r === undefined) return;
+  curRows()[+e.target.dataset.r][e.target.dataset.k] = e.target.value;
+  renderGrid(); paginate();
+}, true);
+$('steps').addEventListener('click', e => {
+  if (!TABLES[docType] || e.target.dataset.rm === undefined) return;
+  curRows().splice(+e.target.dataset.rm, 1);
+  if (!curRows().length) curRows().push({});
+  renderGrid(); paginate();
+}, true);
+
+/** อัปเดตเฉพาะช่องที่คำนวณ เพื่อไม่ให้เคอร์เซอร์เด้งตอนพิมพ์ */
+function refreshCalcCells() {
+  const t = TABLES[docType], rs = curRows(), ps = curPars();
+  const tb = $('steps').querySelector('.rowgrid tbody'); if (!tb) return;
+  rs.forEach((r, i) => {
+    const o = rowCalc(t, r, ps, i, rs);
+    const tds = tb.rows[i].querySelectorAll('.calc');
+    visCols(t, ps).filter(c => c.t === 'calc').forEach((c, j) => {
+      if (tds[j]) tds[j].textContent = c.text ? o[c.k] : F(o[c.k], c.dec);
+    });
+  });
+  const box = $('steps').querySelector('.sumbox');
+  if (box && t.sum) box.innerHTML = t.sum(rs, ps).map(([k, v]) => `<span>${k} : <b>${v}</b></span>`).join('');
+}
+
+/* ---------------------- นาฬิกาจับเวลา (Time Study) ---------------------- */
+let swT0 = 0, swRun = false, swTimer = null, swRow = 0, swCol = 1;
+function initStopwatch() {
+  const show = () => { $('swTime').textContent = ((performance.now() - swT0) / 1000).toFixed(1); };
+  $('swGo').onclick = () => {
+    if (swRun) { clearInterval(swTimer); swRun = false; $('swGo').textContent = 'เริ่ม'; return; }
+    swT0 = performance.now(); swRun = true; $('swGo').textContent = 'หยุด';
+    swTimer = setInterval(show, 100);
+  };
+  $('swLap').onclick = () => {
+    if (!swRun) return;
+    const sec = +((performance.now() - swT0) / 1000).toFixed(1);
+    const rs = curRows();
+    if (!rs[swRow]) swRow = 0;
+    rs[swRow]['c' + swCol] = sec;
+    swCol++; if (swCol > 5) { swCol = 1; swRow++; if (!rs[swRow]) rs.push({}); }
+    swT0 = performance.now();
+    renderGrid(); paginate();
+  };
+  $('swRst').onclick = () => {
+    clearInterval(swTimer); swRun = false; swRow = 0; swCol = 1;
+    $('swGo').textContent = 'เริ่ม'; $('swTime').textContent = '0.0';
+  };
+}
+
+/* ---------------------- กราฟ (SVG วาดเอง ไม่ใช้ไลบรารี) ---------------------- */
+function chartBalance(cs, ps) {
+  const ts = cs.map(r => N(r.time) / (N(r.man) || 1)); if (!ts.length) return '';
+  const takt = N(ps.demand) > 0 ? N(ps.shift) * 60 / N(ps.demand) : 0;
+  const top = Math.max(...ts, takt) * 1.15 || 1;
+  const W = 1000, H = 260, pad = 34, bw = (W - pad * 2) / ts.length;
+  const y = v => H - pad - (v / top) * (H - pad * 2);
+  return `<svg viewBox="0 0 ${W} ${H}">
+    <line x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}" stroke="#000"/>
+    <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${H - pad}" stroke="#000"/>
+    ${ts.map((v, i) => `<rect x="${pad + i * bw + bw * .15}" y="${y(v)}"
+        width="${bw * .7}" height="${H - pad - y(v)}" fill="#0071E3"/>
+      <text x="${pad + i * bw + bw / 2}" y="${y(v) - 4}" font-size="12" text-anchor="middle">${F(v, 0)}</text>
+      <text x="${pad + i * bw + bw / 2}" y="${H - pad + 14}" font-size="11"
+        text-anchor="middle">${esc((cs[i].st || 'S' + (i + 1)).slice(0, 12))}</text>`).join('')}
+    ${takt > 0 ? `<line x1="${pad}" y1="${y(takt)}" x2="${W - pad}" y2="${y(takt)}"
+        stroke="#E5322B" stroke-width="2" stroke-dasharray="7 4"/>
+      <text x="${W - pad}" y="${y(takt) - 5}" font-size="12" fill="#E5322B"
+        text-anchor="end">Takt ${F(takt)} วิ</text>` : ''}
+  </svg>`;
+}
+
+function chartXbar(cs, ps) {
+  const st = qcStats(cs, ps); if (!st) return '';
+  const spec = [['USL', ps && ps.usl !== '' && ps.usl != null ? N(ps.usl) : null],
+                ['LSL', ps && ps.lsl !== '' && ps.lsl != null ? N(ps.lsl) : null]]
+               .filter(x => x[1] !== null);
+  const one = (vals, ucl, lcl, mid, label, sp0, flag) => {
+    const W = 1000, H = 150, pad = 40;
+    const sv = (sp0 || []).map(x => x[1]);
+    const lo = Math.min(lcl, ...vals, ...sv), hi = Math.max(ucl, ...vals, ...sv);
+    const sp = (hi - lo) || 1, top = hi + sp * .15, bot = lo - sp * .15;
+    const y = v => H - 20 - (v - bot) / (top - bot) * (H - 40);
+    const x = i => pad + i * (W - pad * 2) / Math.max(1, vals.length - 1);
+    const pts = vals.map((v, i) => `${x(i)},${y(v)}`).join(' ');
+    return `<svg viewBox="0 0 ${W} ${H}">
+      <text x="4" y="14" font-size="13" font-weight="700">${label}</text>
+      <line x1="${pad}" y1="${y(ucl)}" x2="${W - 10}" y2="${y(ucl)}" stroke="#E5322B" stroke-dasharray="6 3"/>
+      <line x1="${pad}" y1="${y(lcl)}" x2="${W - 10}" y2="${y(lcl)}" stroke="#E5322B" stroke-dasharray="6 3"/>
+      <line x1="${pad}" y1="${y(mid)}" x2="${W - 10}" y2="${y(mid)}" stroke="#0a0"/>
+      <text x="${W - 12}" y="${y(ucl) - 3}" font-size="11" fill="#E5322B" text-anchor="end">UCL ${F(ucl, 2)}</text>
+      <text x="${W - 12}" y="${y(lcl) + 12}" font-size="11" fill="#E5322B" text-anchor="end">LCL ${F(lcl, 2)}</text>
+      <polyline points="${pts}" fill="none" stroke="#0071E3" stroke-width="2"/>
+      ${(sp0 || []).map(([nm, v]) => `<line x1="${pad}" y1="${y(v)}" x2="${W - 10}" y2="${y(v)}"
+          stroke="#8000c0" stroke-width="1.5"/>
+        <text x="${pad + 4}" y="${y(v) - 3}" font-size="11" fill="#8000c0">${nm} ${F(v, 2)}</text>`).join('')}
+      ${vals.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="${flag && flag.has(i) ? 4.5 : 3.5}"
+        fill="${v > ucl || v < lcl ? '#E5322B' : flag && flag.has(i) ? '#F5A623' : '#0071E3'}"/>`).join('')}
+    </svg>`;
+  };
+  return one(st.xb, st.uclx, st.lclx, st.xbb, 'X̄ Chart', spec, st.rule.hit)
+       + one(st.rr, st.uclr, st.lclr, st.rb, 'R Chart')
+       + (st.rule.rules.length ? `<div class="rulenote"><b>สัญญาณเตือน (จุดสีส้ม) :</b> ${
+            st.rule.rules.map(esc).join(' · ')}</div>` : '');
+}
+
+/* ---------------------- หน้าเอกสารของตาราง IE ---------------------- */
+function paginateTABLE(h, size, stage) {
+  const t = TABLES[docType], rs = curRows(), ps = curPars();
+  const calc = rs.map((r, i) => rowCalc(t, r, ps, i, rs));
+  const parLine = (t.pars || []).length
+    ? `<div class="iepar">${(t.pars).map(p => `<b>${p.l} :</b> ${esc(ps[p.id])}`).join(' &nbsp;&nbsp; ')}</div>` : '';
+  const head = '<table class="ietab steptab"><thead><tr>'
+    + '<th style="width:5%">ลำดับ</th>'
+    + visCols(t, ps).map(c => `<th style="width:${c.w}%">${c.h}</th>`).join('')
+    + '</tr></thead><tbody></tbody></table>';
+
+  let body = newPage(h, size, t.title), tbody;
+  const start = () => { body.insertAdjacentHTML('beforeend', parLine + head);
+                        tbody = body.querySelector('.steptab tbody'); };
+  const over = () => tbody.closest('table').getBoundingClientRect().bottom
+                   > body.getBoundingClientRect().bottom + 0.5;
+  start();
+
+  rs.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    const cls = t.hi && t.hi(r, ps);            // true = แดง, 'mid' = เหลือง
+    if (cls) tr.className = cls === true ? 'hi' : cls;
+    tr.innerHTML = `<td class="c">${i + 1}</td>` + visCols(t, ps).map(c => c.t === 'calc'
+      ? `<td class="n">${c.text ? esc(calc[i][c.k]) : F(calc[i][c.k], c.dec)}</td>`
+      : `<td class="${c.t === 'num' ? 'n' : ''}">${nl(r[c.k] == null ? '' : r[c.k])}</td>`).join('');
+    tbody.appendChild(tr);
+    if (over() && tbody.rows.length > 1) {
+      tbody.removeChild(tr); body = newPage(h, size, t.title); start(); tbody.appendChild(tr);
+    }
+  });
+
+  /* สรุป + กราฟ + ช่องลงนาม ต่อท้ายหน้าสุดท้าย ถ้าไม่พอก็ขึ้นหน้าใหม่ */
+  const tail = `<div class="iesum">${(t.sum ? t.sum(rs, ps) : [])
+      .map(([k, v]) => `<span><b>${k} :</b> ${v}</span>`).join('')}</div>`
+    + (t.chart ? `<div class="chartbox">${
+        t.chart === 'balance' ? chartBalance(rs, ps) : chartXbar(rs, ps)}</div>` : '')
+    + signRow(h);
+  body.insertAdjacentHTML('beforeend', tail);
+  if (body.scrollHeight > body.clientHeight + 1) {      // ท้ายเอกสารล้น -> ย้ายไปหน้าใหม่
+    [...body.children].slice(-3).forEach(el => el.remove());
+    body = newPage(h, size, t.title);
+    body.insertAdjacentHTML('beforeend', tail);
+  }
+}
+
+
+/* =======================================================================
+   Skill Matrix (ตารางทักษะพนักงาน / OJT)
+   ระดับทักษะแบบ ILUO : วงกลมเติมทีละ 1/4 ส่วน เป็นมาตรฐานที่โรงงานใช้กันทั่วไป
+   ======================================================================= */
+const SK_LV = [
+  { v: 0, t: 'ยังไม่ได้อบรม' },
+  { v: 1, t: 'กำลังเรียนรู้ (ต้องมีพี่เลี้ยง)' },
+  { v: 2, t: 'ทำได้เองตามมาตรฐาน' },
+  { v: 3, t: 'ทำได้คล่อง / แก้ปัญหาได้' },
+  { v: 4, t: 'สอนคนอื่นได้ (Trainer)' },
+];
+const skill = { skills: ['ขึ้นงานเครื่อง', 'ตรวจคุณภาพ', 'เปลี่ยนรุ่น'], people: [] };
+
+/** วงกลมแสดงระดับทักษะ (0 = ว่าง, 4 = เต็มวง) */
+function lvSvg(lv, px) {
+  const S = px || 16, R = 7, C = 10;
+  const ring = `<circle cx="${C}" cy="${C}" r="${R}" fill="#fff" stroke="#000" stroke-width="1.4"/>`;
+  let fill = '';
+  if (lv >= 4) fill = `<circle cx="${C}" cy="${C}" r="${R}" fill="#0071E3"/>`;
+  else if (lv > 0) {
+    const a = lv / 4 * Math.PI * 2;
+    const x = C + R * Math.sin(a), y = C - R * Math.cos(a);
+    fill = `<path d="M${C} ${C} L${C} ${C - R} A${R} ${R} 0 ${lv > 2 ? 1 : 0} 1 ${x} ${y} Z" fill="#0071E3"/>`;
+  }
+  return `<svg width="${S}" height="${S}" viewBox="0 0 20 20">${ring}${fill}
+    <circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="#000" stroke-width="1.4"/></svg>`;
+}
+
+const skLv = (pi, si) => N((skill.people[pi].lv || [])[si]);
+
+function renderSkillEditor() {
+  $('skList').innerHTML = skill.skills.map((sName, i) =>
+    `<span class="skchip"><input data-sk="${i}" value="${esc(sName)}">
+       <span class="skdel" data-skdel="${i}">×</span></span>`).join('');
+
+  $('steps').innerHTML = `<div class="skwrap"><table class="sktab">
+      <thead class="skhead"><tr><th>ชื่อ-สกุล</th><th>ตำแหน่ง</th>
+        ${skill.skills.map(x => `<th>${esc(x)}</th>`).join('')}<th></th></tr></thead>
+      <tbody>${skill.people.map((p, i) => `<tr>
+        <td><input data-p="${i}" data-f="name" value="${esc(p.name || '')}" placeholder="ชื่อพนักงาน"></td>
+        <td><input data-p="${i}" data-f="pos" value="${esc(p.pos || '')}" placeholder="ตำแหน่ง"></td>
+        ${skill.skills.map((_, j) =>
+          `<td class="lv" data-p="${i}" data-s="${j}" title="คลิกเพื่อเลื่อนระดับ">${lvSvg(skLv(i, j), 18)}</td>`).join('')}
+        <td class="skdel" data-pdel="${i}">×</td></tr>`).join('')}
+      </tbody></table></div>
+    <button class="ghost" id="skAddP">+ เพิ่มพนักงาน</button>
+    <div class="sumbox">${skSummary().map(([k, v]) => `<span>${k} : <b>${v}</b></span>`).join('')}</div>`;
+  $('skAddP').onclick = () => { skill.people.push({ name: '', pos: '', lv: [] }); renderSkillEditor(); paginate(); };
+}
+
+function skSummary() {
+  const min = N($('skMin').value) || 2;
+  const can = skill.skills.map((_, j) => skill.people.filter((_, i) => skLv(i, j) >= 2).length);
+  const risk = skill.skills.filter((_, j) => can[j] < min);
+  const cells = skill.people.length * skill.skills.length;
+  const done = skill.people.reduce((a, _, i) => a + skill.skills.filter((_, j) => skLv(i, j) >= 2).length, 0);
+  return [['จำนวนพนักงาน', skill.people.length + ' คน'],
+          ['จำนวนทักษะ', skill.skills.length + ' ทักษะ'],
+          ['ความครอบคลุม', cells ? F(done / cells * 100, 0) + ' %' : '-'],
+          ['ทักษะเสี่ยง (คนทำได้ < ' + min + ')', risk.length ? risk.join(', ') : 'ไม่มี'],
+          ['ต้องเข้า OJT', skill.people.reduce((a, _, i) =>
+             a + skill.skills.filter((_, j) => skLv(i, j) < 2).length, 0) + ' ช่อง']];
+}
+
+$('skAddSkill') && ($('skAddSkill').onclick = () => {
+  skill.skills.push('ทักษะใหม่ ' + (skill.skills.length + 1));
+  skill.people.forEach(p => (p.lv = p.lv || []).push(0));
+  renderSkillEditor(); paginate();
+});
+$('skList') && $('skList').addEventListener('input', e => {
+  if (e.target.dataset.sk === undefined) return;
+  skill.skills[+e.target.dataset.sk] = e.target.value;
+  paginate();
+});
+$('skList') && $('skList').addEventListener('click', e => {
+  const d = e.target.dataset.skdel; if (d === undefined) return;
+  skill.skills.splice(+d, 1);
+  skill.people.forEach(p => p.lv && p.lv.splice(+d, 1));
+  renderSkillEditor(); paginate();
+});
+$('skMin') && $('skMin').addEventListener('change', () => { renderSkillEditor(); paginate(); });
+$('skBy') && $('skBy').addEventListener('input', paginate);
+
+$('steps').addEventListener('click', e => {
+  if (docType !== 'SKILL') return;
+  const d = e.target.closest('[data-p]');
+  if (d && d.dataset.s !== undefined) {              // คลิกช่องระดับ -> เลื่อนระดับ 0→4→0
+    const i = +d.dataset.p, j = +d.dataset.s;
+    const p = skill.people[i]; p.lv = p.lv || [];
+    p.lv[j] = (N(p.lv[j]) + 1) % 5;
+    d.innerHTML = lvSvg(p.lv[j], 18);
+    const box = $('steps').querySelector('.sumbox');
+    if (box) box.innerHTML = skSummary().map(([k, v]) => `<span>${k} : <b>${v}</b></span>`).join('');
+    paginate();
+  } else if (e.target.dataset.pdel !== undefined) {
+    skill.people.splice(+e.target.dataset.pdel, 1);
+    renderSkillEditor(); paginate();
+  }
+}, true);
+$('steps').addEventListener('input', e => {
+  if (docType !== 'SKILL' || e.target.dataset.p === undefined || e.target.dataset.f === undefined) return;
+  skill.people[+e.target.dataset.p][e.target.dataset.f] = e.target.value;
+  paginate();
+}, true);
+
+/* ---------------------- หน้าเอกสาร Skill Matrix ---------------------- */
+function paginateSKILL(h, size, stage) {
+  const min = N($('skMin').value) || 2;
+  const can = skill.skills.map((_, j) => skill.people.filter((_, i) => skLv(i, j) >= 2).length);
+  const legend = `<div class="sklegend"><b>เกณฑ์ระดับทักษะ :</b>
+      ${SK_LV.map(l => `<span>${lvSvg(l.v, 15)} ${l.v} = ${l.t}</span>`).join('')}
+      <span style="margin-left:auto"><b>ผู้ประเมิน :</b> ${esc($('skBy').value) || '____________'}</span>
+    </div>`;
+  const head = `<table class="mx steptab"><thead><tr>
+      <th style="width:6%">ลำดับ</th><th style="width:18%">ชื่อ-สกุล</th><th style="width:14%">ตำแหน่ง</th>
+      ${skill.skills.map((x, j) =>
+        `<th class="vert"${can[j] < min ? ' style="background:#FDE8E6"' : ''}><div>${esc(x)}</div></th>`).join('')}
+      <th style="width:9%">ทำได้ (ทักษะ)</th></tr></thead><tbody></tbody></table>`;
+
+  let body = newPage(h, size, 'SKILL MATRIX (ตารางทักษะพนักงาน / OJT)'), tbody;
+  const start = () => { body.insertAdjacentHTML('beforeend', legend + head);
+                        tbody = body.querySelector('.steptab tbody'); };
+  const over = () => tbody.closest('table').getBoundingClientRect().bottom
+                   > body.getBoundingClientRect().bottom + 0.5;
+  start();
+
+  (skill.people.length ? skill.people : [{ name: '', pos: '', lv: [] }]).forEach((p, i) => {
+    const ok = skill.skills.filter((_, j) => skLv(i, j) >= 2).length;
+    const tr = document.createElement('tr');
+    if (skill.skills.length && ok === 0 && (p.name || '').trim()) tr.className = 'risk';
+    tr.innerHTML = `<td class="lv">${i + 1}</td><td class="nm">${esc(p.name || '')}</td>
+      <td class="nm">${esc(p.pos || '')}</td>
+      ${skill.skills.map((_, j) => `<td class="lv">${lvSvg(skLv(i, j), 15)}</td>`).join('')}
+      <td class="lv">${ok}/${skill.skills.length}</td>`;
+    tbody.appendChild(tr);
+    if (over() && tbody.rows.length > 1) {
+      tbody.removeChild(tr);
+      body = newPage(h, size, 'SKILL MATRIX (ตารางทักษะพนักงาน / OJT)'); start(); tbody.appendChild(tr);
+    }
+  });
+
+  // แถวสรุปท้ายตาราง : จำนวนคนที่ทำได้เองในแต่ละทักษะ
+  const tfoot = `<tfoot><tr><td colspan="3" style="text-align:right"><b>จำนวนคนที่ทำได้เอง (ระดับ ≥ 2)</b></td>
+      ${can.map(c => `<td${c < min ? ' style="background:#FDE8E6;font-weight:700"' : ''}>${c}</td>`).join('')}
+      <td></td></tr></tfoot>`;
+  tbody.insertAdjacentHTML('afterend', tfoot);
+
+  const tail = `<div class="iesum">${skSummary().map(([k, v]) =>
+      `<span><b>${k} :</b> ${v}</span>`).join('')}</div>` + signRow(h);
+  body.insertAdjacentHTML('beforeend', tail);
+  if (body.scrollHeight > body.clientHeight + 1) {
+    [...body.children].slice(-2).forEach(el => el.remove());
+    body = newPage(h, size, 'SKILL MATRIX (ตารางทักษะพนักงาน / OJT)');
+    body.insertAdjacentHTML('beforeend', tail);
+  }
+}
+
+/** รูปที่ยังโหลดไม่เสร็จทำให้วัดความสูงผิด: โหลดครบแล้วค่อยจัดหน้าใหม่อีกรอบ */
+function waitImages(stage) {
+  const loading = [...stage.querySelectorAll('img')].filter(im => !im.complete);
+  if (!loading.length || paginate.busy) return;
+  paginate.busy = true;
+  Promise.all(loading.map(im => new Promise(r => { im.onload = im.onerror = r; })))
+    .then(() => { paginate.busy = false; paginate(); });
+}
+
+/* ---------------------- แบ่งหน้า + ใส่เลขหน้าอัตโนมัติ ---------------------- */
+function paginate() {
+  const h = header(), size = $('paper').value, stage = $('stage');
+  stage.innerHTML = '';
+  // ต้องแยกประเภทก่อนเช็ค "ยังไม่มีรูป" เพราะเอกสารตาราง IE ไม่ได้ใช้รูปเลย
+  if (docType !== 'WI') {                      // เอกสารประเภทอื่นมีตัวจัดหน้าของตัวเอง
+    (TABLES[docType] ? paginateTABLE
+      : { QP: paginateQP, OPL: paginateOPL, SIGN: paginateSIGN, DIAG: paginateDIAG,
+          SKILL: paginateSKILL }[docType])(h, size, stage);
+    waitImages(stage);
+    const pg = stage.querySelectorAll('.page');
+    pg.forEach((p, i) => {
+      const a = p.querySelector('.pgno'), b = p.querySelector('.pgtot');
+      if (a) a.textContent = i + 1;
+      if (b) b.textContent = pg.length;
+    });
+    $('msg').textContent = (docType === 'SKILL'
+        ? skill.people.length + ' คน · ' + skill.skills.length + ' ทักษะ'
+        : TABLES[docType] ? curRows().length + ' แถว'
+        : items.length + ' รายการ') + ' · ' + pg.length + ' หน้า';
+    fitStage(); return;
+  }
+
+  if (!items.length) {
+    stage.innerHTML = '<div class="empty noprint">ยังไม่มีขั้นตอน — ใส่รูปเพื่อเริ่มสร้างเอกสาร</div>';
+    fitStage(); return;
+  }
+
+  /* --- หน้าปก --- */
+  const cover = newPage(h, size);
+  cover.insertAdjacentHTML('beforeend', `
+    <div class="cover-title">Work Instruction</div>
+    <div class="cover-sub">เรื่อง ${esc(h.subject)}</div>
+    <div class="cover-code">รหัสเอกสาร : ${esc(h.docno)}</div>
+    <table class="sign"><tr>
+      ${h.signs.map((s, i) => `<td>${['ผู้จัดทำ', 'ผู้ทบทวน', 'ผู้อนุมัติ'][i]}<br><br>
+        ….....................................<br>
+        ( ${esc(s.name) || '.....................................'} )<br>
+        ตำแหน่ง ${esc(s.pos) || '..........................'}</td>`).join('')}
+    </tr></table>`);
+
+  /* --- หน้าเนื้อหา: ใส่ทีละแถว ถ้าเกินหน้าก็ขึ้นหน้าใหม่ --- */
+  const box = IMG_BOX[size];
+  const tableHtml = '<table class="steptab"><thead><tr>'
+    + COLS.map(c => `<th style="width:${c.pct}%">${c.head}</th>`).join('')
+    + '</tr></thead><tbody></tbody></table>';
+  const ppeHtml = h.ppe.map(u => `<img class="ppe" src="${u}" alt="">`).join('');
+  const metaHtml = `<div class="meta">วัตถุประสงค์ : ${esc(h.purpose)}</div>
+                    <div class="meta" style="margin-bottom:2px">อุปกรณ์เครื่องมือ : ${esc(h.tools)} ${ppeHtml}</div>`;
+
+  let body = newPage(h, size), tbody;
+  const startPage = () => {
+    body.insertAdjacentHTML('beforeend', metaHtml + tableHtml);
+    // ต้องเจาะจงตารางขั้นตอน ไม่งั้นจะไปเจอ tbody ของตารางหัวเอกสารก่อน
+    tbody = body.querySelector('.steptab tbody');
+  };
+  // ล้นหน้าหรือยัง: เทียบขอบล่างของตารางกับขอบล่างของพื้นที่หน้ากระดาษจริง
+  const overflow = () => tbody.closest('table').getBoundingClientRect().bottom
+                       > body.getBoundingClientRect().bottom + 0.5;
+  startPage();
+
+  items.forEach((it, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="c">${i + 1}</td>
+      <td>${nl(it.desc)}</td>
+      <td class="c"><img class="stepimg" src="${it.url}" style="max-height:${box.h}px"></td>
+      <td class="c">${esc(h.worker)}</td>
+      <td>${nl(it.ctl)}</td>
+      <td>${nl(it.warn)}</td>`;
+    tbody.appendChild(tr);
+    // ล้นหน้า -> ย้ายแถวนี้ไปหน้าใหม่ (ถ้าแถวเดียวก็ล้น ก็ปล่อยไว้ ไม่งั้นวนไม่จบ)
+    if (overflow() && tbody.rows.length > 1) {
+      tbody.removeChild(tr);
+      body = newPage(h, size);
+      startPage();
+      tbody.appendChild(tr);
+    }
+  });
+
+  waitImages(stage);
+
+  /* --- เติมเลขหน้า --- */
+  const pages = stage.querySelectorAll('.page');
+  pages.forEach((p, i) => {
+    p.querySelector('.pgno').textContent = i + 1;
+    p.querySelector('.pgtot').textContent = pages.length;
+  });
+  $('msg').textContent = items.length + ' ขั้นตอน · ' + pages.length + ' หน้า';
+  fitStage();
+}
+
+/* ย่อเอกสารให้พอดีจอ (ตอนพิมพ์ใช้ขนาดจริง) */
+function fitStage() {
+  const stage = $('stage'), page = stage.querySelector('.page');
+  if (!page) { stage.style.transform = ''; $('stagewrap').style.height = ''; return; }
+  const avail = $('stagewrap').clientWidth;
+  const k = Math.min(1, avail / page.offsetWidth);
+  stage.style.transform = 'scale(' + k + ')';
+  $('stagewrap').style.height = (stage.scrollHeight * k) + 'px';
+}
+
+$('print').onclick = () => window.print();
+
+/* ---------------------- ย่อรูปสำหรับ Excel ----------------------
+   วาดรูปลงผืนผ้าใบสีขาวที่กว้างเท่าช่องรูปพอดี แล้วจัดรูปไว้กึ่งกลาง
+   เพื่อให้ยึดรูปแบบเต็มช่องได้เลย ไม่ต้องพึ่งการคำนวณตำแหน่งของ ExcelJS
+   (ExcelJS คิดความกว้างคอลัมน์เป็นค่าคงที่ 480000 EMU ไม่สนความกว้างจริง รูปจะหด)
+   หมุนรูปตาม EXIF ของกล้องมือถือให้ด้วย                                      */
+const XL_IMG_W = COLS[2].xl * 7 + 5;      // ความกว้างช่องรูปใน Excel (pixel)
+const PPE_ROW_H = 30;                     // ความสูงแถวไอคอน PPE ใน Excel (point)
+const HDR_H = [28, 24, 20, 20];           // ความสูงแถวหัวเอกสาร 4 แถว (point)
+const TABLE_W = COLS.reduce((a, c) => a + c.xl * 7 + 5, 0);   // ความกว้างตารางรวม (pixel)
+const LOGO_ROWS = [HDR_H[0], HDR_H[1], HDR_H[2]];   // ช่องโลโก้กินแถว 1-3 ของหัวเอกสาร
+const LOGO_W = (COLS[0].xl * 7 + 5) + (COLS[1].xl * 7 + 5);           // กว้าง A+B (pixel)
+const LOGO_H = Math.round((LOGO_ROWS[0] + LOGO_ROWS[1] + LOGO_ROWS[2]) / 0.75);  // สูงแถว 1-3 (pixel)
+
+/** เรียงไอคอน PPE เป็นแถบเดียวกว้างเท่าตาราง เพื่อวางเป็นรูปเดียวใน Excel */
+async function ppeStripImage(urls) {
+  const H = Math.round(PPE_ROW_H / 0.75);
+  const imgs = await Promise.all(urls.map(u => new Promise(ok => {
+    const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = u;
+  })));
+  const cv = Object.assign(document.createElement('canvas'), { width: TABLE_W, height: H });
+  const g = cv.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, TABLE_W, H);
+  let x = 6;
+  for (const im of imgs) {
+    if (!im) continue;
+    const k = (H - 8) / im.height, w = Math.round(im.width * k);
+    g.drawImage(im, x, 4, w, H - 8);
+    x += w + 6;
+  }
+  return cv.toDataURL('image/png').split(',')[1];
+}
+
+/** วาดโลโก้ลงผืนผ้าใบขนาดเท่าช่อง A1:B2 พอดี เพื่อยึดเต็มช่องโดยสัดส่วนไม่เพี้ยน */
+async function prepLogo(dataUrl) {
+  const img = new Image();
+  await new Promise((ok, no) => { img.onload = ok; img.onerror = no; img.src = dataUrl; });
+  const k = Math.min((LOGO_W - 10) / img.width, (LOGO_H - 6) / img.height);
+  const w = Math.round(img.width * k), hh = Math.round(img.height * k);
+  const cv = Object.assign(document.createElement('canvas'), { width: LOGO_W, height: LOGO_H });
+  const g = cv.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, LOGO_W, LOGO_H);
+  g.drawImage(img, Math.round((LOGO_W - w) / 2), Math.round((LOGO_H - hh) / 2), w, hh);
+  return cv.toDataURL('image/png').split(',')[1];
+}
+
+async function resize(file, box, wpx) {
+  const W = wpx || XL_IMG_W;
+  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  const k = Math.min(W / bmp.width, box.h / bmp.height, 1);          // ไม่ขยายรูปที่เล็กอยู่แล้ว
+  const w = Math.max(1, Math.round(bmp.width * k)), h = Math.max(1, Math.round(bmp.height * k));
+  const H = h + 8;                                                   // เว้นขอบบน-ล่างอย่างละ 4px
+  const cv = Object.assign(document.createElement('canvas'), { width: W, height: H });
+  const g = cv.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+  g.drawImage(bmp, Math.round((W - w) / 2), 4, w, h);
+  return { b64: cv.toDataURL('image/jpeg', 0.9).split(',')[1], hh: H };
+}
+
+/* ---------------------- สร้างไฟล์ Excel ---------------------- */
+async function buildWorkbook(ExcelJSLib, h, steps, paper, groups) {
+  const wb = new ExcelJSLib.Workbook();
+  wb.creator = 'โปรแกรมสร้างเอกสารสำหรับวิศวกรโรงงาน';
+  const ws = wb.addWorksheet('WI', {
+    pageSetup: {
+      paperSize: paper === 'A3' ? 8 : 9, orientation: 'landscape',
+      // ย่อคงที่แทน "พอดีหน้า" เพื่อคุมได้ว่าหน้าไหนตัดตรงไหน (ให้ตรงกับตอนพิมพ์จากหน้าเว็บ)
+      fitToPage: false, scale: paper === 'A3' ? 95 : 90, horizontalCentered: true,
+      margins: { left: .2, right: .2, top: .3, bottom: .3, header: .1, footer: .1 },
+    },
+  });
+  ws.columns = COLS.map(c => ({ width: c.xl }));
+  const LAST = String.fromCharCode(64 + COLS.length);          // 'F'
+  const thin = { style: 'thin', color: { argb: 'FF000000' } };
+  const box = { top: thin, left: thin, bottom: thin, right: thin };
+  const FONT = { name: 'Angsana New', size: 14 };
+  const mid = { vertical: 'middle' }, midc = { vertical: 'middle', horizontal: 'center' };
+
+  const put = (ref, val, o) => {
+    o = o || {};
+    const c = ws.getCell(ref);
+    c.value = val;
+    c.border = box;
+    c.alignment = Object.assign({ vertical: 'top', wrapText: true }, o.align);
+    c.font = Object.assign({}, FONT, o.font);
+    if (o.fill) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: o.fill } };
+    return c;
+  };
+
+  const totalPages = groups.length + 1;        // +1 = หน้าปก
+
+  /* ---- หัวเอกสาร 4 แถว เขียนซ้ำทุกหน้า พร้อมเลขหน้าในกล่อง ---- */
+  function header(r, pageNo) {
+    ws.mergeCells('A' + r + ':B' + (r + 2));
+    put('A' + r, null, { align: midc });                       // ช่องโลโก้
+    put('C' + r, 'วิธีปฏิบัติงาน', { align: midc, font: { bold: true, size: 18 } });
+    ws.mergeCells('D' + r + ':E' + r);
+    put('D' + r, 'เอกสารหมายเลข ' + h.docno + '    แก้ไขครั้งที่ ' + h.rev, { align: midc });
+    put('F' + r, 'หน้า ' + pageNo + '/' + totalPages, { align: midc });
+
+    ws.mergeCells('C' + (r + 1) + ':C' + (r + 2));
+    put('C' + (r + 1), 'เรื่อง : ' + h.subject, { align: midc, font: { bold: true, size: 16 } });
+    ['แผนก/หน่วยงาน', 'ผู้รับผิดชอบ', 'วันที่เริ่มใช้'].forEach((t, i) =>
+      put(String.fromCharCode(68 + i) + (r + 1), t,
+        { align: midc, font: { size: 12 }, fill: 'FFF2F2F2' }));
+    [h.dept, h.owner, h.date || '____________'].forEach((t, i) =>
+      put(String.fromCharCode(68 + i) + (r + 2), t, { align: midc }));
+
+    ws.mergeCells('A' + (r + 3) + ':' + LAST + (r + 3));
+    put('A' + (r + 3), 'วัตถุประสงค์ : ' + h.purpose + '      อุปกรณ์เครื่องมือ : ' + h.tools,
+      { align: mid });
+    HDR_H.forEach((ht, i) => { ws.getRow(r + i).height = ht; });
+
+    if (h.logoXl) {                            // โลโก้วางเต็มช่อง A:B ของหัวเอกสาร
+      const id = wb.addImage({ base64: h.logoXl, extension: 'png' });
+      ws.addImage(id, { tl: { col: 0, row: r - 1 }, br: { col: 2, row: r + 2 }, editAs: 'oneCell' });
+    }
+    return r + 4;
+  }
+
+  /* ---- แถบไอคอน PPE + หัวตาราง ---- */
+  function tableHead(r) {
+    if (h.ppeStrip) {
+      ws.mergeCells('A' + r + ':' + LAST + r);
+      put('A' + r, null);
+      ws.getRow(r).height = PPE_ROW_H;
+      const id = wb.addImage({ base64: h.ppeStrip, extension: 'png' });
+      ws.addImage(id, { tl: { col: 0, row: r - 1 }, br: { col: COLS.length, row: r }, editAs: 'oneCell' });
+      r++;
+    }
+    COLS.forEach((c, i) => put(String.fromCharCode(65 + i) + r, c.head,
+      { align: midc, font: { bold: true }, fill: 'FFF2F2F2' }));
+    ws.getRow(r).height = 22;
+    return r + 1;
+  }
+
+  /* ================= หน้าปก ================= */
+  let r = header(1, 1);
+  const band = (text, size, hgt, bold) => {
+    ws.mergeCells('A' + r + ':' + LAST + r);
+    put('A' + r, text, { align: midc, font: { size: size, bold: !!bold } });
+    ws.getRow(r).height = hgt;
+    r++;
+  };
+  band('Work Instruction', 36, 70, true);
+  band('เรื่อง  ' + h.subject, 22, 40, true);
+  band('รหัสเอกสาร : ' + h.docno, 14, 26);
+  band(null, 14, 110);                          // เว้นช่วงกลางหน้าปก
+  ['ผู้จัดทำ', 'ผู้ทบทวน', 'ผู้อนุมัติ'].forEach((t, i) => {
+    const c1 = String.fromCharCode(65 + i * 2), c2 = String.fromCharCode(66 + i * 2);
+    ws.mergeCells(c1 + r + ':' + c2 + r);
+    put(c1 + r, t + '\n\n…....................................\n( '
+      + (h.signs[i].name || '.....................................') + ' )\nตำแหน่ง '
+      + (h.signs[i].pos || '..........................'),
+      { align: { horizontal: 'center', vertical: 'bottom', wrapText: true } });
+  });
+  ws.getRow(r).height = 100;
+  ws.getRow(r).addPageBreak();                  // จบหน้าปก
+  r++;
+
+  /* ================= หน้าขั้นตอน ================= */
+  groups.forEach((idxs, pi) => {
+    r = header(r, pi + 2);
+    r = tableHead(r);
+    idxs.forEach(i => {
+      const st = steps[i];
+      put('A' + r, i + 1, { align: midc });
+      put('B' + r, st.desc);
+      put('C' + r, null);
+      put('D' + r, h.worker, { align: midc });
+      put('E' + r, st.ctl);
+      put('F' + r, st.warn);
+      if (st.img) {
+        const id = wb.addImage({ base64: st.img.b64, extension: 'jpeg' });
+        ws.getRow(r).height = st.img.hh * 0.75;       // แถวสูงเท่ารูปพอดี (1 pixel = 0.75 point)
+        // ยึดรูปเต็มช่อง ห้ามใช้ tl+ext เพราะ ExcelJS จะเติม editAs ลง oneCellAnchor ซึ่งผิดสเปค
+        ws.addImage(id, { tl: { col: 2, row: r - 1 }, br: { col: 3, row: r }, editAs: 'oneCell' });
+      } else ws.getRow(r).height = 30;
+      r++;
+    });
+    if (pi < groups.length - 1) ws.getRow(r - 1).addPageBreak();
+  });
+
+  return wb.xlsx.writeBuffer();
+}
+
+/** อ่านการแบ่งหน้าจากเอกสารที่แสดงอยู่ คืนเป็นรายการดัชนีขั้นตอนของแต่ละหน้า */
+function pageGroups(nFallback) {
+  const tabs = [...document.querySelectorAll('.page .steptab')];
+  const groups = []; let n = 0;
+  tabs.forEach(t => {
+    const c = t.tBodies[0].rows.length;
+    groups.push([...Array(c)].map((_, k) => n + k));
+    n += c;
+  });
+  const all = nFallback == null ? items.length : nFallback;
+  return groups.length ? groups : [[...Array(all)].map((_, i) => i)];
+}
+
+/* =======================================================================
+   สร้าง Excel ของเอกสารทุกประเภท
+   ฟังก์ชันในบล็อกนี้รับแต่ข้อมูลล้วน ๆ ไม่แตะ DOM เลย จะได้ทดสอบซ้ำได้
+   ======================================================================= */
+const XFONT = { name: 'Angsana New', size: 14 };
+const XTHIN = { style: 'thin', color: { argb: 'FF000000' } };
+const XBOX = { top: XTHIN, left: XTHIN, bottom: XTHIN, right: XTHIN };
+const XC = { vertical: 'middle', horizontal: 'center', wrapText: true };
+const XM = { vertical: 'middle', wrapText: true };
+const XR = { vertical: 'top', horizontal: 'right', wrapText: true };
+const PX = xl => xl * 7 + 5;                       // ความกว้างคอลัมน์ Excel -> pixel
+
+function xput(ws, r, c, v, o) {
+  o = o || {};
+  const cell = ws.getCell(r, c);
+  cell.value = v === undefined || v === '' ? null : v;
+  cell.border = XBOX;
+  cell.alignment = Object.assign({ vertical: 'top', wrapText: true }, o.align);
+  cell.font = Object.assign({}, XFONT, o.font);
+  if (o.fill) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: o.fill } };
+  return cell;
+}
+
+/** เขียนข้อความคร่อมหลายคอลัมน์ — ต้องตีกรอบช่องที่ถูกผนวกด้วย ไม่งั้นเส้นขาดตอนพิมพ์ */
+function xspan(ws, r, c1, c2, v, o) {
+  if (c2 > c1) ws.mergeCells(r, c1, r, c2);
+  const cell = xput(ws, r, c1, v, o);
+  for (let c = c1 + 1; c <= c2; c++) {
+    ws.getCell(r, c).border = XBOX;
+    if (o && o.fill) ws.getCell(r, c).fill =
+      { type: 'pattern', pattern: 'solid', fgColor: { argb: o.fill } };
+  }
+  return cell;
+}
+
+function xlSheet(wb, name, widths, paper, portrait) {
+  const ws = wb.addWorksheet(name, {
+    pageSetup: {
+      paperSize: paper === 'A3' ? 8 : 9,
+      orientation: portrait ? 'portrait' : 'landscape',
+      // ย่อคงที่แทน "พอดีหน้า" เพื่อคุมได้ว่าหน้าไหนตัดตรงไหน ให้ตรงกับตอนพิมพ์จากหน้าเว็บ
+      fitToPage: false, scale: paper === 'A3' ? 95 : 90, horizontalCentered: true,
+      margins: { left: .2, right: .2, top: .3, bottom: .3, header: .1, footer: .1 },
+    },
+  });
+  ws.columns = widths.map(w => ({ width: w }));
+  return ws;
+}
+
+/** หัวเอกสาร 2 แถวเหมือนที่เห็นบนหน้าจอ เขียนซ้ำทุกหน้าพร้อมเลขหน้า */
+function xlHead(ws, wb, h, n, r, title, pageNo, total) {
+  let c0 = 1;
+  if (h.logoXl) {
+    ws.mergeCells(r, 1, r + 1, 2);
+    xput(ws, r, 1, null, { align: XC });
+    [[r, 2], [r + 1, 1], [r + 1, 2]].forEach(([rr, cc]) => { ws.getCell(rr, cc).border = XBOX; });
+    const id = wb.addImage({ base64: h.logoXl, extension: 'png' });
+    ws.addImage(id, { tl: { col: 0, row: r - 1 }, br: { col: 2, row: r + 1 }, editAs: 'oneCell' });
+    c0 = 3;
+  }
+  const w = n - c0 + 1;
+  const p1 = Math.min(n - 2, c0 + Math.max(0, Math.round(w * 0.45) - 1));
+  const p2 = Math.min(n - 1, Math.max(p1 + 1, p1 + Math.round(w * 0.3)));
+  xspan(ws, r, c0, p1, title, { align: XC, font: { bold: true, size: 18 } });
+  xspan(ws, r, p1 + 1, p2, 'เอกสารหมายเลข ' + (h.docno || '-'), { align: XC });
+  xspan(ws, r, p2 + 1, n, 'หน้า ' + pageNo + '/' + total, { align: XC });
+  xspan(ws, r + 1, c0, p1, 'เรื่อง : ' + h.subject, { align: XM, font: { bold: true, size: 16 } });
+  xspan(ws, r + 1, p1 + 1, p2, 'แผนก/หน่วยงาน : ' + (h.dept || '-')
+        + '\nผู้รับผิดชอบ : ' + (h.owner || '-'), { align: XM, font: { size: 12 } });
+  xspan(ws, r + 1, p2 + 1, n, 'วันที่เริ่มใช้ : ' + (h.date || '____________')
+        + '\nแก้ไขครั้งที่ ' + (h.rev || '-'), { align: XM, font: { size: 12 } });
+  ws.getRow(r).height = 30;
+  ws.getRow(r + 1).height = 34;
+  return r + 2;
+}
+
+/** ช่องลงนามท้ายเอกสาร */
+function xlSignRow(ws, h, n, r) {
+  const w = Math.max(1, Math.floor(n / 3));
+  ['ผู้จัดทำ', 'ผู้ทบทวน', 'ผู้อนุมัติ'].forEach((t, i) => {
+    const sg = (h.signs || [])[i] || {};
+    xspan(ws, r, i * w + 1, i === 2 ? n : (i + 1) * w,
+      t + '\n\n….....................................\n( '
+      + (sg.name || '.....................................') + ' )\nตำแหน่ง '
+      + (sg.pos || '..........................'),
+      { align: { horizontal: 'center', vertical: 'bottom', wrapText: true } });
+  });
+  ws.getRow(r).height = 92;
+  return r + 1;
+}
+
+/** แถบหัวข้อ-ค่า ท้ายเอกสาร (สรุปผลคำนวณ / เกณฑ์ / คำอธิบายสัญลักษณ์) */
+function xlNotes(ws, n, r, list, fill) {
+  const half = Math.max(1, Math.round(n * 0.34));
+  list.forEach(([k, v]) => {
+    xspan(ws, r, 1, half, String(k), { align: XM, font: { bold: true }, fill: fill || 'FFF2F2F2' });
+    xspan(ws, r, half + 1, n, v == null ? '' : String(v), { align: XM });
+    ws.getRow(r).height = 20;
+    r++;
+  });
+  return r;
+}
+
+/* ---------- เอกสารแบบตาราง : IE ทั้ง 10 ชนิด + Q-Point (มีคอลัมน์รูป) ---------- */
+function xlTable(wb, h, d, paper) {
+  const widths = [6, ...d.cols.map(c => Math.max(7, Math.round(c.w * 1.5)))];
+  const n = widths.length;
+  const ws = xlSheet(wb, d.sheet, widths, paper, false);
+  let r = 1;
+  d.groups.forEach((idxs, pi) => {
+    r = xlHead(ws, wb, h, n, r, d.title, pi + 1, d.groups.length);
+    [d.info, d.pars].forEach(line => {
+      if (!line) return;
+      xspan(ws, r, 1, n, line, { align: XM, font: { size: 12 }, fill: 'FFF7F7F7' });
+      ws.getRow(r).height = 18; r++;
+    });
+    xput(ws, r, 1, 'ลำดับ', { align: XC, font: { bold: true }, fill: 'FFF2F2F2' });
+    d.cols.forEach((c, j) =>
+      xput(ws, r, j + 2, c.h, { align: XC, font: { bold: true, size: 12 }, fill: 'FFF2F2F2' }));
+    ws.getRow(r).height = 36; r++;
+    idxs.forEach(i => {
+      const row = d.rows[i]; if (!row) return;
+      const fill = row.hi === 'mid' ? 'FFFFF4DC' : row.hi ? 'FFFDE8E6' : null;
+      xput(ws, r, 1, i + 1, { align: XC, fill });
+      d.cols.forEach((c, j) => {
+        const v = row.cells[j];
+        const num = c.num && v !== '' && v != null && isFinite(v);
+        xput(ws, r, j + 2, num ? Number(v) : (v == null ? '' : v),
+             { align: c.num ? XR : undefined, fill });
+      });
+      if (row.img) {
+        ws.getRow(r).height = row.img.hh * 0.75;      // 1 pixel = 0.75 point
+        const id = wb.addImage({ base64: row.img.b64, extension: 'jpeg' });
+        ws.addImage(id, { tl: { col: d.imgCol + 1, row: r - 1 },
+                          br: { col: d.imgCol + 2, row: r }, editAs: 'oneCell' });
+      } else ws.getRow(r).height = row.h || 26;
+      r++;
+    });
+    if (pi < d.groups.length - 1) ws.getRow(r - 1).addPageBreak();
+  });
+  if (d.sum && d.sum.length) r = xlNotes(ws, n, r, d.sum);
+  r = xlSignRow(ws, h, n, r);
+  return ws;
+}
+
+/* ---------- Skill Matrix : คอลัมน์เท่าจำนวนทักษะ หัวตารางหมุนตั้ง ---------- */
+function xlSkill(wb, h, d, paper) {
+  const widths = [6, 24, 18, ...d.skills.map(() => 5), 11];
+  const n = widths.length;
+  const ws = xlSheet(wb, 'SKILL', widths, paper, false);
+  let r = xlHead(ws, wb, h, n, 1, 'SKILL MATRIX (ตารางทักษะพนักงาน / OJT)', 1, 1);
+  xspan(ws, r, 1, n, 'ผู้ประเมิน : ' + (d.by || '____________')
+        + '     เกณฑ์ : ทักษะหนึ่งต้องมีคนทำได้เองอย่างน้อย ' + d.min + ' คน',
+        { align: XM, font: { size: 12 }, fill: 'FFF7F7F7' });
+  ws.getRow(r).height = 18; r++;
+
+  ['ลำดับ', 'ชื่อ-สกุล', 'ตำแหน่ง'].forEach((t, j) =>
+    xput(ws, r, j + 1, t, { align: XC, font: { bold: true, size: 12 }, fill: 'FFF2F2F2' }));
+  d.skills.forEach((sk, j) => xput(ws, r, j + 4, sk, {
+    align: { textRotation: 90, horizontal: 'center', vertical: 'bottom', wrapText: true },
+    font: { bold: true, size: 12 },
+    fill: d.can[j] < d.min ? 'FFFDE8E6' : 'FFF2F2F2' }));
+  xput(ws, r, n, 'ทำได้ (ทักษะ)',
+       { align: XC, font: { bold: true, size: 12 }, fill: 'FFF2F2F2' });
+  ws.getRow(r).height = 110; r++;
+
+  d.people.forEach((p, i) => {
+    const fill = d.skills.length && p.ok === 0 && p.name.trim() ? 'FFFDE8E6' : null;
+    xput(ws, r, 1, i + 1, { align: XC, fill });
+    xput(ws, r, 2, p.name, { align: XM, fill });
+    xput(ws, r, 3, p.pos, { align: XM, fill });
+    p.lv.forEach((v, j) => xput(ws, r, j + 4, v, { align: XC, fill }));
+    xput(ws, r, n, p.ok + '/' + d.skills.length, { align: XC, fill });
+    ws.getRow(r).height = 22; r++;
+  });
+
+  xspan(ws, r, 1, 3, 'จำนวนคนที่ทำได้เอง (ระดับ ≥ 2)',
+        { align: { horizontal: 'right', vertical: 'middle' }, font: { bold: true } });
+  d.can.forEach((c, j) => xput(ws, r, j + 4, c,
+    { align: XC, font: { bold: true }, fill: c < d.min ? 'FFFDE8E6' : null }));
+  xput(ws, r, n, null);
+  ws.getRow(r).height = 22; r++;
+
+  r = xlNotes(ws, n, r, d.legend.map(([v, t]) => ['ระดับ ' + v, t]));
+  r = xlNotes(ws, n, r, d.sum);
+  r = xlSignRow(ws, h, n, r);
+  return ws;
+}
+
+/* ---------- OPL : รูป 1-4 ช่อง + ตารางลงชื่อผู้รับการสอน ---------- */
+function xlOPL(wb, h, d, paper) {
+  const widths = [38, 37, 38, 37], n = 4;
+  const ws = xlSheet(wb, 'OPL', widths, paper, false);
+  let r = xlHead(ws, wb, h, n, 1, 'ONE POINT LESSON (บทเรียนหนึ่งจุด)', 1, 1);
+  xspan(ws, r, 1, n, 'ประเภท : ' + d.kindText + '        ผู้สอน : ' + (d.trainer || '____________'),
+        { align: XM, fill: 'FFF7F7F7' });
+  ws.getRow(r).height = 20; r++;
+
+  const per = d.cells.length <= 1 ? 1 : 2;
+  for (let i = 0; i < d.cells.length; i += per) {
+    const imgRow = r, capRow = r + 1;
+    let hh = 90;
+    d.cells.slice(i, i + per).forEach((cell, k) => {
+      const c1 = per === 1 ? 1 : k * 2 + 1, c2 = per === 1 ? n : k * 2 + 2;
+      xspan(ws, imgRow, c1, c2, null, { align: XC });
+      xspan(ws, capRow, c1, c2, (i + k + 1) + '. ' + (cell.desc || ''), { align: XM });
+      if (cell.img) {
+        const id = wb.addImage({ base64: cell.img.b64, extension: 'jpeg' });
+        ws.addImage(id, { tl: { col: c1 - 1, row: imgRow - 1 },
+                          br: { col: c2, row: imgRow }, editAs: 'oneCell' });
+        hh = Math.max(hh, cell.img.hh * 0.75);
+      }
+    });
+    ws.getRow(imgRow).height = hh;
+    ws.getRow(capRow).height = 44;
+    r += 2;
+  }
+
+  xspan(ws, r, 1, n, 'ผู้รับการสอน / Trainee (ลงชื่อ)',
+        { align: XC, font: { bold: true }, fill: 'FFF2F2F2' });
+  ws.getRow(r).height = 20; r++;
+  for (let k = 0; k < Math.ceil(d.rows / 2); k++) {
+    for (let c = 1; c <= n; c += 2) {
+      xput(ws, r, c, 'ชื่อ', { align: XM, font: { size: 12 }, fill: 'FFFAFAFA' });
+      xput(ws, r, c + 1, null);
+    }
+    ws.getRow(r).height = 22; r++;
+  }
+  r = xlSignRow(ws, h, n, r);
+  return ws;
+}
+
+/* ---------- ผังงาน / เลย์เอาต์ : รูปจาก Visio ฯลฯ เต็มหน้า ---------- */
+function xlDiag(wb, h, d, paper) {
+  const widths = [30, 30, 30, 30, 30], n = 5;
+  const ws = xlSheet(wb, 'DIAGRAM', widths, paper, false);
+  const pages = [];
+  for (let i = 0; i < d.items.length; i += d.per) pages.push(d.items.slice(i, i + d.per));
+  let r = 1;
+  pages.forEach((grp, pi) => {
+    r = xlHead(ws, wb, h, n, r, d.title, pi + 1, pages.length);
+    grp.forEach((it, k) => {
+      xspan(ws, r, 1, n, it.img ? null : '(ยังไม่มีรูปผัง)', { align: XC });
+      if (it.img) {
+        const id = wb.addImage({ base64: it.img.b64, extension: 'jpeg' });
+        ws.addImage(id, { tl: { col: 0, row: r - 1 }, br: { col: n, row: r }, editAs: 'oneCell' });
+        ws.getRow(r).height = it.img.hh * 0.75;
+      } else ws.getRow(r).height = 150;
+      r++;
+      xspan(ws, r, 1, n, (pi * d.per + k + 1) + '. ' + (it.desc || ''), { align: XM });
+      ws.getRow(r).height = 24; r++;
+    });
+    if (pi < pages.length - 1) ws.getRow(r - 1).addPageBreak();
+  });
+  if (d.sign) r = xlSignRow(ws, h, n, r);
+  return ws;
+}
+
+/* ---------- ป้ายความปลอดภัย : เก็บเป็นทะเบียนป้ายให้ DCC แก้ข้อความต่อได้ ---------- */
+function xlSigns(wb, h, d, paper) {
+  const widths = [6, 22, 40, 34, 38], n = 5;
+  const ws = xlSheet(wb, 'SIGN', widths, paper, false);
+  let r = xlHead(ws, wb, h, n, 1, 'ป้ายความปลอดภัย (SAFETY SIGN)', 1, 1);
+  ['ลำดับ', 'ประเภทป้าย', 'ข้อความ (ไทย)', 'ข้อความ (อังกฤษ)', 'ภาพสัญลักษณ์'].forEach((t, j) =>
+    xput(ws, r, j + 1, t, { align: XC, font: { bold: true, size: 12 }, fill: 'FFF2F2F2' }));
+  ws.getRow(r).height = 24; r++;
+  d.items.forEach((it, i) => {
+    xput(ws, r, 1, i + 1, { align: XC });
+    xput(ws, r, 2, it.kind, { align: XC, font: { bold: true, color: { argb: it.fg } }, fill: it.band });
+    xput(ws, r, 3, it.th, { align: XM, font: { bold: true, size: 16 } });
+    xput(ws, r, 4, it.en, { align: XM });
+    xput(ws, r, 5, null, { align: XC });
+    if (it.img) {
+      const id = wb.addImage({ base64: it.img.b64, extension: 'jpeg' });
+      ws.addImage(id, { tl: { col: 4, row: r - 1 }, br: { col: 5, row: r }, editAs: 'oneCell' });
+      ws.getRow(r).height = it.img.hh * 0.75;
+    } else ws.getRow(r).height = 46;
+    r++;
+  });
+  r = xlNotes(ws, n, r, [['หมายเหตุ',
+    'รูปทรงและสีของป้ายเป็นไปตาม ISO 3864 — ไฟล์นี้เก็บ "เนื้อหาป้าย" ให้แก้ข้อความต่อได้ '
+    + 'ส่วนป้ายที่พร้อมติดหน้างานให้สั่งพิมพ์จากหน้าเว็บโดยตรง']]);
+  r = xlSignRow(ws, h, n, r);
+  return ws;
+}
+
+/** ทางเข้าเดียวของการสร้างไฟล์ทุกประเภท */
+async function buildAnyWorkbook(ExcelJSLib, kind, h, d, paper) {
+  const wb = new ExcelJSLib.Workbook();
+  wb.creator = 'โปรแกรมสร้างเอกสารสำหรับวิศวกรโรงงาน';
+  ({ TABLE: xlTable, SKILL: xlSkill, OPL: xlOPL, DIAG: xlDiag, SIGN: xlSigns })[kind](wb, h, d, paper);
+  return wb.xlsx.writeBuffer();
+}
+
+/* ---------------------- รวบรวมข้อมูลจากหน้าจอให้ตัวสร้าง Excel ---------------------- */
+async function dataTABLE() {
+  const t = TABLES[docType], rs = curRows(), ps = curPars();
+  const cols = visCols(t, ps);
+  const calc = rs.map((r, i) => rowCalc(t, r, ps, i, rs));
+  return {
+    sheet: docType, title: t.title,
+    pars: (t.pars || []).map(x => x.l + ' : ' + ps[x.id]).join('        ') || null,
+    cols: cols.map(c => ({ h: c.h, w: c.w, num: c.t === 'num' || (c.t === 'calc' && !c.text) })),
+    rows: rs.map((r, i) => ({
+      hi: (t.hi && t.hi(r, ps)) || false,
+      cells: cols.map(c => c.t === 'calc'
+        ? (c.text ? calc[i][c.k] : Number(F(calc[i][c.k], c.dec)))
+        : (r[c.k] == null ? '' : r[c.k])),
+    })),
+    sum: t.sum ? t.sum(rs, ps) : [],
+    groups: pageGroups(rs.length),
+  };
+}
+
+async function dataQP(paper) {
+  const box = IMG_BOX[paper], wpx = PX(Math.round(QP_COLS[3].pct * 1.5));
+  const rows = [];
+  for (const it of items) rows.push({
+    cells: [it.desc || '', it.std || '', '',
+            (it.method || '') + (it.freq ? '\nความถี่ : ' + it.freq : ''), it.fix || ''],
+    img: it.file ? await resize(it.file, box, wpx) : null,
+  });
+  return {
+    sheet: 'QP', title: 'Q-POINT (จุดควบคุมคุณภาพ)',
+    info: 'Process : ' + $('qpProcess').value + '        Station : ' + $('qpStation').value
+        + '        Machine : ' + $('qpMachine').value,
+    cols: QP_COLS.slice(1).map(c => ({ h: c.head, w: c.pct, num: false })),
+    imgCol: 2, rows, sum: [], groups: pageGroups(items.length),
+  };
+}
+
+function dataSKILL() {
+  const min = N($('skMin').value) || 2;
+  const can = skill.skills.map((_, j) => skill.people.filter((_, i) => skLv(i, j) >= 2).length);
+  return {
+    skills: skill.skills, min, can, by: $('skBy').value,
+    people: (skill.people.length ? skill.people : [{ name: '', pos: '', lv: [] }]).map((pp, i) => ({
+      name: pp.name || '', pos: pp.pos || '',
+      lv: skill.skills.map((_, j) => skLv(i, j)),
+      ok: skill.skills.filter((_, j) => skLv(i, j) >= 2).length,
+    })),
+    legend: SK_LV.map(l => [l.v, l.t]), sum: skSummary(),
+  };
+}
+
+async function dataOPL() {
+  const kinds = { basic: 'ความรู้พื้นฐาน', trouble: 'ตัวอย่างปัญหา', kaizen: 'ตัวอย่างการปรับปรุง' };
+  const use = items.slice(0, 4);
+  const wpx = use.length <= 1 ? PX(150) : PX(75);
+  const cells = [];
+  for (const it of use)
+    cells.push({ desc: it.desc, img: it.file ? await resize(it.file, { h: 300 }, wpx) : null });
+  return { kindText: kinds[$('oplKind').value] || '-', trainer: $('oplTrainer').value,
+           cells: cells.length ? cells : [{ desc: '', img: null }], rows: +$('oplRows').value || 8 };
+}
+
+async function dataDIAG() {
+  const kind = $('diagKind').value;
+  const per = +$('diagPer').value;
+  const out = [];
+  for (const it of items)
+    out.push({ desc: it.desc, img: it.file ? await resize(it.file, { h: per === 1 ? 430 : 240 }, 900) : null });
+  return {
+    title: kind === '__other' ? ($('diagTitle').value.trim() || 'DIAGRAM') : kind,
+    per, items: out.length ? out : [{ desc: '', img: null }],
+    sign: $('diagSign').value === '1',
+  };
+}
+
+async function dataSIGN() {
+  const out = [];
+  for (const it of items) {
+    const k = SIGN_KIND[it.kind || 'warn'];
+    out.push({
+      kind: k.label + ' / ' + k.en,
+      band: 'FF' + k.band.slice(1), fg: 'FF' + (k.fg === '#fff' ? 'FFFFFF' : '000000'),
+      th: it.desc || '', en: it.en || '',
+      img: it.file ? await resize(it.file, { h: 130 }, 250) : null,
+    });
+  }
+  return { items: out.length ? out : [{ kind: '-', band: 'FFFFFFFF', fg: 'FF000000',
+                                        th: '', en: '', img: null }] };
+}
+
+/** เซฟไฟล์ที่สร้างเสร็จ */
+function saveXlsx(buf, name) {
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([buf],
+      { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })),
+    download: name,
+  });
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+$('xls').onclick = async () => {
+  if (docType !== 'WI') return exportOther();
+  const blank = items.map((it, i) => it.desc.trim() ? 0 : i + 1).filter(Boolean);
+  if (blank.length && !confirm('ขั้นตอนที่ ' + blank.join(', ') + ' ยังไม่มีรายละเอียด สร้างไฟล์ต่อหรือไม่?')) return;
+  $('xls').disabled = true;
+  const keep = $('msg').textContent;
+  $('msg').textContent = 'กำลังสร้างไฟล์ Excel...';
+  try {
+    const h = header(), box = IMG_BOX[$('paper').value], steps = [];
+    if (h.logo) h.logoXl = await prepLogo(h.logo);
+    if (h.ppe.length) h.ppeStrip = await ppeStripImage(h.ppe);
+    for (const it of items)
+      steps.push({ desc: it.desc.trim(), ctl: it.ctl.trim(), warn: it.warn.trim(),
+                   img: await resize(it.file, box) });
+    const buf = await buildWorkbook(ExcelJS, h, steps, $('paper').value, pageGroups());
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(new Blob([buf],
+        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })),
+      download: 'WI_' + (h.docno || 'Generated') + '.xlsx',
+    });
+    a.click(); URL.revokeObjectURL(a.href);
+    $('msg').textContent = keep + ' · ดาวน์โหลด Excel แล้ว';
+  } catch (err) {
+    $('msg').textContent = 'สร้างไฟล์ไม่สำเร็จ: ' + err.message;
+  } finally { $('xls').disabled = false; }
+};
+
+/** ส่งออก Excel ของเอกสารที่ไม่ใช่ WI */
+async function exportOther() {
+  $('xls').disabled = true;
+  const keep = $('msg').textContent;
+  $('msg').textContent = 'กำลังสร้างไฟล์ Excel...';
+  try {
+    const h = header(), paper = $('paper').value;
+    if (h.logo) h.logoXl = await prepLogo(h.logo);
+    let kind = 'TABLE', d;
+    if (TABLES[docType]) d = await dataTABLE();
+    else if (docType === 'QP') d = await dataQP(paper);
+    else if (docType === 'SKILL') { kind = 'SKILL'; d = dataSKILL(); }
+    else if (docType === 'OPL') { kind = 'OPL'; d = await dataOPL(); }
+    else if (docType === 'DIAG') { kind = 'DIAG'; d = await dataDIAG(); }
+    else { kind = 'SIGN'; d = await dataSIGN(); }
+    const buf = await buildAnyWorkbook(ExcelJS, kind, h, d, paper);
+    saveXlsx(buf, docType + '_' + (h.docno || 'Generated') + '.xlsx');
+    $('msg').textContent = keep + ' · ดาวน์โหลด Excel แล้ว';
+  } catch (err) {
+    $('msg').textContent = 'สร้างไฟล์ไม่สำเร็จ: ' + err.message;
+  } finally { $('xls').disabled = false; }
+}
+
+if (typeof module !== 'undefined') module.exports = {
+  buildWorkbook, COLS, buildAnyWorkbook, xlTable, xlSkill, xlOPL, xlDiag, xlSigns };
+
+/* =======================================================================
+   1) ดึงภาพช็อตสำคัญจากวิดีโอ (Video → Keyframes)
+   หลักการ: ไล่ดูวิดีโอเป็นช่วง ๆ ย่อเป็นภาพจิ๋วแล้ววัดว่าภาพเปลี่ยนไปจาก
+   "ภาพที่เก็บไว้ล่าสุด" มากแค่ไหน ถ้าเปลี่ยนเกินเกณฑ์ถือว่าเป็นขั้นตอนใหม่
+   ทำงานในเครื่องล้วน ไม่ต้องต่อเน็ต ไม่ต้องใช้ AI
+   ======================================================================= */
+const SENS = { fine: .03, normal: .05, coarse: .09 };   // เกณฑ์ความต่างของภาพ
+const MAX_FRAMES = 40;
+let vidFrames = [];                                     // [{t,url,blob,on}]
+
+async function extractKeyframes(file, thresh, onProgress) {
+  const v = document.createElement('video');
+  v.preload = 'auto'; v.muted = true; v.playsInline = true;
+  v.src = URL.createObjectURL(file);
+  await new Promise((ok, no) => {
+    v.onloadedmetadata = ok;
+    v.onerror = () => no(new Error('เปิดไฟล์วิดีโอนี้ไม่ได้ (ลองแปลงเป็น .mp4 ก่อน)'));
+  });
+  let dur = v.duration;
+  if (!isFinite(dur)) {          // ไฟล์ที่อัดมาบางชนิดไม่บอกความยาว ต้องบังคับให้เบราว์เซอร์หาเอง
+    v.currentTime = 1e6;
+    await new Promise(ok => { v.onseeked = ok; });
+    dur = v.duration; v.currentTime = 0;
+    await new Promise(ok => { v.onseeked = ok; });
+  }
+  if (!isFinite(dur) || dur <= 0) throw new Error('อ่านความยาววิดีโอไม่ได้');
+
+  const SW = 64, SH = 36;
+  const sc = Object.assign(document.createElement('canvas'), { width: SW, height: SH });
+  const sg = sc.getContext('2d', { willReadFrequently: true });
+  const bigW = Math.min(v.videoWidth || 1280, 1280);
+  const bigH = Math.round((v.videoHeight || 720) * bigW / (v.videoWidth || 1280));
+  const bc = Object.assign(document.createElement('canvas'), { width: bigW, height: bigH });
+  const bg = bc.getContext('2d');
+
+  const stepT = Math.max(0.35, dur / 200);      // ตรวจไม่เกิน ~200 จุดต่อคลิป
+  const out = [];
+  let prev = null;
+  for (let t = 0; t < dur && out.length < MAX_FRAMES; t += stepT) {
+    v.currentTime = Math.min(t, Math.max(0, dur - 0.05));
+    await new Promise(ok => { v.onseeked = ok; });
+    sg.drawImage(v, 0, 0, SW, SH);
+    const d = sg.getImageData(0, 0, SW, SH).data;
+    let diff = 1;
+    if (prev) {
+      let sum = 0;
+      for (let k = 0; k < d.length; k += 4)
+        sum += Math.abs(d[k] - prev[k]) + Math.abs(d[k + 1] - prev[k + 1]) + Math.abs(d[k + 2] - prev[k + 2]);
+      diff = sum / (SW * SH * 3 * 255);
+    }
+    if (diff > thresh) {
+      bg.drawImage(v, 0, 0, bigW, bigH);
+      const blob = await new Promise(ok => bc.toBlob(ok, 'image/jpeg', 0.9));
+      out.push({ t: v.currentTime, blob, url: URL.createObjectURL(blob), on: true });
+      prev = d.slice(0);
+    }
+    onProgress(t / dur);
+  }
+  URL.revokeObjectURL(v.src);
+  return out;
+}
+
+const mmss = t => Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0');
+
+async function pickFromVideo(file) {
+  $('vdTitle').textContent = 'ดึงภาพจากวิดีโอ : ' + file.name;
+  $('vdFrames').innerHTML = '';
+  $('vdNote').textContent = 'กำลังไล่ดูวิดีโอ...';
+  $('vdAdd').disabled = true;
+  $('vdModal').hidden = false;
+  const run = async () => {
+    $('vdBar').style.width = '0%';
+    $('vdNote').textContent = 'กำลังไล่ดูวิดีโอ...';
+    $('vdFrames').innerHTML = ''; $('vdAdd').disabled = true;
+    try {
+      vidFrames = await extractKeyframes(file, SENS[$('vdSens').value],
+        f => { $('vdBar').style.width = Math.round(f * 100) + '%'; });
+      $('vdBar').style.width = '100%';
+      if (!vidFrames.length) { $('vdNote').textContent = 'ไม่พบภาพที่ต่างกันพอ ลองปรับเป็น "ละเอียด"'; return; }
+      $('vdNote').textContent = 'ได้ ' + vidFrames.length + ' ภาพ — คลิกเพื่อเลือก/ไม่เลือก';
+      $('vdFrames').innerHTML = vidFrames.map((f, i) =>
+        `<div class="frame on" data-fr="${i}"><img src="${f.url}" alt=""><span>${mmss(f.t)}</span></div>`).join('');
+      $('vdAdd').disabled = false;
+    } catch (err) {
+      $('vdNote').textContent = err.message;
+    }
+  };
+  $('vdSens').onchange = run;
+  run();
+}
+
+$('vdFrames').onclick = e => {
+  const el = e.target.closest('[data-fr]'); if (!el) return;
+  const f = vidFrames[+el.dataset.fr];
+  f.on = !f.on; el.classList.toggle('on', f.on);
+};
+$('vdAll').onclick = () => {
+  const on = vidFrames.some(f => !f.on);
+  vidFrames.forEach((f, i) => { f.on = on; $('vdFrames').children[i].classList.toggle('on', on); });
+};
+$('vdCancel').onclick = () => { $('vdModal').hidden = true; vidFrames = []; };
+$('vdAdd').onclick = () => {
+  vidFrames.filter(f => f.on).forEach(f =>
+    items.push({ file: f.blob, url: f.url, desc: '', ctl: '', warn: '' }));
+  $('vdModal').hidden = true; vidFrames = [];
+  render();
+};
+
+/* =======================================================================
+   2) แต่งรูปในตัว: ลูกศรชี้ / กรอบแดง / เบลอปิดข้อมูล
+   เก็บเป็นรายการ "รอยวาด" แล้ววาดทับรูปต้นฉบับใหม่ทุกครั้ง จึงเลิกทำได้
+   ======================================================================= */
+const ED = { idx: -1, bmp: null, ops: [], tool: 'arrow', drag: null };
+
+async function openEditor(i) {
+  const it = items[i];
+  ED.idx = i; ED.ops = []; ED.drag = null; ED.tool = 'arrow';
+  ED.bmp = await createImageBitmap(it.file, { imageOrientation: 'from-image' });
+  const cv = $('edcv');
+  const k = Math.min(1600 / ED.bmp.width, 1);
+  cv.width = Math.round(ED.bmp.width * k);
+  cv.height = Math.round(ED.bmp.height * k);
+  $('edModal').hidden = false;
+  edTool('arrow');
+  edDraw();
+}
+
+function edTool(t) {
+  ED.tool = t;
+  ['arrow', 'rect', 'blur'].forEach(x => $('ed_' + x).classList.toggle('on', x === t));
+}
+
+function edOp(g, op) {
+  const cv = $('edcv');
+  const lw = Math.max(4, cv.width / 160);   // เส้นหนาตามขนาดรูป ให้เห็นชัดตอนพิมพ์
+  g.save();
+  if (op.type === 'blur') {
+    g.beginPath(); g.rect(op.x, op.y, op.w, op.h); g.clip();
+    g.filter = 'blur(' + Math.max(6, cv.width / 90) + 'px)';
+    g.drawImage(ED.bmp, 0, 0, cv.width, cv.height);
+    g.filter = 'none';
+  } else {
+    g.strokeStyle = '#E5322B'; g.fillStyle = '#E5322B';
+    g.lineWidth = lw; g.lineCap = 'round'; g.lineJoin = 'round';
+    if (op.type === 'rect') {
+      g.strokeRect(op.x, op.y, op.w, op.h);
+    } else {                                   // ลูกศร
+      const x2 = op.x + op.w, y2 = op.y + op.h;
+      const a = Math.atan2(op.h, op.w), head = lw * 4;
+      g.beginPath(); g.moveTo(op.x, op.y);
+      g.lineTo(x2 - Math.cos(a) * head * .8, y2 - Math.sin(a) * head * .8); g.stroke();
+      g.beginPath(); g.moveTo(x2, y2);
+      g.lineTo(x2 - Math.cos(a - .4) * head, y2 - Math.sin(a - .4) * head);
+      g.lineTo(x2 - Math.cos(a + .4) * head, y2 - Math.sin(a + .4) * head);
+      g.closePath(); g.fill();
+    }
+  }
+  g.restore();
+}
+
+function edDraw() {
+  const cv = $('edcv'), g = cv.getContext('2d');
+  g.clearRect(0, 0, cv.width, cv.height);
+  g.drawImage(ED.bmp, 0, 0, cv.width, cv.height);
+  ED.ops.forEach(op => edOp(g, op));
+  if (ED.drag) edOp(g, ED.drag);
+}
+
+(() => {
+  const cv = $('edcv');
+  const pos = e => {
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height };
+  };
+  cv.addEventListener('pointerdown', e => {
+    const p = pos(e);
+    ED.drag = { type: ED.tool, x: p.x, y: p.y, w: 0, h: 0 };
+    try { cv.setPointerCapture(e.pointerId); } catch (_) { }
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!ED.drag) return;
+    const p = pos(e);
+    ED.drag.w = p.x - ED.drag.x; ED.drag.h = p.y - ED.drag.y;
+    edDraw();
+  });
+  cv.addEventListener('pointerup', () => {
+    if (!ED.drag) return;
+    if (Math.abs(ED.drag.w) > 4 || Math.abs(ED.drag.h) > 4) {
+      if (ED.drag.type !== 'arrow' && ED.drag.w < 0) { ED.drag.x += ED.drag.w; ED.drag.w *= -1; }
+      if (ED.drag.type !== 'arrow' && ED.drag.h < 0) { ED.drag.y += ED.drag.h; ED.drag.h *= -1; }
+      ED.ops.push(ED.drag);
+    }
+    ED.drag = null; edDraw();
+  });
+})();
+
+$('ed_arrow').onclick = () => edTool('arrow');
+$('ed_rect').onclick = () => edTool('rect');
+$('ed_blur').onclick = () => edTool('blur');
+$('edUndo').onclick = () => { ED.ops.pop(); edDraw(); };
+$('edCancel').onclick = () => { $('edModal').hidden = true; };
+$('edSave').onclick = () => {
+  $('edcv').toBlob(blob => {
+    const it = items[ED.idx];
+    URL.revokeObjectURL(it.url);
+    it.file = blob; it.url = URL.createObjectURL(blob);
+    $('edModal').hidden = true;
+    render();
+  }, 'image/jpeg', 0.92);
+};
+
+
+/* ---------------------- โหมดสว่าง / มืด ---------------------- */
+(() => {
+  const btn = $('theme'), NEXT = { auto: 'light', light: 'dark', dark: 'auto' };
+  const NAME = { auto: 'ตามเครื่อง', light: 'สว่าง', dark: 'มืด' };
+  let mode = 'auto';
+  try { mode = localStorage.getItem('wi_theme') || 'auto'; } catch (_) { }
+  const apply = () => {
+    if (mode === 'auto') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', mode);
+    btn.textContent = { auto: '🌗', light: '☀️', dark: '🌙' }[mode];
+    btn.title = 'โหมดแสดงผล : ' + NAME[mode] + ' (คลิกเพื่อสลับ)';
+  };
+  btn.onclick = () => {
+    mode = NEXT[mode];
+    try { localStorage.setItem('wi_theme', mode); } catch (_) { }
+    apply();
+  };
+  apply();
+})();
+
+Object.entries(CONFIG.fields).forEach(([id, v]) => { if ($(id)) $(id).value = v; });
+initPositions();
+renderPPE();
+render();
+</script>
+</body>
+</html>
