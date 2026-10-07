@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#05924a">
+<title>ระบบแจ้งซ่อมบำรุง — YOUR COMPANY</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  // ต้องอยู่หลัง CDN — ไม่งั้น utility class อย่าง font-bold จะยังใช้ฟอนต์ระบบ
+  tailwind.config = {
+    theme: { extend: { fontFamily: { sans: ['Sarabun', 'system-ui', 'sans-serif'] } } }
+  };
+</script>
+<?!= include("styles") ?>
+</head>
+
+<!-- prefillMachine มาจาก QR — server กรองให้ตรงทะเบียนแล้ว
+     วางใน attribute ไม่ใช่ในแท็ก script เพราะ scriptlet แบบ escape เหมาะกับ attribute
+     แต่ผิด context ถ้าอยู่ในสตริง JavaScript -->
+<body data-prefill-machine="<?= prefillMachine ?>">
+
+<noscript>
+  <div style="padding:24px;font-family:Sarabun,sans-serif;text-align:center">
+    <h1 style="font-size:18px;font-weight:700">เบราว์เซอร์นี้ปิดการใช้งาน JavaScript</h1>
+    <p style="color:#64748b">ระบบแจ้งซ่อมต้องใช้ JavaScript — กรุณาเปิดใช้งานแล้วโหลดหน้านี้ใหม่</p>
+  </div>
+</noscript>
+
+<div class="flex min-h-screen">
+
+<!-- ══════════════════ SIDEBAR ══════════════════ -->
+<aside id="sidebar" class="sidebar">
+  <div class="px-5 py-5">
+    <div class="logo-chip mb-3">
+      <!-- โลโก้: สลับ data URI นี้เป็นของบริษัทคุณได้เลย (หรือใส่ URL รูปก็ได้) -->
+      <img src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='10' fill='%23334155'/%3E%3Cpath d='M31 14a7 7 0 0 0-9.9 8.4L14 29.5 18.5 34l7.1-7.1A7 7 0 0 0 34 17.1l-3.6 3.6-2.9-2.9L31 14z' fill='%23f8fafc'/%3E%3C/svg%3E"
+           alt="logo">
+    </div>
+    <p class="font-bold text-white leading-tight">ระบบแจ้งซ่อมบำรุง</p>
+    <p class="text-[11px] text-slate-400">Maintenance System</p>
+  </div>
+
+  <nav class="px-3 space-y-1">
+    <p class="nav-head">งานประจำวัน</p>
+    <button type="button" class="tab-btn" data-tab="list">
+      <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6v3H9z"/><path d="M15 5h2a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2"/><path d="M9 12h6M9 16h4"/></svg><span class="grow text-left">ติดตามสถานะงาน</span>
+      <span id="navCountOpen" class="nav-pill zero" title="งานที่ยังไม่ปิด">0</span>
+    </button>
+    <button type="button" class="tab-btn" data-tab="create">
+      <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4H7a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-7"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L13 13l-4 1 1-4z"/></svg><span class="grow text-left">แจ้งซ่อมใหม่</span>
+    </button>
+    <button type="button" class="tab-btn needs-login" data-tab="check">
+      <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.2l2.4 2.4 4.6-4.9"/></svg><span class="grow text-left">เช็คชีตประจำวัน</span>
+      <span id="navCheck" class="nav-pill zero" style="background:#0284c7" title="เครื่องที่ยังไม่ตรวจวันนี้">0</span>
+    </button>
+
+    <!-- ขึ้นเฉพาะคนที่ล็อกอินแล้ว เพราะต้องรู้ว่า "ฉัน" คือใครถึงจะกรองงานได้ -->
+    <button type="button" id="navPmBtn" class="tab-btn needs-login hidden" data-tab="pm">
+      <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3.5v4M16 3.5v4"/><path d="M8 14h2M14 14h2M8 17.5h2"/></svg><span class="grow text-left">แผน PM</span>
+      <span id="navPmLate" class="nav-pill zero" style="background:#dc2626" title="เลยกำหนดแล้ว">0</span>
+    </button>
+
+    <button type="button" id="navMineBtn" class="tab-btn needs-login hidden" data-tab="mine">
+      <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 9.5h17v9a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M9 9.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v3.5"/><path d="M3.5 14h17"/></svg><span class="grow text-left">งานของฉัน</span>
+      <span id="navMine" class="nav-pill zero" style="background:#7c3aed" title="งานที่มอบหมายให้ฉันและยังไม่เสร็จ">0</span>
+    </button>
+
+    <button type="button" class="tab-btn" data-tab="feedback">
+      <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 12.5c0 3.9-3.8 7-8.5 7-1 0-2-.1-2.9-.4L4 21l1.4-3.6A6.6 6.6 0 0 1 3.5 12.5c0-3.9 3.8-7 8.5-7s8.5 3.1 8.5 7z"/></svg><span class="grow text-left">แนะนำ / ติชม</span>
+    </button>
+
+    <button type="button" id="navParamBtn" class="tab-btn needs-login hidden" data-tab="param">
+      <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 13.6V5.5a1.5 1.5 0 0 0-3 0v8.1a3.5 3.5 0 1 0 3 0z"/><circle cx="12" cy="17" r="1.3" fill="currentColor" stroke="none"/></svg><span class="grow text-left">พารามิเตอร์เครื่องจักร</span>
+    </button>
+
+    <p class="nav-head needs-login">รายงาน</p>
+    <button type="button" class="tab-btn needs-login" data-tab="report">
+      <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16"/><rect x="6" y="11" width="3.2" height="6"/><rect x="12" y="6" width="3.2" height="11"/><rect x="17.5" y="14" width="2.5" height="3"/></svg><span class="grow text-left">Dashboard Summary</span>
+      <span id="lockBadge" class="hidden nav-pill" style="background:#16a34a" title="เข้าสู่ระบบแล้ว">✓</span>
+    </button>
+    <button type="button" class="tab-btn needs-login" data-tab="kpi">
+      <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg><span class="grow text-left">KPI</span>
+    </button>
+    <button type="button" class="tab-btn needs-login" data-tab="timeline">
+      <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span class="grow text-left">ไทม์ไลน์ย้อนเหตุการณ์</span>
+    </button>
+    <button type="button" class="tab-btn needs-login" data-tab="qr">
+      <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1"/><rect x="13.5" y="3.5" width="7" height="7" rx="1"/><rect x="3.5" y="13.5" width="7" height="7" rx="1"/><path d="M13.5 13.5h3v3h-3zM17.5 17.5h3v3h-3z"/></svg><span class="grow text-left">QR ติดเครื่องจักร</span>
+    </button>
+
+    <p id="navExtHead" class="nav-head needs-login hidden">ระบบอื่น</p>
+    <a id="navStock" href="#" target="_blank" rel="noopener"
+       class="tab-btn needs-login hidden" title="เปิดระบบเบิก-รับ-นับอะไหล่ในแท็บใหม่">
+      <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 8.2v7.6a1.5 1.5 0 0 1-.8 1.3l-7 3.6a1.5 1.5 0 0 1-1.4 0l-7-3.6a1.5 1.5 0 0 1-.8-1.3V8.2"/><path d="M3.9 7.4l7.4-3.6a1.5 1.5 0 0 1 1.4 0l7.4 3.6-8.1 4z"/><path d="M12 11.4V20"/></svg><span class="grow text-left">ระบบ Stock อะไหล่</span>
+      <span class="text-slate-500 text-xs" aria-hidden="true">↗</span>
+    </a>
+  </nav>
+
+  <div class="mt-auto p-3 space-y-2">
+    <button type="button" id="refreshBtn"
+            class="w-full flex items-center justify-center gap-2 bg-slate-700/70 hover:bg-slate-600 text-slate-100 px-3 py-2 rounded-lg text-sm font-medium transition">
+      <span id="refreshIco">⟳</span> Refresh ข้อมูล
+    </button>
+    <button type="button" id="loginBtn"
+            class="w-full flex items-center justify-center gap-2 bg-[#05924a] hover:bg-[#046b36] text-white px-3 py-2 rounded-lg text-sm font-semibold shadow-lg shadow-[#05924a]/20 transition">
+      🔑 เข้าสู่ระบบ
+    </button>
+    <button type="button" id="logoutBtn"
+            class="hidden w-full bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-lg text-sm font-medium transition">
+      ⎋ ออกจากระบบ
+    </button>
+    <div id="whoami" class="hidden items-center gap-2.5 text-[11px] px-2.5 py-2 rounded-lg"
+         style="background:rgba(1,226,108,.12);color:#9be7c0"></div>
+    <div class="side-toggle">
+      <button type="button" id="themeBtn" title="สลับโหมดสว่าง / มืด">🌙 มืด</button>
+      <button type="button" id="langBtn" title="Switch language">EN</button>
+    </div>
+    <div id="flowStatus" class="flow-chip flow-off" role="status" aria-live="polite">—</div>
+  </div>
+</aside>
+<!-- ขึ้นเมื่อ init() พัง จะได้ไม่ต้องเดาว่าทำไมหน้าเว็บว่าง -->
+<div id="bootError" class="hidden fixed top-0 inset-x-0 z-[60] bg-red-600 text-white text-sm px-4 py-3 text-center"></div>
+<div id="scrim" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-30 md:hidden"></div>
+
+<!-- ══════════════════ CONTENT ══════════════════ -->
+<div class="flex-1 min-w-0 flex flex-col">
+
+  <header class="app-header">
+    <button type="button" id="burger" class="md:hidden text-2xl leading-none px-1 text-slate-600"
+            aria-label="เปิดเมนู" aria-controls="sidebar">☰</button>
+    <div class="min-w-0">
+      <h2 id="pageTitle" class="font-bold text-lg truncate leading-tight">ติดตามสถานะงาน</h2>
+      <p id="pageSub" class="text-xs text-slate-500 truncate">รายการแจ้งซ่อมทั้งหมดในระบบ</p>
+    </div>
+    <div class="ml-auto text-right shrink-0">
+      <div id="clockTime" class="clock-time">--:--:--</div>
+      <div id="clockDate" class="clock-date hidden sm:block">&nbsp;</div>
+    </div>
+
+    <!-- ต้องล็อกอินก่อนถึงจะรู้ว่า "งานของฉัน" คืออะไร คนแจ้งซ่อมทั่วไปจึงไม่เห็นกระดิ่ง -->
+    <div id="bellWrap" class="needs-login relative shrink-0">
+      <button type="button" id="bellBtn" class="bell-btn" aria-label="การแจ้งเตือน"
+              aria-expanded="false" aria-controls="bellPanel">🔔<span id="bellCount" class="bell-dot hidden">0</span></button>
+      <div id="bellPanel" class="bell-panel hidden" role="dialog" aria-label="การแจ้งเตือน">
+        <div class="bell-head">
+          <b class="text-sm">การแจ้งเตือน</b>
+          <button type="button" id="bellRead" class="text-xs font-semibold" style="color:var(--brand)">อ่านแล้วทั้งหมด</button>
+        </div>
+        <div id="bellList"></div>
+      </div>
+    </div>
+    <button type="button" data-tab="create"
+            class="hidden sm:flex items-center gap-1.5 bg-[#05924a] hover:bg-[#046b36] text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm shadow-[#05924a]/30 transition">
+      ＋ แจ้งซ่อม
+    </button>
+  </header>
+
+  <main class="p-4 md:p-6 grow">
+
+  <!-- ────────── ติดตามสถานะงาน (หน้าหลัก) ────────── -->
+  <section id="tab-list" class="tab-panel space-y-4">
+
+    <div id="miniStats" class="grid grid-cols-2 lg:grid-cols-5 gap-3"></div>
+    <!-- การ์ดชุดนี้คือภาพรวมของทั้งระบบ ไม่ขึ้นกับช่วงเวลา
+         งานค้างจากเดือนก่อนก็ยังค้างอยู่จริง กรองออกแล้วจะกลายเป็นการบอกว่าไม่มีงานค้าง
+         แต่ต้องเขียนไว้ให้ชัด ไม่งั้นเลขบนการ์ดกับบนชิปจะไม่ตรงกันโดยไม่มีคำอธิบาย -->
+    <p class="text-[11px] text-slate-400 -mt-2">การ์ดด้านบนคือสถานะปัจจุบันของทั้งระบบ ไม่ขึ้นกับช่วงเวลา ส่วนตัวเลขบนปุ่มกรองนับเฉพาะในช่วงที่เลือก</p>
+
+    <div class="panel p-4">
+      <div class="flex flex-wrap items-center gap-2 mb-4">
+        <div id="filterBar" class="flex flex-wrap gap-2 grow"></div>
+        <select id="datePreset" aria-label="ช่วงเวลา" class="inp !w-auto">
+          <option value="">ทุกช่วงเวลา</option>
+          <option value="today">วันนี้</option>
+          <option value="7">7 วันล่าสุด</option>
+          <option value="30">30 วันล่าสุด</option>
+          <option value="month">เดือนนี้</option>
+          <option value="lastmonth">เดือนที่แล้ว</option>
+        </select>
+        <div class="flex items-center gap-1.5 grow min-w-0 basis-56">
+          <input id="dateFrom" type="date" aria-label="ตั้งแต่วันที่" class="inp !w-auto grow min-w-0">
+          <span class="text-slate-400 shrink-0" aria-hidden="true">–</span>
+          <input id="dateTo" type="date" aria-label="ถึงวันที่" class="inp !w-auto grow min-w-0">
+        </div>
+        <select id="priorityFilter" aria-label="กรองตามความสำคัญ" class="inp !w-auto">
+          <option value="">ทุกความสำคัญ</option>
+        </select>
+        <div class="relative grow sm:grow-0">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" aria-hidden="true">🔍</span>
+          <input id="searchBox" type="search" aria-label="ค้นหาใบแจ้งซ่อม"
+                 class="inp !w-full sm:!w-64 !pl-9" placeholder="ค้นหา เลขที่ / เครื่องจักร / ผู้แจ้ง">
+        </div>
+      </div>
+
+      <!-- โผล่เมื่อเลือกอย่างน้อย 1 ใบ -->
+      <div id="bulkBar" class="bulk-bar hidden">
+        <span id="bulkCount" class="font-bold text-sm">เลือก 0 ใบ</span>
+        <select id="bulkStatus" class="inp !w-auto" aria-label="เปลี่ยนสถานะเป็น"></select>
+        <select id="bulkAssign" class="inp !w-auto" aria-label="มอบหมายให้"></select>
+        <select id="bulkPri" class="inp !w-auto" aria-label="เปลี่ยนความสำคัญ"></select>
+        <button type="button" id="bulkApply" class="btn" style="background:var(--brand)">ใช้กับที่เลือก</button>
+        <button type="button" id="bulkClear" class="chip">ล้างการเลือก</button>
+      </div>
+
+      <div class="overflow-x-auto -mx-4 px-4">
+        <table class="w-full text-sm as-cards">
+          <thead>
+            <tr>
+              <th class="th bulk-col w-8"><input type="checkbox" id="bulkAll" aria-label="เลือกทั้งหมดในหน้านี้"></th>
+              <th class="th">เลขที่</th>
+              <th class="th">เครื่องจักร</th>
+              <th class="th">อาการ</th>
+              <th class="th">ความสำคัญ</th>
+              <th class="th">ผู้รับผิดชอบ</th>
+              <th class="th">วันที่แจ้ง</th>
+              <th class="th">กำหนดเสร็จ</th>
+              <th class="th">สถานะ</th>
+              <th class="th w-10"><span class="sr-only">เปิดรายละเอียด</span></th>
+            </tr>
+          </thead>
+          <tbody id="ticketBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────────── งานของฉัน (ช่าง) ────────── -->
+  <section id="tab-mine" class="tab-panel hidden space-y-4">
+
+    <div id="mineStats" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+
+    <div class="panel p-4">
+      <h3 class="panel-title">งานซ่อมที่มอบหมายให้ฉัน</h3>
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <div id="mineRange" class="flex flex-wrap gap-2"></div>
+        <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer ml-auto">
+          <input id="mineDone" type="checkbox" class="w-4 h-4 accent-[#05924a]"> แสดงงานที่ปิดแล้วด้วย
+        </label>
+      </div>
+      <p id="mineRangeNote" class="text-[11px] text-slate-400 mb-3"></p>
+      <div class="overflow-x-auto -mx-4 px-4">
+        <table class="w-full text-sm as-cards">
+          <thead>
+            <tr>
+              <th class="th">เลขที่</th>
+              <th class="th">เครื่องจักร</th>
+              <th class="th">อาการ</th>
+              <th class="th">ความสำคัญ</th>
+              <th class="th">ผู้รับผิดชอบ</th>
+              <th class="th">วันที่แจ้ง</th>
+              <th class="th">กำหนดเสร็จ</th>
+              <th class="th">สถานะ</th>
+              <th class="th w-10"><span class="sr-only">เปิดรายละเอียด</span></th>
+            </tr>
+          </thead>
+          <tbody id="mineBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel p-4">
+      <h3 class="panel-title">งาน PM ที่ฉันดูแล
+        <span id="minePmDue" class="age age-late hidden"></span></h3>
+      <div class="overflow-x-auto -mx-4 px-4">
+        <table class="w-full text-sm">
+          <thead>
+            <tr>
+              <th class="th">เครื่องจักร</th>
+              <th class="th">งาน PM</th>
+              <th class="th num">รอบ (วัน)</th>
+              <th class="th">ทำครั้งล่าสุด</th>
+              <th class="th">ครบกำหนด</th>
+              <th class="th num">เหลือ</th>
+            </tr>
+          </thead>
+          <tbody id="minePmBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────────── แผน PM ────────── -->
+  <section id="tab-pm" class="tab-panel hidden space-y-4">
+
+    <div class="panel p-4">
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="button" id="pmPrev" class="btn" style="background:#64748b" aria-label="เดือนก่อน">‹</button>
+        <div class="text-center min-w-[9rem]">
+          <div id="pmMonthLabel" class="font-bold text-lg leading-tight">—</div>
+          <div id="pmMonthSub" class="text-xs text-slate-500">&nbsp;</div>
+        </div>
+        <button type="button" id="pmNext" class="btn" style="background:#64748b" aria-label="เดือนถัดไป">›</button>
+        <button type="button" id="pmToday" class="btn" style="background:#0284c7">วันนี้</button>
+
+        <select id="pmKindFilter" aria-label="กรองตามประเภทงาน" class="inp !w-auto ml-auto">
+          <option value="">ทุกประเภทงาน</option>
+        </select>
+        <select id="pmMachineFilter" aria-label="กรองตามเครื่องจักร" class="inp !w-auto">
+          <option value="">ทุกเครื่องจักร</option>
+        </select>
+        <button type="button" id="pmPlanBtn" class="btn hidden" style="background:#7c3aed">⚙️ แก้แผน PM</button>
+        <button type="button" id="pmSheetBtn" class="btn" style="background:#475569"
+                title="พิมพ์ใบงาน PM ของทุกรายการที่แสดงอยู่ตอนนี้ รวมเป็นไฟล์เดียว">🖨 ใบงานทั้งเดือน</button>
+        <button type="button" id="pmBuildBtn" class="btn hidden" style="background:var(--brand)">🗓️ ออกตารางล่วงหน้า</button>
+        <button type="button" id="pmLineBtn" class="btn" style="background:#06c755"
+                title="สรุปงาน PM ของเดือนนี้เป็นข้อความ ก๊อปไปวางในไลน์ได้เลย">💬 สรุปส่งไลน์</button>
+        <button type="button" id="pmReportBtn" class="btn hidden" style="background:#0f766e"
+                title="รายงานสรุปงาน PM รายเดือนสำหรับส่งผู้จัดการ">📊 รายงานสรุป PM</button>
+      </div>
+    </div>
+
+    <!-- 6 ใบ — 3 คอลัมน์ลงตัวสองแถวพอดี ถ้าใช้ 5 จะเหลือใบเดียวโดดอยู่แถวล่าง -->
+    <div id="pmStats" class="grid grid-cols-2 lg:grid-cols-3 gap-3"></div>
+
+    <div class="panel p-4">
+      <h3 class="panel-title">ปฏิทิน PM</h3>
+      <div class="overflow-x-auto -mx-4 px-4">
+        <div id="pmCal" class="pm-cal"></div>
+      </div>
+      <div class="pm-legend" id="pmLegend"></div>
+    </div>
+
+    <div class="panel p-4">
+      <h3 class="panel-title">รายการ PM ของเดือนนี้</h3>
+      <div class="overflow-x-auto -mx-4 px-4">
+        <table class="w-full text-sm as-cards">
+          <thead>
+            <tr>
+              <th class="th">วันที่วางแผน</th>
+              <th class="th">ประเภท</th>
+              <th class="th">เครื่องจักร</th>
+              <th class="th">งาน PM</th>
+              <th class="th num">ชม.</th>
+              <th class="th">ผู้รับผิดชอบ</th>
+              <th class="th">สถานะ</th>
+              <th class="th">วันที่ทำจริง</th>
+              <th class="th">หมายเหตุ</th>
+              <th class="th w-10 no-print"><span class="sr-only">จัดการ</span></th>
+            </tr>
+          </thead>
+          <tbody id="pmListBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────────── หน้าต่างจัดการรายการ PM ────────── -->
+  <div id="pmItemModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md p-5 space-y-3 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between">
+        <h3 id="pmItemTitle" class="font-bold">รายการ PM</h3>
+        <button type="button" id="pmItemClose" class="text-2xl leading-none text-slate-400" aria-label="ปิด">×</button>
+      </div>
+      <div id="pmItemInfo" class="text-sm text-slate-600"></div>
+
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div><label class="lbl" for="pmItemStatus">สถานะ</label>
+          <select id="pmItemStatus" class="inp"></select></div>
+        <div><label class="lbl" for="pmItemKind">ประเภทงาน</label>
+          <select id="pmItemKind" class="inp"></select></div>
+      </div>
+      <div><label class="lbl" for="pmItemHours">ชั่วโมงที่วางแผนไว้</label>
+        <input id="pmItemHours" type="number" min="0" step="0.5" class="inp num" placeholder="เช่น 4">
+        <p class="text-[11px] text-slate-400 mt-1">
+          ใช้คิดว่าเดือนนี้ทีมมีงานที่วางแผนไว้กี่ชั่วโมง เทียบกับเวลาที่ถูกงานด่วนแย่งไป</p></div>
+      <div><label class="lbl" for="pmItemActual">วันที่ทำจริง</label>
+        <input id="pmItemActual" type="date" class="inp"></div>
+      <div><label class="lbl" for="pmItemOwner">ผู้รับผิดชอบ</label>
+        <input id="pmItemOwner" class="inp" list="teamList"></div>
+      <div><label class="lbl" for="pmItemNote">หมายเหตุ</label>
+        <input id="pmItemNote" class="inp" placeholder="เช่น รออะไหล่ / ทำพร้อมกับงานซ่อม"></div>
+      <p id="pmItemMsg" class="text-sm text-red-600"></p>
+      <div class="flex gap-2">
+        <button type="button" id="pmItemSave" class="btn grow" style="background:var(--brand)">บันทึกสถานะ</button>
+        <button type="button" id="pmItemPdf" class="btn" style="background:#475569"
+                title="พิมพ์ใบงานพร้อมหัวข้อตรวจ ให้ช่างถือเข้าไปหน้าเครื่อง">📄 ใบงาน PM</button>
+      </div>
+
+      <div class="border-t border-slate-100 pt-3 space-y-3">
+        <h4 class="font-bold text-sm">ตรวจแล้วเจอของที่ต้องซ่อม</h4>
+        <p class="text-[11px] text-slate-400">งาน PM ไม่ได้สร้างใบแจ้งซ่อมเองอีกแล้ว
+          เปิดใบเฉพาะตอนตรวจแล้วเจอของเสียจริง ใบที่ได้จะถูกผูกกลับมาที่รายการ PM นี้</p>
+        <div><label class="lbl" for="pmFound">สิ่งที่พบ <b class="req">*</b></label>
+          <input id="pmFound" class="inp" placeholder="เช่น ซีลเพลารั่ว น้ำมันหยดลงพื้น"></div>
+        <div><label class="lbl" for="pmFoundPri">ความเร่งด่วน</label>
+          <select id="pmFoundPri" class="inp"></select></div>
+        <button type="button" id="pmMakeTicket" class="btn w-full" style="background:#0284c7">🔧 เปิดใบแจ้งซ่อมจากงานนี้</button>
+      </div>
+
+      <div class="border-t border-slate-100 pt-3 space-y-3">
+        <h4 class="font-bold text-sm">เลื่อนแผน + ออกรายการชดเชย</h4>
+        <p class="text-[11px] text-slate-400">รายการเดิมจะถูกปิดเป็น "เลื่อน" และออกรายการใหม่ในวันที่เลือก
+          ประวัติการเลื่อนเก็บไว้ทั้งคู่ จะได้ตอบผู้จัดการได้ว่าเลื่อนกี่ครั้งเพราะอะไร</p>
+        <div><label class="lbl" for="pmMoveDate">วันที่ใหม่</label>
+          <input id="pmMoveDate" type="date" class="inp"></div>
+        <div><label class="lbl" for="pmMoveReason">เหตุผลที่เลื่อน <b class="req">*</b></label>
+          <input id="pmMoveReason" class="inp" placeholder="เช่น สายการผลิตไม่หยุด / รออะไหล่"></div>
+        <button type="button" id="pmMoveBtn" class="btn w-full" style="background:#f97316">เลื่อนแผน</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────── หน้าต่างแก้แผน PM (หัวหน้างาน) ────────── -->
+  <div id="pmPlanModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <form id="pmPlanForm" class="bg-white rounded-2xl w-full max-w-lg p-5 space-y-3 max-h-[90vh] overflow-y-auto" novalidate>
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold">เพิ่ม / แก้แผน PM</h3>
+        <button type="button" id="pmPlanClose" class="text-2xl leading-none text-slate-400" aria-label="ปิด">×</button>
+      </div>
+      <p class="text-xs text-slate-500">เครื่องจักร + ชื่องาน ที่ซ้ำกับของเดิม = แก้ของเดิม ไม่ใช่เพิ่มแถวใหม่
+        · แก้แล้วกด "ออกตารางล่วงหน้า" เพื่อให้ปฏิทินอัปเดต</p>
+      <div><label class="lbl" for="ppPick">เลือกแผนเดิมมาแก้</label>
+        <select id="ppPick" class="inp"><option value="">— เพิ่มแผนใหม่ —</option></select></div>
+      <div><label class="lbl" for="ppMachine">เครื่องจักร <b class="req">*</b></label>
+        <select id="ppMachine" class="inp"></select></div>
+      <div><label class="lbl" for="ppTask">งาน PM <b class="req">*</b></label>
+        <input id="ppTask" class="inp" placeholder="เช่น ตรวจเช็คระบบหล่อลื่นและเปลี่ยนน้ำมันเกียร์"></div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div><label class="lbl" for="ppCycle">รอบ (วัน) <b class="req">*</b></label>
+          <input id="ppCycle" type="number" min="1" step="1" value="90" class="inp num"></div>
+        <div><label class="lbl" for="ppLast">ทำครั้งล่าสุด</label>
+          <input id="ppLast" type="date" class="inp"></div>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div><label class="lbl" for="ppKind">ประเภทงาน</label>
+          <select id="ppKind" class="inp"></select></div>
+        <div><label class="lbl" for="ppHours">ชั่วโมงที่วางแผน</label>
+          <input id="ppHours" type="number" min="0" step="0.5" value="4" class="inp num"></div>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div><label class="lbl" for="ppOwner">ผู้รับผิดชอบ</label>
+          <input id="ppOwner" class="inp" list="teamList"></div>
+        <label class="flex items-end gap-2 text-sm pb-2 cursor-pointer">
+          <input id="ppActive" type="checkbox" class="w-4 h-4 accent-[#05924a]" checked> ใช้งานอยู่
+        </label>
+      </div>
+      <div>
+        <label class="lbl" for="ppChecklist">หัวข้อตรวจ — บรรทัดละหัวข้อ</label>
+        <textarea id="ppChecklist" rows="7" class="inp" style="font-family:inherit"
+          placeholder="ตรวจระดับน้ำมันเกียร์ | อยู่ระหว่างขีด MIN–MAX&#10;อัดจาระบีแบริ่งทุกจุด | 3 จุด&#10;วัดอุณหภูมิเสื้อเกียร์ | ไม่เกิน 70 °C"></textarea>
+        <p class="text-[11px] text-slate-400 mt-1">
+          ใส่เกณฑ์ต่อท้ายด้วยเครื่องหมาย <b>|</b> เช่น <span class="font-mono">วัดแรงดันลม | 6–8 bar</span>
+          — ช่องเกณฑ์นี้คือสิ่งที่ทำให้ใบงานเป็นคู่มือตรวจจริง ไม่ใช่แค่รายการชื่อ<br>
+          เว้นว่างไว้ก็ได้ ใบงานจะพิมพ์บรรทัดว่างให้ช่างเขียนเอง 8 บรรทัด</p>
+      </div>
+      <p id="ppMsg" class="text-sm text-red-600"></p>
+      <button type="submit" id="ppSave" class="btn w-full" style="background:var(--brand)">บันทึกแผน</button>
+    </form>
+  </div>
+
+  <!-- ────────── แนะนำ / ติชม ────────── -->
+  <section id="tab-feedback" class="tab-panel hidden space-y-4">
+    <form id="fbForm" class="panel p-6 space-y-5 max-w-3xl" novalidate>
+      <div class="border-b border-slate-100 pb-4">
+        <h2 class="text-lg font-bold">แนะนำ / ติชม ฝ่ายวิศวกรรมและซ่อมบำรุง</h2>
+        <p class="text-sm text-slate-500 mt-1">
+          ความเห็นของคุณถูกอ่านโดยหัวหน้างานเท่านั้น และนำไปใช้ปรับปรุงการทำงานจริง</p>
+      </div>
+
+      <div><label class="lbl">ประเภท <b class="req">*</b></label>
+        <div id="fbTypes" class="flex flex-wrap gap-2"></div></div>
+
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div><label class="lbl" for="fbDept">แผนกของคุณ <b class="req">*</b></label>
+          <select id="fbDept" class="inp"></select></div>
+        <div><label class="lbl" for="fbBy">ชื่อผู้ให้ความเห็น</label>
+          <input id="fbBy" class="inp" placeholder="เว้นว่างได้ ไม่บังคับ">
+          <p class="text-[11px] text-slate-400 mt-1">ไม่ลงชื่อก็ส่งได้ · ลงชื่อไว้จะติดต่อกลับได้ถ้าต้องการรายละเอียดเพิ่ม</p></div>
+      </div>
+
+      <div id="fbStarWrap">
+        <label class="lbl">ให้คะแนนภาพรวมของฝ่ายซ่อมบำรุง <span class="text-slate-400 font-normal">(ไม่บังคับ)</span></label>
+        <div class="stars" data-stars role="radiogroup" aria-label="ให้คะแนน">
+          <button type="button" class="star" data-star="1" aria-label="1 ดาว">★</button>
+          <button type="button" class="star" data-star="2" aria-label="2 ดาว">★</button>
+          <button type="button" class="star" data-star="3" aria-label="3 ดาว">★</button>
+          <button type="button" class="star" data-star="4" aria-label="4 ดาว">★</button>
+          <button type="button" class="star" data-star="5" aria-label="5 ดาว">★</button>
+          <span class="star-text text-xs text-slate-400 ml-1">ยังไม่ให้คะแนน</span>
+        </div>
+      </div>
+
+      <div><label class="lbl" for="fbSubject">หัวข้อเรื่อง <b class="req">*</b></label>
+        <input id="fbSubject" class="inp" placeholder="เช่น อยากให้มีช่างประจำกะดึก"></div>
+
+      <div><label class="lbl" for="fbDetail">รายละเอียด</label>
+        <textarea id="fbDetail" rows="5" class="inp" maxlength="2000"
+                  placeholder="เล่าให้ละเอียดเท่าที่สะดวก — เหตุการณ์ เครื่องไหน ช่วงไหน จะช่วยให้แก้ได้ตรงจุด"></textarea></div>
+
+      <p id="fbMsg" class="text-sm"></p>
+      <button type="submit" id="fbSend" class="btn w-full sm:w-auto" style="background:var(--brand)">
+        ส่งความคิดเห็น</button>
+    </form>
+
+    <!-- ปุ่มลอยมุมขวาล่าง — อยู่ในหน้านี้เท่านั้น
+         วางไว้ในตัว section เลย พอสลับเมนู section ถูกซ่อน ปุ่มก็หายตาม ไม่ต้องมีโค้ดคุม -->
+    <button type="button" id="beerFab" class="beer-fab" title="เลี้ยงเบียร์ช่างซ่อมบำรุง">
+      <span aria-hidden="true">🍺</span><span class="beer-fab-txt">เลี้ยงเบียร์ช่าง</span>
+    </button>
+  </section>
+
+  <!-- ────────── พารามิเตอร์เครื่องจักร ────────── -->
+  <section id="tab-param" class="tab-panel hidden space-y-4">
+
+    <!-- ───── หน้าแรก: การ์ดสถานะรายเครื่อง ───── -->
+    <div id="paramHome" class="space-y-4">
+      <div class="panel p-4">
+        <div class="flex flex-wrap items-center gap-3">
+          <p id="paramRound" class="text-sm text-slate-500 grow"></p>
+          <a id="paramFormLink" class="btn hidden" style="background:#0284c7" target="_blank" rel="noopener">✏️ บันทึกค่ารอบนี้</a>
+          <button type="button" id="paramRefresh" class="btn" style="background:#64748b">⟳ ดึงข้อมูลใหม่</button>
+        </div>
+        <p id="pmExternal" class="hidden text-[11px] text-slate-400 mt-2"></p>
+        <p id="paramStation" class="text-sm font-semibold mt-2" style="color:var(--brand)" hidden></p>
+        <label id="paramMineWrap" class="mine-only mt-2" hidden>
+          <input type="checkbox" id="paramMineOnly"><span>เฉพาะเครื่องที่ฉันดูแล</span></label>
+      </div>
+
+      <div id="paramAlert" class="hidden param-alert"></div>
+      <div id="paramCards" class="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"></div>
+    </div>
+
+    <!-- ───── หน้าที่สอง: รายละเอียดเครื่องเดียว ───── -->
+    <div id="paramDetail" class="hidden space-y-4">
+      <div class="panel p-4">
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="grow min-w-0">
+            <h2 id="pdTitle" class="text-lg font-bold"></h2>
+            <p id="pdWho" class="text-sm text-slate-500"></p>
+          </div>
+          <button type="button" id="pdBack" class="btn" style="background:#64748b">← กลับ</button>
+        </div>
+      </div>
+
+      <div id="pdAlert" class="hidden param-alert">
+        <p id="pdAlertText" class="font-bold"></p>
+        <div class="flex flex-wrap gap-2 mt-3">
+          <button type="button" id="pdTicket" class="btn" style="background:#dc2626">🔧 เปิดใบแจ้งซ่อมจากค่านี้</button>
+        </div>
+        <p id="pdTicketMsg" class="text-sm mt-2"></p>
+      </div>
+
+      <p id="pdIso" class="text-[11px] text-slate-400"></p>
+
+      <!-- การรับรองของวิศวกร/หัวหน้า — คนละเรื่องกับ "ค่าอยู่ในพิกัดไหม"
+           ค่าอยู่ในพิกัดคือเครื่องคำนวณ ส่วนการรับรองคือมีคนรับผิดชอบว่าตรวจแล้วจริง -->
+      <div id="pdOk" class="pd-ok hidden">
+        <div class="grow">
+          <p id="pdOkState" class="font-bold"></p>
+          <p id="pdOkWho" class="text-[11px] text-slate-400"></p>
+        </div>
+        <div id="pdOkBtns" class="flex items-center gap-2 flex-wrap hidden">
+          <!-- ชื่อที่จะไปอยู่บนแถวรับรอง ต้องเห็นก่อนกด ไม่ใช่รู้ตอนเปิดชีตดูย้อนหลัง
+               อ่านจากคนที่ล็อกอิน ไม่ให้พิมพ์เอง — ชื่อที่พิมพ์ได้คือลายเซ็นที่ใครก็ปลอมได้ -->
+          <span class="pd-signer">ผู้รับรอง:<b id="pdOkMe"></b></span>
+          <input id="pdOkNote" class="inp" type="text" placeholder="หมายเหตุ (ถ้ามี)">
+          <button type="button" id="pdOkYes" class="btn">✅ รับรองค่ารอบนี้</button>
+          <button type="button" id="pdOkNo" class="btn" style="background:#b45309">↩︎ ตีกลับให้ลงใหม่</button>
+        </div>
+        <p id="pdOkMsg" class="text-sm w-full"></p>
+      </div>
+
+      <div class="panel p-4">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <h3 class="panel-title mb-0">ค่าที่วัดเทียบมาตรฐาน</h3>
+          <div class="flex items-center gap-2 flex-wrap">
+            <p id="pdLegend" class="text-[11px] text-slate-400"></p>
+            <!-- ช่างกรอกที่ Google Form เหมือนเดิม หน้านี้เป็นแดชบอร์ดอ่านอย่างเดียว
+                 ลิงก์อยู่ตรงนี้ด้วยเพราะคนที่เพิ่งเห็นว่าค่าหลุด คือคนที่กำลังจะไปวัดซ้ำ -->
+            <a id="pdFormLink" class="btn hidden" style="background:#0284c7;text-decoration:none"
+               target="_blank" rel="noopener">✏️ ไปกรอกที่ฟอร์ม</a>
+          </div>
+        </div>
+
+        <div id="pdScada" class="pd-scada"></div>
+        <p id="pdGap" class="text-[11px] text-amber-600 mt-3"></p>
+      </div>
+
+      <div class="panel p-4">
+        <h3 class="panel-title">ประวัติการบันทึก 7 รอบล่าสุด</h3>
+        <div class="overflow-x-auto -mx-4 px-4">
+          <table class="w-full text-sm">
+            <thead><tr>
+              <th class="th">วันที่</th><th class="th">รอบ</th><th class="th">ผู้บันทึก</th>
+              <th class="th">สถานะเครื่อง</th><th class="th">ผลตรวจ</th><th class="th">หัวหน้าตรวจสอบ</th>
+            </tr></thead>
+            <tbody id="pdHist"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="paramStats" class="hidden"></div>
+    <select id="pmMachine" class="hidden"></select>
+    <button type="button" id="pmRefresh" class="hidden"></button>
+
+    <div class="panel p-4 hidden" id="paramTrendPanel">
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <h3 class="panel-title !mb-0 grow">ค่าย้อนหลัง</h3>
+        <input id="pmFrom" type="date" aria-label="ตั้งแต่วันที่" class="inp !w-auto">
+        <span class="text-slate-400" aria-hidden="true">–</span>
+        <input id="pmTo" type="date" aria-label="ถึงวันที่" class="inp !w-auto">
+      </div>
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <label class="lbl !mb-0" for="pmTrend">กราฟแนวโน้มของ</label>
+        <select id="pmTrend" class="inp !w-auto"></select>
+      </div>
+      <div class="h-64"><canvas id="pmChart"></canvas></div>
+      <div class="overflow-x-auto -mx-4 px-4 mt-4">
+        <table class="w-full text-sm">
+          <thead>
+            <tr>
+              <th class="th">วันที่</th><th class="th">กะ</th><th class="th">เครื่องจักร</th>
+              <th class="th">พารามิเตอร์</th><th class="th num">ค่า</th>
+              <th class="th">สถานะ</th><th class="th">ผู้บันทึก</th>
+            </tr>
+          </thead>
+          <tbody id="pmLogBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────────── ไทม์ไลน์ย้อนเหตุการณ์ ────────── -->
+  <section id="tab-timeline" class="tab-panel hidden space-y-4">
+    <div class="panel p-4">
+      <div class="flex flex-wrap items-end gap-3">
+        <div class="grow min-w-0 basis-64">
+          <label class="lbl" for="tlMachine">เครื่องจักร <b class="req">*</b></label>
+          <select id="tlMachine" class="inp"></select>
+        </div>
+        <div><label class="lbl" for="tlFrom">ตั้งแต่</label>
+          <input id="tlFrom" type="date" class="inp !w-auto"></div>
+        <div><label class="lbl" for="tlTo">ถึง</label>
+          <input id="tlTo" type="date" class="inp !w-auto"></div>
+        <button type="button" id="tlGo" class="btn" style="background:var(--brand)">🕘 ดูไทม์ไลน์</button>
+      </div>
+      <p class="text-[11px] text-slate-400 mt-2">
+        รวมใบแจ้งซ่อม · งาน PM · เช็คชีตประจำวัน · บันทึกพารามิเตอร์ ของเครื่องนั้นไว้บนแกนเวลาเดียว
+        เรียงจากใหม่ไปเก่า</p>
+    </div>
+
+    <div id="tlChips" class="flex flex-wrap gap-2"></div>
+    <div class="panel p-4"><div id="tlBody" class="tl"></div></div>
+  </section>
+
+  <!-- ────────── ฟอร์มแจ้งซ่อม ────────── -->
+  <section id="tab-create" class="tab-panel hidden">
+    <form id="ticketForm" class="panel p-6 space-y-5 max-w-4xl" novalidate>
+      <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div>
+          <h2 class="text-lg font-bold">ใบแจ้งซ่อมใหม่</h2>
+          <p class="text-xs text-slate-500">กรอกข้อมูลให้ครบเพื่อให้ช่างประเมินงานได้เร็วขึ้น</p>
+        </div>
+        <span class="text-right text-sm shrink-0">
+          <span class="block text-xs text-slate-500">เลขที่ใบแจ้งซ่อม</span>
+          <b id="previewId" class="text-blue-600 text-base">-</b>
+        </span>
+      </div>
+
+      <fieldset class="fs">
+        <legend class="lg">1 · ผู้แจ้ง</legend>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="lbl" for="reporter">ชื่อผู้แจ้ง <b class="req">*</b></label>
+            <input id="reporter" name="reporter" required autocomplete="name" class="inp" placeholder="ชื่อ-นามสกุล">
+          </div>
+          <div>
+            <label class="lbl" for="department">ฝ่าย <b class="req">*</b></label>
+            <input id="department" name="department" required class="inp"
+                   list="deptList" autocomplete="off" placeholder="เลือกจากรายการ หรือพิมพ์เอง">
+            <datalist id="deptList"></datalist>
+            <p class="text-[11px] text-slate-400 mt-1">
+              ไม่มีฝ่ายของคุณในรายการ พิมพ์ลงไปได้เลย</p>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="fs">
+        <legend class="lg">2 · เครื่องจักรและอาการ</legend>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="lbl" for="workType">ลักษณะงาน <b class="req">*</b></label>
+            <select id="workType" name="work_type" required class="inp"></select>
+            <p id="workTypeHint" class="text-[11px] text-slate-500 mt-1"></p>
+          </div>
+          <div>
+            <!-- ไม่มีช่อง "อื่นๆ กรอกเอง" แล้ว — server ปฏิเสธชื่อนอกทะเบียน
+                 ถ้าเครื่องไม่อยู่ในลิสต์ ต้องไปเพิ่มที่ชีต "ทะเบียนเครื่องจักร" ก่อน
+                 (นี่คือสิ่งที่แก้ปัญหาชื่อเครื่องแตก 117 แบบ) -->
+            <label class="lbl" for="machineSelect">เครื่องจักร / อุปกรณ์
+              <b id="machineReq" class="req">*</b>
+              <span id="machineOpt" class="hidden text-[11px] font-normal text-slate-400">(ไม่บังคับ)</span>
+            </label>
+            <select id="machineSelect" required class="inp">
+              <option value="">-- เลือกเครื่องจักร --</option>
+            </select>
+            <p id="machineHint" class="text-[11px] text-slate-400 mt-1">
+              ไม่พบเครื่องที่ต้องการ? แจ้งผู้ดูแลเพิ่มในทะเบียนเครื่องจักรก่อน
+            </p>
+          </div>
+        </div>
+        <div class="mt-4">
+          <label class="lbl" for="description">รายละเอียดอาการเสีย <b class="req">*</b></label>
+          <textarea id="description" name="description" required rows="3" class="inp" placeholder="อาการที่พบ..."></textarea>
+        </div>
+        <div class="grid md:grid-cols-2 gap-4 mt-4">
+          <div>
+            <label class="lbl" for="cause">สาเหตุ (เบื้องต้น)</label>
+            <textarea id="cause" name="cause" rows="3" class="inp" placeholder="คาดว่าเกิดจาก..."></textarea>
+          </div>
+          <div>
+            <label class="lbl" for="action_needed">ความต้องการ <b class="req">*</b></label>
+            <select id="action_needed" name="action_needed" required class="inp">
+              <option value="">-- เลือกความต้องการ --</option>
+            </select>
+            <p class="text-[11px] text-slate-400 mt-1">
+              เลือก "ซ่อมเอง" เมื่อหน้างานจัดการเองได้ ระบบจะได้แยกสถิติออกจากงานที่ต้องเรียกช่าง
+            </p>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="fs">
+        <legend class="lg">3 · ความเร่งด่วน</legend>
+        <span class="lbl block">ระดับความสำคัญ <b class="req">*</b></span>
+        <div id="priorityPick" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-2" role="group" aria-label="ระดับความสำคัญ"></div>
+        <input type="hidden" id="priority" name="priority">
+        <p id="priorityHint" class="text-xs text-slate-500 mt-2"></p>
+      </fieldset>
+
+      <fieldset class="fs">
+        <legend class="lg">4 · รูปถ่าย</legend>
+        <!-- ไม่ใส่ capture เพื่อให้เลือกจากแกลเลอรีได้ด้วย มือถือยังเปิดกล้องได้ปกติ -->
+        <label for="photo" class="dropzone">
+          <span class="text-2xl" aria-hidden="true">📷</span>
+          <span class="text-sm font-semibold">แตะเพื่อถ่ายรูปหรือเลือกไฟล์</span>
+          <span class="text-xs text-slate-500">ระบบจะย่อและบีบอัดให้ไม่เกิน 1.5 MB อัตโนมัติ</span>
+        </label>
+        <input type="file" id="photo" accept="image/*" class="hidden">
+        <p id="photoInfo" class="text-xs text-slate-500 mt-2" role="status" aria-live="polite"></p>
+        <img id="photoPreview" alt="ตัวอย่างรูปที่แนบ" class="hidden mt-3 max-h-60 rounded-xl border border-slate-200 shadow-sm">
+      </fieldset>
+
+      <button type="submit" id="submitBtn"
+              class="w-full bg-[#05924a] hover:bg-[#046b36] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-[#05924a]/25 disabled:opacity-50 transition">
+        ส่งใบแจ้งซ่อม
+      </button>
+    </form>
+  </section>
+
+  <!-- ────────── เช็คชีตประจำวัน ────────── -->
+  <section id="tab-check" class="tab-panel hidden space-y-4">
+    <div class="panel p-3 flex flex-wrap items-center gap-3">
+      <label class="lbl !mb-0" for="checkDate">วันที่</label>
+      <input type="date" id="checkDate" class="inp !w-auto">
+      <a id="checkFormLink" href="#" target="_blank" rel="noopener"
+         class="hidden btn" style="background:var(--brand);text-decoration:none">📝 เปิดฟอร์มเช็คชีต</a>
+      <label id="checkMineWrap" class="mine-only" hidden>
+        <input type="checkbox" id="checkMineOnly"><span>เฉพาะเครื่องที่ฉันดูแล</span></label>
+      <button type="button" id="checkRefresh" class="chip ml-auto">⟳ โหลดใหม่</button>
+    </div>
+    <p id="checkWarn" class="param-alert hidden"></p>
+    <div id="checkStats" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+
+    <!-- รายข้อของเครื่องที่เลือก — ขึ้นเหนือกริดเพราะเป็นสิ่งที่คนกำลังดูอยู่ -->
+    <div id="checkDetail" class="panel p-4 hidden">
+      <div class="flex items-start justify-between gap-2 flex-wrap">
+        <div>
+          <h3 id="cdTitle" class="panel-title mb-0"></h3>
+          <p id="cdWho" class="text-xs text-slate-500"></p>
+        </div>
+        <button type="button" id="cdClose" class="btn" style="background:#64748b">✕ ปิด</button>
+      </div>
+      <div id="cdAlert" class="param-alert hidden mt-3">
+        <p id="cdAlertText" class="font-bold"></p>
+        <div class="flex flex-wrap gap-2 mt-3">
+          <button type="button" id="cdTicket" class="btn" style="background:#dc2626">
+            🔧 เปิดใบแจ้งซ่อมจากข้อที่ไม่ผ่าน</button>
+          <a id="cdPhoto" href="#" target="_blank" rel="noopener"
+             class="hidden btn" style="background:#0284c7;text-decoration:none">🖼️ ดูรูปหลักฐาน</a>
+        </div>
+        <p id="cdTicketMsg" class="text-sm mt-2"></p>
+      </div>
+      <div id="cdGroups" class="cd-groups"></div>
+      <p id="cdIso" class="text-[11px] text-slate-400 mt-3"></p>
+    </div>
+
+    <div class="panel p-4">
+      <h3 class="panel-title">สถานะการตรวจรายเครื่อง</h3>
+      <div id="checkGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+    </div>
+  </section>
+
+  <!-- ────────── QR ติดหน้าเครื่องจักร ────────── -->
+  <section id="tab-qr" class="tab-panel hidden space-y-4">
+    <div class="panel p-4 no-print">
+      <h3 class="panel-title">สติกเกอร์ QR สำหรับติดหน้าเครื่อง</h3>
+      <p class="text-sm text-slate-600 mb-3">
+        พนักงานสแกนแล้วฟอร์มจะเลือกเครื่องนั้นไว้ให้เลย ไม่ต้องพิมพ์ชื่อเอง
+        — แก้ปัญหาชื่อเครื่องจักรที่สะกดไม่ตรงกัน และแจ้งซ่อมได้เร็วขึ้น
+      </p>
+      <div class="flex flex-wrap items-center gap-3">
+        <label class="lbl !mb-0" for="qrFilter">กรองตามกลุ่ม</label>
+        <select id="qrFilter" class="inp !w-auto"></select>
+        <button type="button" id="qrPrint" class="btn" style="background:var(--brand)">🖨️ พิมพ์ทั้งหมด</button>
+        <span id="qrCount" class="text-xs text-slate-500"></span>
+      </div>
+    </div>
+    <div id="qrGrid" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3"></div>
+  </section>
+
+  <!-- ────────── หน้าจอเข้าสู่ระบบ (เฉพาะ Dashboard/Export) ────────── -->
+  <section id="lockScreen" class="tab-panel hidden">
+    <div class="panel p-8 max-w-md mx-auto mt-6 text-center">
+      <div class="w-14 h-14 rounded-2xl grid place-items-center text-2xl mx-auto mb-4"
+           style="background:#e8fbf1;color:#05924a" aria-hidden="true">🔒</div>
+      <h2 class="text-lg font-bold">ส่วนนี้ต้องเข้าสู่ระบบ</h2>
+      <p class="text-sm text-slate-500 mt-1 mb-6">
+        Dashboard และการส่งออกข้อมูล มีค่าใช้จ่าย เวลาซ่อม<br>และข้อมูลเชิงลึกของทั้งโรงงาน<br>
+        <span class="text-slate-400">การแจ้งซ่อม ติดตามสถานะ และตรวจรับงาน ISO<br>ใช้ได้โดยไม่ต้องเข้าสู่ระบบ</span>
+      </p>
+      <button type="button" id="lockLoginBtn"
+              class="w-full bg-[#05924a] hover:bg-[#046b36] text-white font-bold py-3 rounded-xl shadow-lg shadow-[#05924a]/25 transition">
+        🔑 เข้าสู่ระบบ
+      </button>
+      <p id="lockNote" class="hidden text-sm text-amber-700 bg-amber-50 rounded-lg p-3 mt-4 text-left"></p>
+    </div>
+  </section>
+
+  <!-- ────────── DASHBOARD ────────── -->
+  <section id="tab-report" class="tab-panel hidden space-y-4" data-active="0">
+
+    <!-- ตัวกรองช่วงเวลา -->
+    <div class="panel p-3 flex flex-wrap items-center gap-3">
+      <span class="text-sm font-semibold text-slate-600">ช่วงเวลา</span>
+      <select id="yearPicker" aria-label="เลือกปี" class="inp !w-auto"></select>
+      <select id="monthPicker" aria-label="เลือกเดือน" class="inp !w-auto"></select>
+      <span id="periodInfo" class="text-xs text-slate-500 ml-auto"></span>
+      <button type="button" id="exportBtn"
+              class="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm shadow-green-600/30 transition">
+        ⬇ Export Excel
+      </button>
+    </div>
+
+    <!-- แถบหน้าย่อย -->
+    <div id="subTabs" class="subtabs" role="tablist"></div>
+
+    <!-- 1) หน้าสรุป -->
+    <div id="sub-overview" class="sub-panel space-y-4">
+      <div id="ovStats" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+      <div class="grid lg:grid-cols-3 gap-4">
+        <div class="panel p-4 lg:col-span-2">
+          <h3 class="panel-title">แนวโน้มการแจ้งซ่อมรายเดือน</h3>
+          <div class="h-64"><canvas id="chartTrend"></canvas></div>
+        </div>
+        <div class="panel p-4">
+          <h3 class="panel-title">สัดส่วนสถานะงาน</h3>
+          <div class="h-64"><canvas id="chartStatus"></canvas></div>
+        </div>
+      </div>
+      <div class="panel p-4">
+        <h3 class="panel-title">Top 5 เครื่องจักรที่เสียบ่อยที่สุด</h3>
+        <div class="h-64"><canvas id="chartTop5"></canvas></div>
+      </div>
+    </div>
+
+    <!-- 1.5) Pivot สรุปรายเดือน — ชุดกราฟที่ใช้พรีเซนต์ผู้จัดการ -->
+    <div id="sub-pivot" class="sub-panel hidden space-y-4">
+      <div class="panel p-3 flex flex-wrap items-center gap-3 text-sm">
+        <span class="font-semibold text-slate-600">สถานะ</span>
+        <select id="pvStatus" aria-label="กรองตามสถานะ" class="inp !w-auto">
+          <option value="">ทั้งหมด</option>
+          <option value="ซ่อมแล้ว">ซ่อมแล้ว</option>
+          <option value="รอซ่อม">รอซ่อม</option>
+        </select>
+        <span class="font-semibold text-slate-600">เครื่องจักร</span>
+        <select id="pvMachine" aria-label="กรองตามเครื่องจักร" class="inp !w-auto max-w-[16rem]"></select>
+        <span class="font-semibold text-slate-600">แสดง Top</span>
+        <select id="pvTop" aria-label="จำนวนเครื่องที่แสดง" class="inp !w-auto">
+          <option value="8">8 อันดับ</option>
+          <option value="12" selected>12 อันดับ</option>
+          <option value="20">20 อันดับ</option>
+          <option value="0">ทั้งหมด</option>
+        </select>
+      </div>
+
+      <div id="pvStats" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+
+      <div class="grid lg:grid-cols-2 gap-4">
+        <div class="panel p-4">
+          <h3 class="panel-title">จำนวนรายการการแจ้งซ่อม</h3>
+          <div class="h-80"><canvas id="chartPvCount"></canvas></div>
+        </div>
+        <div class="panel p-4">
+          <h3 class="panel-title">ค่าใช้จ่ายรายเครื่องจักร</h3>
+          <p id="pvCostNote" class="text-[11px] text-slate-400 -mt-1 mb-2"></p>
+          <div class="h-80"><canvas id="chartPvCost"></canvas></div>
+        </div>
+      </div>
+
+      <div class="grid lg:grid-cols-2 gap-4">
+        <div class="panel p-4">
+          <h3 class="panel-title">ผลรวมของค่าใช้จ่าย</h3>
+          <div class="overflow-x-auto max-h-96 overflow-y-auto">
+            <table class="w-full text-sm"><thead><tr>
+              <th class="th">เครื่องจักร</th><th class="th num">ผลรวม ของ ค่าใช้จ่าย</th>
+            </tr></thead><tbody id="pvCostBody"></tbody></table>
+          </div>
+        </div>
+        <div class="panel p-4">
+          <h3 class="panel-title">นับจำนวนของเครื่องจักร</h3>
+          <div class="overflow-x-auto max-h-96 overflow-y-auto">
+            <table class="w-full text-sm"><thead><tr>
+              <th class="th">เครื่องจักร</th><th class="th num">นับจำนวน ของ เครื่องจักร</th>
+            </tr></thead><tbody id="pvCountBody"></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2) จำนวนแจ้งซ่อม-ค่าใช้จ่ายรวม -->
+    <div id="sub-cost" class="sub-panel hidden space-y-4">
+      <div id="costStats" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+      <div class="panel p-4">
+        <h3 class="panel-title">จำนวนใบแจ้งซ่อม เทียบ ค่าใช้จ่ายรวม (รายเดือน)</h3>
+        <div class="h-72"><canvas id="chartCostMix"></canvas></div>
+      </div>
+      <div class="panel p-4">
+        <h3 class="panel-title">ค่าใช้จ่ายสะสมรายเครื่อง (Pareto)</h3>
+        <p class="text-xs text-slate-500 mb-2">
+          แท่ง = ค่าใช้จ่ายรายเครื่อง · เส้น = สัดส่วนสะสม — เครื่องที่อยู่ก่อนเส้นแตะ 80%
+          คือกลุ่มที่ลงมือแล้วได้ผลมากที่สุด
+        </p>
+        <div class="h-80"><canvas id="chartPareto"></canvas></div>
+        <p id="paretoNote" class="text-sm mt-3 text-slate-600"></p>
+      </div>
+      <div class="panel p-4">
+        <h3 class="panel-title">สรุปรายเดือน</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm"><thead><tr>
+            <th class="th">เดือน</th><th class="th num">จำนวนใบ</th><th class="th num">เสร็จ</th>
+            <th class="th num">ค่าใช้จ่ายรวม</th><th class="th num">เฉลี่ย/ใบ</th>
+          </tr></thead><tbody id="costMonthBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3) รายการซ่อมซ้ำ -->
+    <div id="sub-repeat" class="sub-panel hidden space-y-4">
+      <div class="panel p-3 flex flex-wrap items-center gap-3 text-sm">
+        <label class="font-semibold text-slate-600" for="repeatWindow">
+          นับเป็น "ซ่อมซ้ำ" เมื่อเครื่องเดิมเสียอีกครั้งภายใน
+        </label>
+        <select id="repeatWindow" class="inp !w-auto">
+          <option value="7">7 วัน</option>
+          <option value="15">15 วัน</option>
+          <option value="30" selected>30 วัน</option>
+          <option value="60">60 วัน</option>
+          <option value="90">90 วัน</option>
+        </select>
+      </div>
+      <div id="repeatStats" class="grid grid-cols-2 lg:grid-cols-3 gap-3"></div>
+      <div class="panel p-4">
+        <h3 class="panel-title">รายการซ่อมซ้ำ — นับจำนวนครั้งต่อเครื่อง (สูตรเดียวกับชีทเดิม)</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm"><thead><tr>
+            <th class="th">เครื่องจักร</th><th class="th num">จำนวนครั้งที่แจ้ง</th>
+            <th class="th">สถานะ</th><th class="th">ความเสี่ยง</th>
+          </tr></thead><tbody id="repeatCountBody"></tbody></table>
+        </div>
+      </div>
+
+      <div class="panel p-4">
+        <h3 class="panel-title">คู่ใบแจ้งซ่อมที่เกิดซ้ำภายในกรอบเวลา</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm"><thead><tr>
+            <th class="th">เครื่องจักร</th><th class="th">ใบก่อนหน้า</th><th class="th">ใบซ้ำ</th>
+            <th class="th num">ห่างกัน</th><th class="th">อาการซ้ำ</th><th class="th num">ค่าใช้จ่ายรวม</th>
+          </tr></thead><tbody id="repeatBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4) Heatmap -->
+    <div id="sub-heat" class="sub-panel hidden space-y-4">
+      <div class="panel p-3 flex flex-wrap items-center gap-3 text-sm">
+        <label class="font-semibold text-slate-600" for="heatMode">มุมมอง</label>
+        <select id="heatMode" class="inp !w-auto">
+          <option value="machine">เครื่องจักร × เดือน</option>
+          <option value="weekday">วันในสัปดาห์ × ช่วงเวลา</option>
+        </select>
+        <span class="text-xs text-slate-500">* Heatmap ใช้ข้อมูลทั้งปีที่เลือก</span>
+      </div>
+      <div class="panel p-4">
+        <h3 id="heatTitle" class="panel-title">ความถี่การเสีย</h3>
+        <div class="overflow-x-auto"><div id="heatWrap"></div></div>
+        <div class="flex items-center gap-2 mt-4 text-xs text-slate-500">
+          <span>น้อย</span>
+          <span class="heat-legend" aria-hidden="true"></span>
+          <span>มาก</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5) Machine Ranking -->
+    <div id="sub-rank" class="sub-panel hidden space-y-4">
+      <div class="panel p-3 flex flex-wrap items-center gap-3 text-sm">
+        <label class="font-semibold text-slate-600" for="rankBy">จัดอันดับตาม</label>
+        <select id="rankBy" class="inp !w-auto">
+          <option value="count">จำนวนครั้งที่เสีย</option>
+          <option value="cost">ค่าใช้จ่ายรวม</option>
+          <option value="downtime">เวลาหยุดเครื่องรวม</option>
+          <option value="repeat">จำนวนครั้งที่ซ่อมซ้ำ</option>
+        </select>
+      </div>
+      <div class="panel p-4">
+        <h3 class="panel-title">อันดับเครื่องจักร</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm"><thead><tr>
+            <th class="th w-14 num">#</th><th class="th">เครื่องจักร</th><th class="th num">ครั้ง</th>
+            <th class="th">ความเสี่ยง</th><th class="th num">ซ่อมซ้ำ</th><th class="th num">ค่าใช้จ่ายรวม</th>
+            <th class="th num">Downtime รวม</th><th class="th num">MTTR</th>
+            <th class="th num">%</th><th class="th num">Pareto สะสม</th><th class="th">สัดส่วน</th>
+          </tr></thead><tbody id="rankBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5.6) ความคิดเห็น -->
+    <div id="sub-workload" class="sub-panel hidden space-y-4">
+      <div class="panel p-3 flex flex-wrap items-center gap-3 text-sm">
+        <span class="font-semibold text-slate-600">งานที่ค้างอยู่ตอนนี้ — ไม่ขึ้นกับช่วงเวลาที่เลือกด้านบน</span>
+        <label class="ml-auto inline-flex items-center gap-2">
+          <input type="checkbox" id="wlHideEmpty" class="bulk-cb">
+          <span class="text-slate-600">ซ่อนคนที่ไม่มีงานค้าง</span>
+        </label>
+      </div>
+
+      <div id="wlStats" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+
+      <div class="panel p-4">
+        <h3 class="panel-title">ภาระงานรายคน</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm"><thead><tr>
+            <th class="th">ช่าง</th><th class="th num">งานค้าง</th>
+            <th class="th">สัดส่วนตามสถานะ</th>
+            <th class="th num">วิกฤต/ด่วน</th><th class="th num">เลยกำหนด</th>
+            <th class="th num">ปิดในช่วงที่เลือก</th><th class="th num">MTTR</th>
+          </tr></thead><tbody id="wlBody"></tbody></table>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-2">
+          นับทุกคนที่มีชื่อในช่อง "ผู้รับผิดชอบ" รวมชื่อที่ไม่อยู่ในชีต Users แล้ว (ผู้รับเหมา/คนที่ลาออก) ·
+          ใบที่มอบหมายหลายคนนับให้ทุกคน ผลรวมจึงมากกว่าจำนวนใบจริงได้</p>
+      </div>
+    </div>
+
+    <div id="sub-feedback" class="sub-panel hidden space-y-4">
+      <div id="fbStats" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+      <div class="panel p-4">
+        <h3 class="panel-title">ความคิดเห็นจากผู้ใช้บริการ</h3>
+        <p id="fbBeer" class="text-sm text-amber-700 mb-2"></p>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm"><thead><tr>
+            <th class="th">เมื่อไหร่</th><th class="th">ประเภท</th><th class="th">คะแนน</th>
+            <th class="th">เรื่อง</th><th class="th">รายละเอียด</th><th class="th">จากใคร</th>
+          </tr></thead><tbody id="fbBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6) KPI -->
+    <div id="sub-kpi" class="sub-panel hidden space-y-4">
+      <div class="panel p-3 flex flex-wrap items-center gap-4 text-sm">
+        <!-- SLA จริงแยกตามระดับความสำคัญที่ชีต "ตั้งค่า" แล้ว (วิกฤต 4 / ด่วน 24 / ปกติ 72 ชม.)
+             ช่องนี้เหลือเป็นค่าอ้างอิงสำหรับใบเก่าที่ยังไม่มีคอลัมน์ "กำหนดเสร็จ" -->
+        <label class="flex items-center gap-2">
+          <span class="font-semibold text-slate-600">เกณฑ์อ้างอิงสำหรับใบเก่า</span>
+          <input id="slaHours" type="number" min="1" step="1" value="72" class="inp !w-20 num"> ชม.
+        </label>
+        <label class="flex items-center gap-2">
+          <span class="font-semibold text-slate-600">เป้า % ปิดงานทันกำหนด</span>
+          <input id="slaTarget" type="number" min="1" max="100" step="1" value="90" class="inp !w-20 num"> %
+        </label>
+        <!-- มีผลกับการ์ด % Breakdown อย่างเดียว — ตัวชี้วัดอื่นไม่ได้แยกตามกลุ่มเครื่องจักร -->
+        <label class="flex items-center gap-2">
+          <span class="font-semibold text-slate-600">% Breakdown ของ</span>
+          <select id="bdGroup" class="inp !w-auto">
+            <option value="">เครื่องจักรผลิตทั้งหมด</option>
+            <option value="เครื่องจักรหลัก">เฉพาะเครื่องจักรหลัก</option>
+            <option value="เครื่องจักรรอง">เฉพาะเครื่องจักรรอง</option>
+          </select>
+        </label>
+        <span class="text-xs text-slate-400">
+          ใบใหม่ใช้ "กำหนดเสร็จ" รายใบที่ระบบคำนวณจากระดับความสำคัญ
+        </span>
+      </div>
+      <div class="panel p-3 flex flex-wrap items-center gap-3 text-sm" id="kpiPickBar" hidden>
+        <label class="flex items-center gap-2">
+          <span class="font-semibold text-slate-600">ดูทีละตัว</span>
+          <select id="kpiPick" class="inp !w-auto"></select>
+        </label>
+        <label class="flex items-center gap-2">
+          <span class="font-semibold text-slate-600">KPI รายตำแหน่ง</span>
+          <select id="rolePick" class="inp !w-auto"></select>
+        </label>
+        <span class="text-xs text-slate-400">เลือกตัวใดตัวหนึ่งแล้วรายละเอียดจะขึ้นในหน้านี้เลย ไม่ต้องเปิดหน้าต่างซ้อน</span>
+      </div>
+      <div id="kpiCards" class="space-y-6"></div>
+      <div id="rolePanel" class="space-y-4" hidden>
+        <div class="panel p-3 flex flex-wrap items-center gap-3 text-sm">
+          <span class="font-semibold text-slate-600" id="roleNote"></span>
+          <label class="ml-auto inline-flex items-center gap-2">
+            <input type="checkbox" id="tsHideFew" class="bulk-cb" checked>
+            <span class="text-slate-600">ซ่อนคนที่ใบน้อยเกินกว่าจะตัดสิน</span>
+          </label>
+        </div>
+        <div class="panel p-4">
+          <h3 class="panel-title" id="roleTitle">ผลงานรายคน</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm"><thead><tr id="tsHead"></tr></thead><tbody id="tsBody"></tbody></table>
+          </div>
+          <p id="tsNote" class="text-[11px] text-slate-400 mt-2"></p>
+        </div>
+        <div class="panel p-4" id="roleGap" hidden>
+          <h3 class="panel-title">ตัวชี้วัดของตำแหน่งนี้ที่ระบบยังวัดให้ไม่ได้</h3>
+          <dl id="roleGapList" class="text-sm space-y-2"></dl>
+        </div>
+      </div>
+      <div id="kpiInline" class="panel p-4" hidden>
+        <h3 id="kiTitle" class="panel-title"></h3>
+        <p id="kiFormula" class="text-sm text-slate-500 mb-3"></p>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm"><thead><tr id="kiHead"></tr></thead><tbody id="kiBody"></tbody></table>
+        </div>
+      </div>
+      <div class="panel p-4">
+        <h3 class="panel-title">ข้อมูล PM รายเดือน (ตรงกับชีท "PM รายเดือน" ของไฟล์เดิม)</h3>
+        <div id="pmInputs" class="grid sm:grid-cols-3 gap-4"></div>
+      </div>
+
+      <div class="panel p-4">
+        <h3 class="panel-title">นิยาม KPI</h3>
+        <dl id="kpiDefs" class="text-sm space-y-2"></dl>
+      </div>
+    </div>
+
+  </section>
+
+  </main>
+</div>
+</div>
+
+<!-- รายชื่อช่างจากชีต Users — ใช้เติมช่อง "ผู้เข้าซ่อม" ใน modal -->
+<datalist id="teamList"></datalist>
+
+<!-- ══════════════════ MODAL ══════════════════ -->
+<div id="modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto p-4"
+     role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="panel max-w-2xl mx-auto my-4 overflow-hidden animate-pop">
+    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+      <h2 id="mTitle" class="font-bold text-lg"></h2>
+      <button type="button" id="mClose" aria-label="ปิด"
+              class="w-8 h-8 rounded-lg grid place-items-center text-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700">&times;</button>
+    </div>
+    <div id="mBody" class="p-5 space-y-4"></div>
+  </div>
+</div>
+
+<!-- สรุปเตือนตอนเข้าระบบ
+     ขึ้นเองเฉพาะตอนมีงานค้างจริง ถ้าไม่มีอะไรจะบอกก็ไม่ต้องให้กดปิดเปล่า ๆ
+     ปุ่ม "สรุป" ที่ต้องกดเองไม่ได้แก้ปัญหา เพราะคนที่ลืมงานค้างคือคนที่ไม่กด -->
+<!-- รายละเอียดใต้การ์ด KPI — กว้างกว่าหน้าต่างอื่นเพราะเป็นตาราง ไม่ใช่ฟอร์ม -->
+<!-- z-40 ต่ำกว่าหน้าต่างอื่นโดยตั้งใจ — เปิดใบแจ้งซ่อมจากตารางนี้แล้วหน้าต่างใบต้องทับขึ้นมา
+     พอปิดใบก็กลับมาเจอตารางเดิมที่ค้างไว้ ไม่ต้องกดเปิดการ์ดใหม่ทุกครั้ง -->
+<div id="kpiDrillModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 overflow-y-auto p-4"
+     role="dialog" aria-modal="true" aria-labelledby="kdTitle">
+  <div class="panel max-w-5xl mx-auto my-8 overflow-hidden animate-pop">
+    <div class="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+      <div class="min-w-0">
+        <h2 id="kdTitle" class="font-bold text-lg"></h2>
+        <p id="kdFormula" class="text-sm text-slate-500"></p>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button type="button" id="kdBack" class="btn hidden" style="background:#64748b">← กลับ</button>
+        <span id="kdCount" class="text-xs text-slate-400"></span>
+        <button type="button" id="kdClose" aria-label="ปิด"
+                class="w-8 h-8 rounded-lg grid place-items-center text-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700">&times;</button>
+      </div>
+    </div>
+    <div class="p-5">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr id="kdHead"></tr></thead>
+          <tbody id="kdBody"></tbody>
+        </table>
+      </div>
+      <p class="text-[11px] text-slate-400 mt-3">กดที่แถวเพื่อเปิดใบแจ้งซ่อมนั้น</p>
+    </div>
+  </div>
+</div>
+
+<div id="beerModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto p-4"
+     role="dialog" aria-modal="true" aria-labelledby="beerTitle">
+  <div class="panel max-w-sm mx-auto my-8 overflow-hidden animate-pop">
+    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+      <h2 id="beerTitle" class="font-bold text-lg">🍺 เลี้ยงเบียร์ช่าง</h2>
+      <button type="button" id="beerClose" aria-label="ปิด"
+              class="w-8 h-8 rounded-lg grid place-items-center text-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700">&times;</button>
+    </div>
+    <div class="p-5 space-y-3">
+      <p class="text-sm text-slate-500">เครื่องกลับมาเดินแล้วเพราะมีคนลงไปแก้ให้ — บอกเขาสักหน่อย</p>
+
+      <div><label class="lbl" for="beerWho">เลี้ยงใคร <b class="req">*</b></label>
+        <select id="beerWho" class="inp"></select></div>
+      <div><label class="lbl" for="beerMsg">ฝากข้อความ</label>
+        <input id="beerMsg" class="inp" maxlength="200" placeholder="เช่น ขอบคุณที่มาซ่อมตอนตีสอง"></div>
+      <div><label class="lbl" for="beerBy">ชื่อคุณ</label>
+        <input id="beerBy" class="inp" placeholder="เว้นว่างได้ ไม่บังคับ"></div>
+
+      <p id="beerNote" class="text-sm min-h-[1.25rem]" role="alert"></p>
+      <button type="button" id="beerSend" class="btn w-full" style="background:#d97706">ส่งคำขอบคุณ</button>
+
+      <!-- ช่องทางโอนจริง โผล่เฉพาะตอนหัวหน้าใส่ค่าไว้ในชีตตั้งค่า -->
+      <div id="beerPay" class="hidden border-t border-slate-100 pt-3 space-y-3">
+        <p class="text-[11px] text-slate-400">อยากเลี้ยงของจริง — เข้ากองกลางช่าง ไม่ผ่านระบบ ระบบไม่เก็บยอด</p>
+        <div id="beerQrWrap" class="hidden text-center">
+          <!-- ข้างในเป็นได้ทั้ง QR ที่ระบบสร้างจากเบอร์ และรูปที่หัวหน้าแคปมาวาง -->
+          <div id="beerQrBox"></div>
+          <p class="text-[11px] text-slate-400 mt-1"><i class="bi bi-cash-coin"></i> พร้อมเพย์</p>
+        </div>
+        <div id="beerBtcWrap" class="hidden text-center">
+          <div id="beerBtcQr" class="beer-qr-box"></div>
+          <p class="text-[11px] text-slate-400 mt-1"><i class="bi bi-currency-bitcoin"></i> Bitcoin</p>
+          <input id="beerBtcAddr" class="beer-addr" readonly aria-label="ที่อยู่ Bitcoin">
+          <p class="text-[11px] text-slate-400">แตะที่อยู่เพื่อเลือกทั้งหมด แล้วคัดลอก</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="welcomeModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto p-4"
+     role="dialog" aria-modal="true" aria-labelledby="wcTitle">
+  <div class="panel max-w-sm mx-auto my-8 overflow-hidden animate-pop">
+    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+      <h2 id="wcTitle" class="font-bold text-lg">สรุปงานค้าง</h2>
+      <button type="button" id="wcClose" aria-label="ปิด"
+              class="w-8 h-8 rounded-lg grid place-items-center text-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700">&times;</button>
+    </div>
+    <div class="p-5 space-y-3">
+      <p id="wcHello" class="text-sm text-slate-500"></p>
+      <div id="wcCards" class="grid grid-cols-3 gap-2"></div>
+      <div id="wcMine" class="hidden"></div>
+      <div id="wcWarn" class="space-y-1"></div>
+      <button type="button" id="wcGo"
+              class="w-full bg-[#05924a] hover:bg-[#046b36] text-white font-bold py-3 rounded-xl shadow-lg shadow-[#05924a]/25 transition">
+        ดูรายการงาน
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="loginModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto p-4"
+     role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+  <div class="panel max-w-sm mx-auto my-8 overflow-hidden animate-pop">
+    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+      <h2 id="loginTitle" class="font-bold text-lg">เข้าสู่ระบบ</h2>
+      <button type="button" id="loginClose" aria-label="ปิด"
+              class="w-8 h-8 rounded-lg grid place-items-center text-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700">&times;</button>
+    </div>
+    <div class="p-5">
+      <p class="text-sm text-slate-500 mb-4">
+        สำหรับ <b>ช่างซ่อมบำรุง</b> และ <b>หัวหน้างาน/ผู้จัดการ</b><br>
+        <span class="text-slate-400">ผู้แจ้งซ่อมไม่ต้องเข้าสู่ระบบ</span>
+      </p>
+      <form id="pwForm" class="space-y-3">
+        <div>
+          <label class="lbl" for="emailInput">อีเมล</label>
+          <input id="emailInput" type="email" class="inp" autocomplete="username"
+                 placeholder="อีเมลที่หัวหน้าเพิ่มไว้ในระบบ">
+        </div>
+        <div>
+          <label class="lbl" for="pwInput">รหัส PIN</label>
+          <input id="pwInput" type="password" inputmode="numeric" class="inp"
+                 autocomplete="current-password" placeholder="ตัวเลข — ตั้งครั้งแรกขอ 6–8 หลัก">
+        </div>
+        <p id="pwMsg" class="text-sm text-red-600 min-h-[1.25rem]" role="alert"></p>
+        <button id="pwBtn" type="submit"
+                class="w-full bg-[#05924a] hover:bg-[#046b36] text-white font-bold py-3 rounded-xl shadow-lg shadow-[#05924a]/25 transition">
+          เข้าสู่ระบบ
+        </button>
+      </form>
+      <p class="text-xs text-slate-400 mt-4">
+        เข้าสู่ระบบหนึ่งครั้งใช้ได้ 8 ชั่วโมง<br>
+        เข้าครั้งแรก = ตั้ง PIN ของตัวเอง ใส่ตัวเลขที่อยากใช้แล้วกดเข้าสู่ระบบได้เลย
+      </p>
+    </div>
+  </div>
+</div>
+
+<div id="modal2" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto p-4"
+     role="dialog" aria-modal="true" aria-labelledby="m2Title">
+  <div class="panel max-w-3xl mx-auto my-4 overflow-hidden animate-pop">
+    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+      <h2 id="m2Title" class="font-bold text-lg"></h2>
+      <button type="button" id="m2Close" aria-label="ปิด"
+              class="w-8 h-8 rounded-lg grid place-items-center text-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700">&times;</button>
+    </div>
+    <div id="m2Body" class="p-5 space-y-4"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+<!-- defer: ทำงานหลัง parse เสร็จแต่ก่อน DOMContentLoaded จึงยังทันที่ init() ใช้ -->
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<!-- ป้ายตัวเลขบนกราฟ — ต้องโหลดหลัง chart.js เพราะต้อง register เข้ากับตัวหลัก -->
+<script defer src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script>
+  // อ่านจาก data attribute แทนการฝังค่าลงในสตริง JS ตรง ๆ
+  window.PREFILL_MACHINE = document.body.dataset.prefillMachine || "";
+</script>
+<?!= include("app") ?>
+</body>
+</html>

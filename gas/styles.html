@@ -1,0 +1,1098 @@
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   ระบบแจ้งซ่อมบำรุง — styles.css
+   Plain CSS (Tailwind Play CDN ไม่ประมวลผล @apply ในไฟล์ CSS ภายนอก)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* สีแบรนด์ — เปลี่ยนเป็นสีของบริษัทคุณได้ — เขียว #01e26c
+   ใช้เขียวสดเป็นสีเน้นบนพื้นเข้ม และเขียวเข้มกว่าสำหรับปุ่ม/ตัวอักษรบนพื้นขาว
+   (เขียวสดบนขาวมี contrast แค่ ~1.7:1 อ่านไม่ออก จึงใช้เป็นสีตกแต่งเท่านั้น) */
+:root {
+  --brand:      #05924a;   /* ปุ่มหลัก — ตัวอักษรขาวบนสีนี้ได้ contrast 5.3:1 */
+  --brand-dark: #046b36;
+  --brand-glow: #01e26c;   /* สีโลโก้ ใช้บนพื้นเข้ม */
+  --ink:        #0f172a;
+  --muted:      #64748b;
+  --line:       #e2e8f0;
+  --bg:         #f4f7f5;
+
+  /* ── สเกลกลางของหน้าตา ──
+     เดิมเงากับความโค้งตั้งค่ากันแบบเฉพาะกิจทีละที่ พอทำเมนูใหม่ก็เดาใหม่
+     รวมไว้ที่เดียวแล้วเรียกใช้ทุกที่ อยากปรับความหนักเบาทั้งระบบก็แก้บรรทัดเดียว
+
+     เน้น "เส้นขอบ" มากกว่า "เงา" โดยตั้งใจ
+     เงาจาง ๆ หายไปเลยบนจอแท็บเล็ตถูก ๆ กลางแดดในโรงงาน แต่เส้นขอบไม่หาย */
+  --line-strong: #cbd5e1;      /* เส้นของ่านออกในที่สว่าง ใช้กับการ์ดและช่องกรอก */
+  --bw-1: 1px;                 /* ตาราง — 332 แถวถ้าหนากว่านี้จะลายตา */
+  --bw-2: 2px;                 /* การ์ด ปุ่ม ช่องกรอก */
+  --bw-4: 4px;                 /* เน้นเป็นพิเศษ เช่น แถบซ้ายของงานวิกฤต */
+
+  --r-xs: .25rem;  --r-sm: .5rem;  --r-md: .75rem;
+  --r-lg: 1rem;    --r-xl: 1.25rem;
+
+  /* 3 ระดับความสูง — การ์ด · ลอยเหนือหน้า · หน้าต่างซ้อน */
+  --e1: 0 1px 2px rgba(15, 23, 42, .07);
+  --e2: 0 3px 8px rgba(15, 23, 42, .10);
+  --e3: 0 12px 28px rgba(15, 23, 42, .18);
+  /* ผิวจม — ช่องกรอกและพื้นที่รอรับค่า */
+  --inset: inset 0 2px 3px rgba(15, 23, 42, .09);
+  /* ผิวยุบ — ปุ่มที่กำลังถูกกด */
+  --pressed: inset 0 2px 4px rgba(15, 23, 42, .22);
+}
+
+/* โลโก้บริษัท — วางบนชิปขาวเพื่อไม่ดัดแปลงสีโลโก้ */
+.logo-chip {
+  background: #fff;
+  border-radius: .5rem;
+  padding: .3125rem .5rem;
+  display: inline-flex;
+  align-items: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+}
+.logo-chip img { display: block; height: 1.5rem; width: auto; }
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Sarabun', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; background-clip: content-box; }
+
+/* ─────────── SIDEBAR ─────────── */
+.sidebar {
+  position: fixed;
+  top: 0; bottom: 0; left: 0;
+  width: 16rem;
+  background: linear-gradient(180deg, #0d1f17 0%, #06120c 100%);
+  display: flex;
+  flex-direction: column;
+  z-index: 40;
+  transform: translateX(-100%);
+  transition: transform .25s cubic-bezier(.4, 0, .2, 1);
+  overflow-y: auto;
+}
+.sidebar.open { transform: none; }
+@media (min-width: 768px) {
+  .sidebar { position: sticky; height: 100vh; flex: 0 0 16rem; transform: none; }
+}
+
+.nav-head {
+  padding: 1rem .75rem .375rem;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #5c7a68;
+}
+
+.tab-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: .625rem;
+  width: 100%;
+  padding: .625rem .75rem;
+  border-radius: .625rem;
+  font-size: .9rem;
+  font-weight: 600;
+  color: #c2d4c9;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .15s, color .15s;
+}
+.tab-btn:hover { background: rgba(1, 226, 108, .12); color: #fff; }
+/* ลิงก์ข้ามระบบใช้ <a> แต่ต้องหน้าตาเหมือนปุ่มเมนูอื่น */
+a.tab-btn { text-decoration: none; }
+.tab-btn.active {
+  background: linear-gradient(90deg, var(--brand) 0%, #07b45b 100%);
+  color: #fff;
+  box-shadow: 0 4px 14px -4px rgba(5, 146, 74, .9);
+}
+.tab-btn.active::before {
+  content: "";
+  position: absolute; left: -.75rem; top: 25%; bottom: 25%;
+  width: 3px; border-radius: 0 3px 3px 0; background: var(--brand-glow);
+}
+/* ไอคอนเมนูเป็น SVG เส้น 2px ไม่ใช่ emoji แล้ว
+   emoji เรนเดอร์ไม่เหมือนกันทุกเครื่อง และดูไม่เป็นทางการเวลาแคปหน้าจอแนบเอกสาร ISO
+   SVG ใช้ currentColor จึงเปลี่ยนสีตามสถานะเมนูและตามธีมได้เอง */
+.nav-ico {
+  width: 1.25rem; height: 1.25rem; flex: 0 0 1.25rem;
+  display: block; opacity: .85;
+}
+.tab-btn.active .nav-ico, .tab-btn:hover .nav-ico { opacity: 1; }
+
+.nav-pill {
+  background: #f97316;
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 700;
+  min-width: 1.375rem;
+  padding: .1rem .4rem;
+  border-radius: 9999px;
+  text-align: center;
+}
+.nav-pill.zero { display: none; }
+
+.flow-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: .4rem .5rem;
+  border-radius: .5rem;
+  text-align: center;
+}
+.flow-off  { background: rgba(148, 163, 184, .15); color: #94a3b8; }
+.flow-warn { background: rgba(245, 158, 11, .18);  color: #fbbf24; }
+.flow-ok   { background: rgba(34, 197, 94, .18);   color: #4ade80; }
+.flow-err  { background: rgba(239, 68, 68, .18);   color: #f87171; }
+
+/* ─────────── HEADER ─────────── */
+.app-header {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: .75rem;
+  padding: .75rem 1rem;
+  background: rgba(255, 255, 255, .85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+@media (min-width: 768px) { .app-header { padding: .875rem 1.5rem; } }
+
+/* ─────────── รูปผู้ใช้ที่ล็อกอินอยู่ ─────────── */
+.avatar {
+  position: relative; display: inline-grid; place-items: center; flex: 0 0 auto;
+  width: 34px; height: 34px; border-radius: 50%; overflow: hidden;
+  background: linear-gradient(135deg, #05924a, #01e26c);
+  color: #fff; font-weight: 800; font-size: 15px; line-height: 1;
+  box-shadow: 0 0 0 2px rgba(1, 226, 108, .25);
+}
+/* รูปวางทับอักษรย่อ ถ้าโหลดไม่ขึ้นมันลบตัวเองแล้วอักษรย่อโผล่มาแทน */
+.avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+/* ─────────── นาฬิกาบนหัวเว็บ ─────────── */
+.clock-time {
+  font-size: 1.0625rem; font-weight: 800; line-height: 1.1; letter-spacing: .02em;
+  font-variant-numeric: tabular-nums;   /* กันตัวเลขขยับซ้ายขวาทุกวินาที */
+  color: var(--brand);
+}
+.clock-date { font-size: 11px; line-height: 1.3; color: #64748b; white-space: nowrap; }
+
+/* ─────────── PANELS / CARDS ─────────── */
+.panel {
+  background: #fff;
+  border: var(--bw-1) solid var(--line-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--e1);
+}
+.panel-title {
+  font-weight: 700; font-size: .9375rem; margin: 0 0 .875rem;
+  display: flex; align-items: center; gap: .5rem;
+}
+
+/* ปุ่มบันทึกกราฟเป็นรูป — เกาะขวาสุดของหัวข้อแผง */
+.chart-save {
+  margin-left: auto; flex: 0 0 auto;
+  font-size: 11px; font-weight: 600; color: #475569;
+  background: #f1f5f9; border: 1px solid var(--line); border-radius: .5rem;
+  padding: .1875rem .5rem; cursor: pointer; white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.chart-save:hover { background: #e2e8f0; color: #0f172a; }
+
+.stat {
+  background: #fff;
+  border: var(--bw-1) solid var(--line-strong);
+  border-radius: var(--r-lg);
+  padding: .875rem 1rem;
+  box-shadow: var(--e1);
+  display: flex; align-items: center; gap: .75rem;
+}
+.stat-ico {
+  width: 2.5rem; height: 2.5rem; flex: 0 0 2.5rem;
+  border-radius: var(--r-md); display: grid; place-items: center; font-size: 1.125rem;
+}
+.stat-label { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.stat-num   { font-size: 1.5rem; font-weight: 700; line-height: 1.15; }
+.stat-sub   { font-size: 11px; color: #94a3b8; }
+
+.kpi {
+  background: #fff;
+  border: var(--bw-1) solid var(--line-strong);
+  border-radius: var(--r-lg);
+  padding: 1.125rem;
+  box-shadow: var(--e1);
+}
+.kpi-head  { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
+.kpi-label { font-size: .8125rem; font-weight: 600; color: var(--muted); }
+.kpi-num   { font-size: 2rem; font-weight: 700; line-height: 1.1; margin: .25rem 0; }
+.kpi-note  { font-size: 11.5px; color: #94a3b8; }
+.kpi-bar   { height: 6px; border-radius: 99px; background: #eef2f7; overflow: hidden; margin-top: .625rem; }
+.kpi-bar > i { display: block; height: 100%; border-radius: 99px; transition: width .4s ease; }
+
+.trend { font-size: 11.5px; font-weight: 700; padding: .1rem .4rem; border-radius: .375rem; }
+.trend-up   { background: #fee2e2; color: #b91c1c; }
+.trend-down { background: #dcfce7; color: #15803d; }
+
+/* ─────────── FORM ─────────── */
+.lbl { display: block; font-size: .8125rem; font-weight: 600; margin-bottom: .3125rem; color: #334155; }
+.req { color: #ef4444; font-weight: 700; }
+
+/* ช่องกรอกเป็น "ผิวจม" — บอกว่าตรงนี้รอรับค่า โดยไม่ต้องใช้สี
+   สำคัญกลางแดดที่สีซีดจนแยกไม่ออกว่าอะไรกดได้อะไรกรอกได้ */
+.inp {
+  width: 100%;
+  border: var(--bw-2) solid var(--line-strong);
+  border-radius: var(--r-md);
+  padding: .5rem .75rem;
+  font-size: .875rem;
+  font-family: inherit;
+  background: #fbfcfd;
+  color: var(--ink);
+  box-shadow: var(--inset);
+  transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.inp:hover { border-color: #94a3b8; }
+.inp:focus {
+  outline: none;
+  border-color: var(--brand);
+  background: #fff;
+  box-shadow: var(--inset), 0 0 0 3px rgba(5, 146, 74, .18);
+}
+textarea.inp { resize: vertical; line-height: 1.6; }
+
+/* Safari บน iPhone จะซูมหน้าจอเองทุกครั้งที่แตะช่องกรอกที่ตัวอักษรเล็กกว่า 16px
+   ช่างยืนหน้าเครื่องแล้วต้องมาปัดจอกลับทุกช่อง — บนจอเล็กจึงบังคับ 16px */
+@media (max-width: 767px) {
+  .inp, input, select, textarea { font-size: 16px; }
+}
+select.inp { cursor: pointer; }
+
+.fs { border: var(--bw-1) solid var(--line-strong); border-radius: var(--r-md); padding: 1rem 1.125rem 1.125rem; margin: 0; }
+.lg { font-size: .8125rem; font-weight: 700; color: var(--brand); padding: 0 .375rem; }
+
+.dropzone {
+  display: flex; flex-direction: column; align-items: center; gap: .25rem;
+  padding: 1.75rem 1rem;
+  border: var(--bw-2) dashed var(--line-strong);
+  border-radius: var(--r-md);
+  background: #f8fafc;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color .15s, background .15s;
+}
+.dropzone:hover { border-color: var(--brand); background: #eff6ff; }
+
+/* ─────────── TABLE ─────────── */
+thead th {
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  border-bottom: var(--bw-2) solid var(--line-strong);
+}
+.th { padding: .625rem .75rem; white-space: nowrap; }
+.td { padding: .625rem .75rem; border-bottom: var(--bw-1) solid #e8edf3; vertical-align: middle; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr { transition: background .12s; }
+tbody tr[data-id]:hover { background: #f8fafc; cursor: pointer; }
+tbody tr:last-child .td { border-bottom: none; }
+
+.empty { padding: 3rem 1rem; text-align: center; color: #94a3b8; font-size: .875rem; }
+
+/* ─────────── BADGES ─────────── */
+.badge {
+  display: inline-flex; align-items: center; gap: .3125rem;
+  padding: .1875rem .5625rem;
+  border-radius: 9999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.badge::before { content: ""; width: 6px; height: 6px; border-radius: 99px; background: currentColor; }
+.badge-wait   { background: #fef9c3; color: #854d0e; }  /* รอซ่อม — เหลือง */
+.badge-repair { background: #ffedd5; color: #9a3412; }  /* กำลังซ่อม — ส้ม */
+.badge-verify { background: #e0f2fe; color: #075985; }  /* รอฝ่ายผลิตตรวจสอบ — ฟ้า */
+.badge-done   { background: #dcfce7; color: #166534; }  /* ซ่อมเสร็จสมบูรณ์ — เขียว */
+/* ม่วง — ตั้งใจให้ต่างจาก 4 สีเดิมชัด ๆ เพราะเป็นสถานะเดียวที่ของ "ไม่ได้อยู่ในโรงงาน" */
+.badge-out    { background: #ede9fe; color: #5b21b6; }  /* ส่งซ่อมภายนอก — ม่วง */
+/* เทาล้วน ไม่มีสี — ใบที่ยกเลิกแล้วไม่ควรดึงสายตาเท่างานที่ยังต้องทำ */
+.badge-cancel { background: #f1f5f9; color: #64748b; }  /* ยกเลิก — เทา */
+
+/* แถวที่ยกเลิก: จางลงและขีดฆ่าเลขที่ใบ ให้รู้ตั้งแต่เหลือบตาว่าไม่ใช่งานที่ต้องทำ
+   ไม่ซ่อนทิ้ง เพราะต้องหาเจอเพื่อกู้คืนได้ */
+tr.row-dead { opacity: .55; }
+tr.row-dead td:first-child { text-decoration: line-through; }
+tr.row-dead:hover { opacity: 1; }
+
+.age { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.age-ok   { color: #64748b; }
+.age-warn { color: #d97706; }
+.age-late { color: #dc2626; }
+
+.tag-repeat {
+  font-size: 10.5px; font-weight: 700;
+  background: #fee2e2; color: #b91c1c;
+  padding: .0625rem .375rem; border-radius: .3125rem;
+  vertical-align: middle;
+}
+
+/* ─────────── CHIPS / SUBTABS ─────────── */
+/* ปฏิทิน PM — grid 7 คอลัมน์ ไม่ใช่ table เพราะแต่ละช่องต้องใส่รายการหลายบรรทัด */
+.pm-cal { display: grid; grid-template-columns: repeat(7, minmax(92px, 1fr)); gap: 1px;
+  background: var(--line); border: 1px solid var(--line); border-radius: .625rem; overflow: hidden; }
+.pm-dow { background: #f8fafc; text-align: center; font-size: .75rem; font-weight: 700;
+  color: #64748b; padding: .5rem .25rem; }
+.pm-day { background: #fff; min-height: 84px; padding: .375rem; font-size: .75rem; }
+.pm-day.out { background: #f8fafc; color: #cbd5e1; }
+.pm-day.weekend { background: #f1f5f9; }
+/* ชมพูอ่อน ไม่ใช่แดงเข้ม — วันหยุดเป็นข้อมูลประกอบ ไม่ใช่คำเตือน
+   สิ่งที่ต้องเตือนจริงคือ "มีแผน PM ตกวันหยุด" ซึ่งใช้ ⚠ บนเลขวันแทน */
+.pm-day.holiday { background: #fef2f2; }
+.pm-day.holiday .pm-daynum { color: #b91c1c; }
+.pm-day.today { background: #ecfdf5; box-shadow: inset 0 0 0 2px var(--brand); }
+.pm-holiname {
+  font-size: .625rem; line-height: 1.25; color: #b91c1c; margin-bottom: .1875rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pm-warn { float: right; font-size: .75rem; line-height: 1; }
+.pm-dot-off  { background: #cbd5e1; }
+.pm-dot-holi { background: #fca5a5; }
+.pm-daynum { font-weight: 700; font-size: .8125rem; margin-bottom: .25rem; }
+.pm-day.out .pm-daynum { font-weight: 400; }
+.pm-ev { display: block; width: 100%; text-align: left; border: 0; cursor: pointer;
+  font-family: inherit; font-size: .6875rem; line-height: 1.3; padding: .1875rem .3125rem;
+  border-radius: .25rem; margin-bottom: .125rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pm-ev:hover { filter: brightness(.94); }
+.pm-more { font-size: .625rem; color: #94a3b8; padding-left: .3125rem; }
+.pm-legend { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: .75rem;
+  font-size: .75rem; color: #64748b; }
+.pm-legend span { display: inline-flex; align-items: center; gap: .3125rem; }
+.pm-dot { width: .625rem; height: .625rem; border-radius: 9999px; display: inline-block; }
+
+.stars { display: flex; align-items: center; gap: .125rem; }
+.star {
+  background: none; border: 0; cursor: pointer; padding: .125rem .1875rem;
+  font-size: 1.75rem; line-height: 1; color: #e2e8f0;
+  transition: color .12s, transform .12s;
+}
+.star:hover { transform: scale(1.12); }
+.star.on { color: #f59e0b; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: .375rem;
+  padding: .375rem .75rem;
+  border-radius: 9999px;
+  font-size: .8125rem;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .15s;
+}
+.chip:hover { border-color: #94a3b8; }
+.chip > span { font-weight: 700; }
+.chip.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+.subtabs {
+  display: flex; gap: .375rem;
+  overflow-x: auto;
+  padding: .3125rem;
+  background: #fff;
+  border-radius: .75rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .06), 0 0 0 1px rgba(15, 23, 42, .04);
+  scrollbar-width: none;
+}
+.subtabs::-webkit-scrollbar { display: none; }
+.subtab {
+  display: flex; align-items: center; gap: .375rem;
+  padding: .5rem .875rem;
+  border-radius: .5rem;
+  font-size: .8125rem;
+  font-weight: 600;
+  color: #475569;
+  background: none; border: none; cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: background .15s, color .15s;
+}
+.subtab:hover { background: #f1f5f9; }
+.subtab.active { background: var(--brand); color: #fff; }
+
+/* ─────────── HEATMAP ─────────── */
+.heat { border-collapse: separate; border-spacing: 3px; font-size: 12px; }
+.heat th {
+  background: none; border: none; color: var(--muted);
+  font-size: 11px; font-weight: 600; padding: .25rem .375rem; white-space: nowrap;
+}
+.heat th.rowhead { text-align: right; max-width: 12rem; overflow: hidden; text-overflow: ellipsis; }
+.heat td {
+  width: 2.5rem; height: 2.125rem;
+  text-align: center;
+  border-radius: .375rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: transform .12s;
+}
+.heat td:hover { transform: scale(1.12); box-shadow: 0 2px 8px rgba(15, 23, 42, .18); }
+.heat-legend {
+  flex: 0 0 8rem; height: 8px; border-radius: 99px;
+  background: linear-gradient(90deg, #f8fafc, #fef3c7, #fed7aa, #fb923c, #ea580c, #b91c1c);
+}
+
+/* ─────────── BUTTONS ─────────── */
+.btn {
+  padding: .5rem 1rem;
+  border-radius: var(--r-md);
+  font-size: .875rem;
+  font-weight: 700;
+  color: #fff;
+  /* ทุกปุ่มในโปรเจคนี้กำหนดสีพื้นเองที่ style= ซึ่งแปลว่าลืมใส่เมื่อไร
+     จะได้ปุ่มตัวหนังสือขาวบนพื้นโปร่งใส = ปุ่มที่มองไม่เห็นและไม่มี error ให้จับ
+     ตั้งค่าเริ่มต้นไว้ตรงนี้ ปุ่มที่ใส่ style= เองยังทับได้เหมือนเดิม */
+  background: var(--brand);
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  /* ขอบล่างเข้มกว่าตัวปุ่ม ทำให้ดูนูนขึ้นมาจริง ไม่ใช่สี่เหลี่ยมแบน */
+  box-shadow: var(--e1), inset 0 -2px 0 rgba(0, 0, 0, .18);
+  transition: filter .15s, transform .05s, box-shadow .05s;
+}
+.btn:hover { filter: brightness(1.08); }
+/* กดแล้วยุบลงไปจริง — บอกว่าระบบรับคำสั่งแล้วโดยไม่ต้องรอ toast */
+.btn:active {
+  transform: translateY(2px);
+  box-shadow: var(--pressed);
+}
+.btn:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; transform: none; }
+
+/* ชิปที่ถูกเลือกอยู่ก็คือปุ่มที่ถูกกดค้าง ให้ดูยุบเหมือนกัน */
+.chip.active { box-shadow: var(--pressed); }
+.subtab.active { box-shadow: var(--pressed); }
+
+/* ─────────── TOAST / ANIM ─────────── */
+.toast {
+  position: fixed; bottom: 1.25rem; right: 1.25rem; z-index: 60;
+  max-width: 22rem;
+  padding: .75rem 1rem;
+  border-radius: .75rem;
+  color: #fff;
+  font-size: .8125rem;
+  font-weight: 600;
+  box-shadow: 0 10px 30px -8px rgba(15, 23, 42, .5);
+  animation: slide-in .25s ease;
+}
+.toast-ok  { background: #16a34a; }
+.toast-err { background: #dc2626; }
+
+@keyframes slide-in { from { opacity: 0; transform: translateY(12px); } }
+@keyframes pop      { from { opacity: 0; transform: scale(.97) translateY(8px); } }
+.animate-pop { animation: pop .18s ease; }
+.spin { display: inline-block; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─────────── PRINT ─────────── */
+@media print {
+  .sidebar, #scrim, .app-header, #filterBar, .subtabs, #toast,
+  .no-print { display: none !important; }
+  .panel { box-shadow: none; border: 1px solid var(--line); }
+  body { background: #fff; }
+}
+
+/* ─────────── สติกเกอร์ QR ติดหน้าเครื่อง ─────────── */
+.qr-card {
+  background: #fff;
+  border: 2px solid var(--brand);
+  border-radius: .75rem;
+  padding: .875rem .75rem;
+  text-align: center;
+  break-inside: avoid;
+}
+.qr-img { display: flex; justify-content: center; margin-bottom: .5rem; }
+.qr-img img, .qr-img canvas { display: block; }
+.qr-name { font-weight: 700; font-size: .875rem; line-height: 1.3; }
+.qr-code { font-size: .75rem; color: var(--muted); font-family: ui-monospace, monospace; }
+.qr-hint { font-size: 10.5px; color: #94a3b8; margin-top: .25rem; }
+
+@media print {
+  #qrGrid { display: grid !important; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .qr-card { border-color: #000; }
+  main { padding: 0 !important; }
+  #tab-qr > .panel:first-child { display: none; }
+}
+
+/* ─────────── ระดับความสำคัญ ─────────── */
+.pri {
+  display: inline-flex; align-items: center; gap: .3125rem;
+  padding: .1875rem .5rem; border-radius: .375rem;
+  font-size: 11.5px; font-weight: 700; white-space: nowrap;
+}
+.pri-1 { background: #fee2e2; color: #991b1b; }   /* วิกฤต */
+.pri-2 { background: #ffedd5; color: #9a3412; }   /* ด่วน */
+.pri-3 { background: #e0f2fe; color: #075985; }   /* ปกติ */
+.pri-4 { background: #f1f5f9; color: #64748b; }   /* ไม่เร่งด่วน */
+
+/* ปุ่มเลือกความสำคัญในฟอร์ม */
+.pri-opt {
+  border: 2px solid var(--line); border-radius: .625rem;
+  padding: .625rem .75rem; text-align: left; cursor: pointer;
+  background: #fff; font-family: inherit; transition: all .15s;
+}
+.pri-opt:hover { border-color: #94a3b8; }
+.pri-opt.on { border-color: currentColor; box-shadow: 0 0 0 3px rgba(5, 146, 74, .12); }
+.pri-opt b { display: block; font-size: .875rem; }
+.pri-opt span { font-size: 11px; color: var(--muted); font-weight: 400; }
+
+.due-late { color: #dc2626; font-weight: 700; }
+.due-soon { color: #d97706; font-weight: 700; }
+.due-ok   { color: #64748b; }
+.unassigned { color: #cbd5e1; font-style: italic; }
+
+tr.row-critical td:first-child { box-shadow: inset var(--bw-4) 0 0 #dc2626; }
+
+/* หน้าต่างซ้อนอยู่สูงสุดในลำดับชั้น ใช้เงาระดับ 3 ให้ลอยออกมาจากพื้นหลังจริง ๆ */
+#modal > div, #modal2 > div, #loginModal > div,
+#pmItemModal > div, #pmPlanModal > div, #pmSpecModal > div {
+  box-shadow: var(--e3);
+  border: var(--bw-1) solid var(--line-strong);
+}
+
+/* ══════════════ กระดานภาระงานช่าง ══════════════ */
+/* ความยาวของแถบ = จำนวนงานเทียบกับคนที่ถือเยอะสุด · สีในแถบ = สัดส่วนตามสถานะ
+   อ่านสองอย่างพร้อมกันได้จากรูปเดียว โดยไม่ต้องใช้ไลบรารีกราฟเพิ่ม */
+.wl-bar {
+  display: flex; height: .875rem; min-width: .875rem; border-radius: 9999px;
+  overflow: hidden; background: var(--line); box-shadow: var(--inset);
+}
+.wl-bar i { display: block; }
+
+/* ══════════════ กระดิ่งแจ้งเตือน ══════════════ */
+.bell-btn {
+  position: relative; font-size: 1.125rem; line-height: 1;
+  padding: .5rem .625rem; border-radius: var(--r-md);
+  border: var(--bw-2) solid var(--line-strong); background: #fff;
+  box-shadow: var(--e1); cursor: pointer;
+}
+.bell-btn:active { box-shadow: var(--pressed); }
+/* ตัวเลขบนกระดิ่งต้องอ่านออกตั้งแต่เหลือบตาแรก จึงใช้แดงเต็มไม่ใช่สีแบรนด์ */
+.bell-dot {
+  position: absolute; top: -.375rem; right: -.375rem;
+  min-width: 1.125rem; height: 1.125rem; padding: 0 .25rem;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 99px; background: #dc2626; color: #fff;
+  font-size: .6875rem; font-weight: 800; border: var(--bw-2) solid #fff;
+}
+.bell-panel {
+  position: absolute; right: 0; top: calc(100% + .5rem); z-index: 60;
+  width: min(22rem, calc(100vw - 2rem));
+  max-height: 26rem; overflow-y: auto;
+  background: #fff; border: var(--bw-2) solid var(--line-strong);
+  border-radius: var(--r-lg); box-shadow: var(--e3);
+}
+.bell-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .5rem; padding: .625rem .75rem;
+  border-bottom: var(--bw-1) solid var(--line);
+  position: sticky; top: 0; background: inherit;
+}
+.bell-item {
+  display: flex; gap: .5rem; width: 100%; text-align: left;
+  padding: .625rem .75rem; font-size: .8125rem; line-height: 1.45;
+  border-bottom: var(--bw-1) solid var(--line); cursor: pointer;
+  background: transparent; color: inherit;
+}
+.bell-item:hover { background: rgba(5, 146, 74, .07); }
+/* ยังไม่อ่าน = แถบซ้ายสีแบรนด์ ไม่ใช่พื้นหลังทั้งแถว
+   พื้นหลังอ่อน ๆ มองไม่ออกบนจอกลางแดด แต่แถบหนา 4px เห็นเสมอ */
+.bell-item.unread { border-left: var(--bw-4) solid var(--brand); font-weight: 600; }
+/* ไอคอนของ Bootstrap Icons นั่งต่ำกว่าเส้นฐานของตัวอักษรโดยค่าเริ่มต้น
+   ยกขึ้นนิดเดียวให้อยู่แนวเดียวกับข้อความไทยที่วางข้าง ๆ */
+.bi { vertical-align: -.125em; }
+
+/* บรรทัดที่สองของการ์ด — ตัวเลขอีกก้อนที่วัดคนละไม้บรรทัดกับตัวใหญ่ด้านบน
+   คั่นด้วยเส้นบาง ๆ ให้เห็นว่าไม่ใช่คำอธิบายต่อจากบรรทัดแรก แต่เป็นคนละเรื่อง */
+.kpi-note2 {
+  font-size: .72rem; color: var(--muted); line-height: 1.5;
+  margin-top: .35rem; padding-top: .35rem; border-top: var(--bw-1) dashed var(--line);
+}
+
+/* หัวข้อกลุ่มการ์ด KPI — แยก "ตัวที่ถูกประเมิน" ออกจาก "ตัวที่เอาไว้วิเคราะห์" */
+.kpi-sec       { margin-bottom: .75rem; }
+.kpi-sec-title { font-size: .9375rem; font-weight: 800; color: #0f172a; }
+.kpi-sec-sub   { font-size: 11.5px; color: #94a3b8; margin-top: .125rem; }
+
+/* ดาวเล็กพอที่จะไม่แย่งสายตาจากตัวเลข ส่วนเส้นทองซ้ายการ์ดบอกกลุ่มได้ตั้งแต่เหลือบ
+   ไม่ใช้สีพื้นหลัง เพราะการ์ดใช้สีตัวเลขบอกผ่าน/ไม่ผ่านอยู่แล้ว ซ้อนอีกชั้นจะอ่านไม่ออกกลางแดด */
+.kpi-star { color: #f59e0b; font-size: .8125rem; margin-right: .25rem; }
+.kpi-main { border-color: #fcd34d; box-shadow: inset 3px 0 0 #f59e0b, var(--e1); }
+
+/* บรรทัดเป้าหมาย — อยู่ใต้ตัวเลขเพราะคำถามคือ "เท่านี้ผ่านหรือยัง" ไม่ใช่ "เป้าคือเท่าไหร่"
+   คนอ่านตัวเลขก่อนเสมอ เป้าจึงต้องอยู่ตำแหน่งที่สายตาตกลงมาพอดี ไม่ใช่เหนือตัวเลข */
+.kpi-goal {
+  display: flex; align-items: baseline; gap: .3rem;
+  font-size: 11.5px; font-weight: 700; color: #92400e;
+  background: #fffbeb; border: 1px solid #fde68a;
+  border-radius: .375rem; padding: .2rem .45rem; margin-bottom: .35rem;
+}
+.kpi-goal > i { font-style: normal; }
+
+/* ยอดรวมใต้ชื่อคอลัมน์ — ตัวหนาสีแบรนด์ให้แยกออกจากชื่อคอลัมน์ได้โดยไม่ต้องมีเส้นคั่น */
+/* ตัวเลขในตารางผลงานช่างที่กดดูใบได้ — เส้นประใต้ตัวเลขบอกว่ากดได้
+   ไม่ใช้สีเพราะคอลัมน์พวกนี้ใช้สีแดงบอก "ต่ำกว่าเกณฑ์" อยู่แล้ว */
+/* ผลงานของตัวเองในหน้าต้อนรับ — สามช่องเรียงกัน เลขใหญ่ ส่วนต่างเล็กอยู่ใต้ */
+.my-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+.my-item { background: var(--panel2, #f8fafc); border-radius: var(--r-md); padding: .5rem .25rem; text-align: center; }
+.my-num  { font-size: 1.375rem; font-weight: 800; line-height: 1.1; }
+.my-lbl  { font-size: 11px; color: var(--muted); margin-top: .1rem; }
+.my-diff { font-size: 10.5px; font-weight: 700; margin-top: .2rem; }
+
+/* ═══ หน้าจอพารามิเตอร์แบบ SCADA ═══
+   สีที่ขอบซ้ายอย่างเดียวไม่พอ ช่างมองจากระยะเครื่องจักร — ใช้พื้นหลังอ่อนทั้งใบ
+   และไม่พึ่งสีอย่างเดียว ทุกสถานะมีข้อความกำกับใต้ค่า เผื่อคนตาบอดสี */
+.pd-scada { display: flex; flex-direction: column; gap: 1rem; margin-top: .75rem; }
+.pd-grp-h {
+  font-size: 12px; font-weight: 800; letter-spacing: .02em;
+  color: var(--muted); margin: 0 0 .4rem; text-transform: none;
+}
+.pd-row { display: grid; gap: .5rem; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); }
+.pd-tile {
+  border: 1px solid var(--line); border-radius: .6rem; padding: .45rem .55rem;
+  background: var(--panel, #fff); min-width: 0;
+}
+.pd-lb {
+  font-size: 10.5px; font-weight: 700; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pd-val { font-size: 19px; font-weight: 800; line-height: 1.25; }
+.pd-u { font-size: 11px; font-weight: 600; opacity: .65; margin-left: 2px; }
+.pd-spec { font-size: 10px; color: var(--muted); white-space: nowrap;
+           overflow: hidden; text-overflow: ellipsis; }
+.pd-spec b { color: #b91c1c; }
+.pd-q { color: #d97706; font-weight: 900; cursor: help; }
+
+.pd-tile.ok   { background: #f0fdf4; border-color: #86efac; }
+.pd-tile.bad  { background: #fef2f2; border-color: #ef4444; }
+.pd-tile.bad .pd-val { color: #b91c1c; }
+.pd-tile.on   { background: #ecfdf5; border-color: #6ee7b7; }
+.pd-tile.off  { background: #f8fafc; border-color: #cbd5e1; }
+.pd-tile.auto { background: repeating-linear-gradient(45deg,
+                  var(--panel, #fff), var(--panel, #fff) 6px,
+                  rgba(100,116,139,.07) 6px, rgba(100,116,139,.07) 12px); }
+.pd-tile.auto .pd-val, .pd-tile.na .pd-val { font-size: 13px; color: var(--muted); }
+.pd-tile.na   { opacity: .45; }
+.pd-tile.gap  { border-style: dashed; }
+.pd-tile.gap .pd-val { color: var(--muted); }
+
+[data-theme="dark"] .pd-tile.ok  { background: rgba(34,197,94,.1);  border-color: #15803d; }
+[data-theme="dark"] .pd-tile.bad { background: rgba(239,68,68,.12); border-color: #b91c1c; }
+[data-theme="dark"] .pd-tile.bad .pd-val { color: #fca5a5; }
+[data-theme="dark"] .pd-spec b { color: #fca5a5; }
+[data-theme="dark"] .pd-tile.on  { background: rgba(16,185,129,.1); border-color: #047857; }
+[data-theme="dark"] .pd-tile.off { background: rgba(148,163,184,.08); }
+
+/* แถบรับรองของวิศวกร — สีกลางเมื่อยังไม่มีใครตรวจ ไม่ใช่สีเขียว
+   เขียวตั้งแต่ยังไม่มีคนเซ็นคือการบอกว่าผ่านแล้วทั้งที่ยังไม่มีใครดู */
+.pd-ok {
+  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+  border: 1px solid var(--line-strong); border-left-width: 4px;
+  border-radius: var(--r-md); padding: .6rem .85rem; background: var(--panel, #fff);
+}
+.pd-ok.ok   { border-left-color: #16a34a; background: #f0fdf4; }
+.pd-ok.back { border-left-color: #b45309; background: #fffbeb; }
+.pd-signer {
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  border: 1px dashed var(--line-strong); border-radius: var(--r-sm);
+  padding: .35rem .6rem; white-space: nowrap;
+}
+.pd-signer b { color: var(--ink); margin-left: .35rem; font-size: 13px; }
+[data-theme="dark"] .pd-signer b { color: #e2e8f0; }
+.pd-ok .inp { min-width: 180px; }
+/* ปุ่มต้องไม่ถูกบีบจนเหลือแต่ไอคอน — คนอ่านไม่ออกว่ากดแล้วเกิดอะไร */
+.pd-ok .btn { white-space: nowrap; flex: none; }
+[data-theme="dark"] .pd-ok.ok   { background: rgba(34,197,94,.1); }
+[data-theme="dark"] .pd-ok.back { background: rgba(180,83,9,.12); }
+
+/* ═══ รายข้อของเช็คชีตประจำวัน ═══
+   ข้อที่ไม่ผ่านต้องหาเจอทันทีในลิสต์ที่ยาว 40-120 ข้อ จึงใช้ทั้งสีและเครื่องหมาย
+   ไม่ใช่สีอย่างเดียว เผื่อคนตาบอดสีและเผื่อพิมพ์ขาวดำ */
+.cd-groups { display: grid; gap: .9rem; margin-top: .9rem;
+             grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.cd-grp-h { font-size: 12px; font-weight: 800; color: var(--muted); margin: 0 0 .35rem; }
+.cd-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .2rem; }
+.cd-item { display: flex; align-items: center; gap: .4rem; font-size: 12px;
+           padding: .22rem .4rem; border-radius: var(--r-sm); }
+.cd-ico { font-weight: 900; width: 1em; text-align: center; }
+.cd-item.ok   { color: var(--muted); }
+.cd-item.ok .cd-ico { color: #16a34a; }
+.cd-item.bad  { background: #fef2f2; color: #b91c1c; font-weight: 700; }
+.cd-item.note { background: var(--panel2, #f8fafc); }
+[data-theme="dark"] .cd-item.bad { background: rgba(239,68,68,.12); color: #fca5a5; }
+
+/* สวิตช์ "เฉพาะเครื่องที่ฉันดูแล" — ให้เห็นว่ากดได้ ไม่ใช่ข้อความเฉย ๆ */
+.mine-only { display: inline-flex; align-items: center; gap: .4rem;
+  font-size: .8rem; font-weight: 600; color: var(--brand); cursor: pointer; }
+.mine-only input { width: 1rem; height: 1rem; accent-color: var(--brand); cursor: pointer; }
+
+/* เครื่องของสถานีตัวเอง — เส้นซ้ายพอให้เหลือบเห็น ไม่ต้องอ่านป้าย */
+.param-mine { box-shadow: inset 3px 0 0 var(--brand); }
+.param-mine-tag {
+  font-size: 10px; font-weight: 800; color: #fff; background: var(--brand);
+  border-radius: .3rem; padding: .05rem .3rem; vertical-align: 2px;
+}
+
+.ts-cell { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.ts-cell:hover { background: rgba(148,163,184,.12); }
+
+/* ปิดไม่กี่ใบ = ยังตัดสินไม่ได้ ต้องเห็นตั้งแต่เหลือบ ไม่ใช่ต้องไปอ่านเชิงอรรถ */
+.ts-few {
+  font-size: 10.5px; font-weight: 700; color: #92400e;
+  background: #fffbeb; border: 1px solid #fde68a;
+  border-radius: .3rem; padding: .05rem .3rem; white-space: nowrap;
+}
+
+.kd-sum {
+  display: block; margin-top: .15rem;
+  font-size: 11px; font-weight: 800; color: var(--brand);
+  white-space: nowrap; text-transform: none; letter-spacing: 0;
+}
+
+.kpi-drill { cursor: pointer; }
+.kpi-drill:hover { border-color: var(--brand); }
+.kpi-drill .kpi-label::after { content: " ›"; color: var(--muted); font-weight: 700; }
+tr.kd-click { cursor: pointer; }
+tr.kd-click td:first-child::after { content: " ›"; color: var(--muted); font-weight: 700; }
+tr.kd-click:hover td { background: rgba(5, 146, 74, .08); }
+
+.kpi-jump { cursor: pointer; }
+.kpi-jump:hover { border-color: var(--brand); }
+.kpi-jump .kpi-note { text-decoration: underline dotted; text-underline-offset: 2px; }
+
+/* ─────────── ไทม์ไลน์ย้อนเหตุการณ์ ─────────── */
+.tl-day {
+  font-weight: 800; font-size: .9rem; margin: 1rem 0 .5rem;
+  padding-bottom: .3rem; border-bottom: var(--bw-1) solid var(--line);
+}
+.tl-day:first-child { margin-top: 0; }
+.tl-row {
+  display: flex; align-items: flex-start; gap: .7rem;
+  padding: .5rem 0; border-left: var(--bw-2) solid var(--line);
+  margin-left: 5rem; padding-left: .9rem; position: relative;
+}
+.tl-row.bad { background: #fef2f2; border-radius: var(--r-sm); }
+.tl-time {
+  position: absolute; left: -5rem; width: 3.4rem; text-align: right;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+  font-size: .75rem; color: var(--muted); padding-top: .15rem;
+}
+.tl-dot {
+  width: 1.5rem; height: 1.5rem; border-radius: 999px; flex: none;
+  display: grid; place-items: center; font-size: .75rem;
+  margin-left: -1.65rem; box-shadow: 0 0 0 3px var(--bg);
+}
+.tl-text { min-width: 0; flex: 1; }
+.tl-title { font-weight: 600; font-size: .88rem; }
+.tl-detail { font-size: .78rem; color: var(--muted); word-break: break-word; }
+.tl-open {
+  flex: none; font-size: .72rem; font-weight: 700; color: #0284c7;
+  border: var(--bw-1) solid #0284c7; border-radius: var(--r-sm); padding: .1rem .5rem;
+}
+
+/* ─────────── สถานะพารามิเตอร์ ───────────
+   แถบสีด้านซ้ายไม่ใช่แค่พื้นการ์ด — เงากับพื้นอ่อนหายไปเลยบนจอแท็บเล็ตถูก ๆ กลางแดดในโรงงาน
+   แต่แถบสีหนา 5px ยังเห็นได้ ตัวอักษรก็เลยต้องบอกสถานะซ้ำอีกที ไม่พึ่งสีอย่างเดียว */
+.param-card {
+  display: block; width: 100%; text-align: left;
+  border: var(--bw-2) solid var(--line-strong); border-left-width: 5px;
+  border-radius: var(--r-md); padding: .85rem 1rem; background: var(--card, #fff);
+  transition: transform .12s, box-shadow .12s;
+}
+.param-card:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(15, 23, 42, .12); }
+.param-card.ok   { border-left-color: #16a34a; }
+.param-card.bad  { border-left-color: #dc2626; }
+.param-card.stop { border-left-color: #94a3b8; }
+.param-card.none { border-left-color: #f59e0b; }
+
+.param-id   { font-size: 1.15rem; font-weight: 800; line-height: 1.2; }
+.param-name { font-size: .8rem; color: var(--muted); margin-bottom: .45rem; }
+.param-meta { font-size: .78rem; color: var(--muted); margin-top: .5rem; line-height: 1.6; }
+.param-warn { color: #b45309; font-weight: 600; }
+
+.param-pill {
+  display: inline-block; padding: .15rem .55rem; border-radius: 999px;
+  font-size: .72rem; font-weight: 700;
+}
+.param-pill.ok   { background: #dcfce7; color: #166534; }
+.param-pill.bad  { background: #fee2e2; color: #991b1b; }
+.param-pill.stop { background: #f1f5f9; color: #475569; }
+.param-pill.none { background: #fef3c7; color: #92400e; }
+
+.param-alert {
+  border: var(--bw-2) solid #fca5a5; background: #fef2f2; color: #991b1b;
+  border-radius: var(--r-md); padding: .8rem 1rem; font-size: .88rem;
+}
+tr.param-out td { background: #fef2f2; }
+
+.beer-fab {
+  position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 40;
+  display: flex; align-items: center; gap: .4rem;
+  padding: .7rem 1.1rem; border-radius: 999px;
+  background: #f59e0b; color: #fff; font-weight: 700; font-size: .9rem;
+  box-shadow: 0 10px 24px rgba(245, 158, 11, .4);
+  transition: transform .15s, box-shadow .15s;
+}
+.beer-fab:hover { transform: translateY(-2px); box-shadow: 0 14px 28px rgba(245, 158, 11, .5); }
+/* จอแคบเหลือแต่แก้วเบียร์ — ปุ่มยาว ๆ ลอยทับตารางบนมือถือแล้วบังของที่คนกำลังอ่าน */
+/* จอแคบเหลือที่น้อย ดึงคอลัมน์เวลาเข้ามาใกล้ที่สุดเท่าที่ยังไม่ชนจุดวงกลม */
+@media (max-width: 480px) {
+  .tl-row  { margin-left: 4.2rem; }
+  .tl-time { left: -4.2rem; width: 2.9rem; font-size: .7rem; }
+
+  .beer-fab { padding: .8rem; }
+  .beer-fab-txt { display: none; }
+  /* ปุ่มลอยทับปุ่ม "ส่งความคิดเห็น" ที่อยู่ท้ายฟอร์มพอดี เว้นที่ไว้ให้เลื่อนพ้นได้ */
+  #tab-feedback { padding-bottom: 4.5rem; }
+}
+
+.beer-qr { width: 180px; max-width: 100%; border-radius: .5rem; display: inline-block; }
+/* พื้นขาวรอบ QR เสมอ — โหมดมืดทำให้ QR บนพื้นเข้มสแกนไม่ติด */
+#beerQrBox, .beer-qr-box { display: inline-block; padding: .4rem; background: #fff; border-radius: .5rem; }
+.beer-addr {
+  width: 100%; margin-top: .4rem; padding: .3rem .5rem;
+  font-family: ui-monospace, monospace; font-size: .68rem; text-align: center;
+  border: var(--bw-1) solid var(--line-strong); border-radius: var(--r-sm);
+  background: transparent; color: var(--muted);
+}
+
+.wc-card { border-radius: .75rem; padding: .6rem .35rem; text-align: center; }
+.wc-num  { font-size: 1.6rem; font-weight: 800; line-height: 1.1; }
+.wc-lbl  { font-size: .7rem; font-weight: 600; margin-top: .15rem; }
+
+.bell-empty { padding: 1.75rem .75rem; text-align: center; color: var(--muted); font-size: .8125rem; }
+
+/* ══════════════ จัดการงานทีละหลายใบ ══════════════ */
+/* ช่องติ๊กมีเฉพาะหัวหน้างาน — ช่างเห็นแล้วกดได้แต่ server ปฏิเสธ คือ UI ที่หลอกคนใช้ */
+.bulk-col { display: none; }
+body.bulk-on .bulk-col { display: table-cell; }
+
+.bulk-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+  padding: .625rem .75rem; margin-bottom: .875rem;
+  border-radius: var(--r-md);
+  background: #ecfdf5; border: var(--bw-2) solid #6ee7b7;
+}
+.bulk-cb { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); cursor: pointer; }
+
+/* ══════════════ Dark mode ══════════════
+   ไม่ได้ไล่ใส่ dark: ทีละคลาสทั่วทั้ง HTML เพราะมีหลายร้อยจุดและพลาดง่าย
+   แต่ทับที่ตัวแปร CSS + utility ของ Tailwind ที่ "ใช้จริง" ในโปรเจคนี้เท่านั้น
+   (สำรวจแล้วมีอยู่ราว 20 คลาส) ได้ผลเท่ากันด้วยโค้ดหนึ่งในยี่สิบ
+
+   ผูกกับ [data-theme="dark"] บน <html> ไม่ใช่ prefers-color-scheme
+   เพราะคนหน้างานอยากสลับเองตามแสงในโรงงาน ไม่ใช่ตามค่าของเครื่อง */
+
+[data-theme="dark"] {
+  --ink:   #e2e8f0;
+  --muted: #94a3b8;
+  --line:  #334155;
+  --bg:    #0b1220;
+  --panel: #131c2e;
+  --panel2:#1b2639;
+  --line-strong: #3b4a61;
+  --inset: inset 0 2px 3px rgba(0, 0, 0, .35);
+  --pressed: inset 0 2px 4px rgba(0, 0, 0, .5);
+  --e1: 0 1px 2px rgba(0, 0, 0, .45);
+  --e2: 0 3px 8px rgba(0, 0, 0, .5);
+  --e3: 0 12px 28px rgba(0, 0, 0, .6);
+}
+
+[data-theme="dark"] body { background: var(--bg); color: var(--ink); }
+
+[data-theme="dark"] .panel,
+[data-theme="dark"] .stat,
+[data-theme="dark"] .kpi { background: var(--panel); border-color: var(--line-strong); }
+[data-theme="dark"] .kpi-sec-title { color: var(--ink); }
+[data-theme="dark"] .kpi-main { border-color: #b45309; box-shadow: inset 3px 0 0 #f59e0b; }
+[data-theme="dark"] .kpi-goal { background: rgba(245,158,11,.12); border-color: #78350f; color: #fcd34d; }
+[data-theme="dark"] .ts-few { background: rgba(245,158,11,.12); border-color: #78350f; color: #fcd34d; }
+[data-theme="dark"] .my-item { background: var(--panel2); }
+
+[data-theme="dark"] .app-header { background: rgba(19,28,46,.88); border-bottom-color: var(--line); }
+
+[data-theme="dark"] .inp,
+[data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea {
+  background: #0f1829; color: var(--ink); border-color: var(--line-strong);
+  box-shadow: var(--inset);
+}
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder { color: #64748b; }
+/* ปฏิทิน/วันที่ของเบราว์เซอร์เป็นไอคอนดำ มองไม่เห็นบนพื้นเข้ม */
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) opacity(.7);
+}
+
+[data-theme="dark"] .th { background: var(--panel2); color: #cbd5e1; border-color: var(--line); }
+[data-theme="dark"] .td { border-color: var(--line); }
+[data-theme="dark"] tbody tr:hover { background: rgba(148,163,184,.08); }
+
+[data-theme="dark"] .chip { background: var(--panel2); color: #cbd5e1; border-color: var(--line); }
+[data-theme="dark"] .chip.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+[data-theme="dark"] .subtabs { background: var(--panel); }
+[data-theme="dark"] .subtab { color: #94a3b8; }
+[data-theme="dark"] .empty { color: #64748b; }
+
+[data-theme="dark"] .pm-cal { background: var(--line); border-color: var(--line); }
+[data-theme="dark"] .pm-day { background: var(--panel); }
+[data-theme="dark"] .pm-day.out { background: var(--panel2); color: #475569; }
+[data-theme="dark"] .pm-day.today { background: rgba(5,146,74,.18); }
+[data-theme="dark"] .pm-dow { background: var(--panel2); color: #94a3b8; }
+[data-theme="dark"] .chart-save { background: var(--panel2); color: #cbd5e1; }
+[data-theme="dark"] .bell-btn,
+[data-theme="dark"] .bell-panel { background: var(--panel); border-color: var(--line-strong); }
+[data-theme="dark"] .bell-dot { border-color: var(--panel); }
+[data-theme="dark"] .bell-item:hover { background: rgba(148,163,184,.10); }
+[data-theme="dark"] .bulk-bar { background: rgba(5,146,74,.14); border-color: #15603c; }
+[data-theme="dark"] .badge-out { background: #312e5f; color: #ddd6fe; }
+[data-theme="dark"] .badge-cancel { background: var(--panel2); color: #94a3b8; }
+/* พื้นแดงอ่อนของแถวที่ผิดปกติกลืนกับตัวอักษรสีอ่อนในโหมดมืดจนอ่านไม่ออก
+   ต้องสลับเป็นแดงเข้มแทน ไม่ใช่แค่หรี่ความทึบลง */
+[data-theme="dark"] .tl-row.bad,
+[data-theme="dark"] tr.param-out td { background: #2a1720; }
+[data-theme="dark"] .param-alert { background: #2a1720; border-color: #7f1d1d; color: #fca5a5; }
+[data-theme="dark"] .param-card { background: var(--panel); border-color: var(--line-strong); }
+[data-theme="dark"] .param-card:hover { box-shadow: 0 8px 18px rgba(0,0,0,.45); }
+[data-theme="dark"] .param-pill.ok   { background: #14331f; color: #86efac; }
+[data-theme="dark"] .param-pill.bad  { background: #3b1518; color: #fca5a5; }
+[data-theme="dark"] .param-pill.stop { background: var(--panel2); color: #94a3b8; }
+[data-theme="dark"] .param-pill.none { background: #33270d; color: #fcd34d; }
+[data-theme="dark"] .param-warn { color: #fcd34d; }
+
+[data-theme="dark"] .pm-day.weekend { background: #16202f; }
+[data-theme="dark"] .pm-day.holiday { background: #2a1720; }
+[data-theme="dark"] .pm-day.holiday .pm-daynum,
+[data-theme="dark"] .pm-holiname { color: #fca5a5; }
+[data-theme="dark"] .wl-bar { background: var(--panel2); }
+
+/* utility ของ Tailwind ที่ใช้จริงในสองไฟล์ — ต้อง !important เพราะ CDN โหลดทีหลัง */
+[data-theme="dark"] .bg-white       { background-color: var(--panel) !important; }
+[data-theme="dark"] .bg-slate-100   { background-color: var(--panel2) !important; }
+[data-theme="dark"] .text-slate-300 { color: #64748b !important; }
+[data-theme="dark"] .text-slate-400 { color: #7c8ba1 !important; }
+[data-theme="dark"] .text-slate-500 { color: #94a3b8 !important; }
+[data-theme="dark"] .text-slate-600 { color: #b6c2d1 !important; }
+[data-theme="dark"] .text-slate-700 { color: #cbd5e1 !important; }
+[data-theme="dark"] .border-slate-100,
+[data-theme="dark"] .border-slate-200 { border-color: var(--line) !important; }
+
+/* กล่องสีอ่อนตามสถานะ — คงความหมายของสีไว้ แค่ลดความสว่างลง */
+[data-theme="dark"] .bg-sky-50   { background-color: rgba(2,132,199,.16) !important; }
+[data-theme="dark"] .bg-green-50 { background-color: rgba(22,163,74,.16) !important; }
+[data-theme="dark"] .bg-red-50   { background-color: rgba(220,38,38,.16) !important; }
+[data-theme="dark"] .text-green-700, [data-theme="dark"] .text-green-800 { color: #4ade80 !important; }
+[data-theme="dark"] .text-red-600,   [data-theme="dark"] .text-red-700   { color: #f87171 !important; }
+[data-theme="dark"] .text-orange-700 { color: #fb923c !important; }
+
+/* การ์ดสถิติและ badge ใช้สีพื้น/สีอักษรแบบ inline จากโค้ด JS
+   ทำให้ CSS เอื้อมไม่ถึง จึงลดความจ้าลงด้วย filter ทั้งก้อนแทนการไล่แก้ทีละที่ */
+[data-theme="dark"] .stat-ico,
+[data-theme="dark"] .badge,
+[data-theme="dark"] .pri,
+[data-theme="dark"] .pm-ev,
+[data-theme="dark"] .tag-repeat { filter: brightness(.82) saturate(1.15); }
+
+[data-theme="dark"] .modal-card,
+[data-theme="dark"] #modal > div,
+[data-theme="dark"] #modal2 > div,
+[data-theme="dark"] #loginModal > div,
+[data-theme="dark"] #pmItemModal > div,
+[data-theme="dark"] #pmPlanModal > div,
+[data-theme="dark"] #pmSpecModal > div { background: var(--panel); color: var(--ink); }
+
+/* ปุ่มสลับธีม/ภาษา ในแถบเมนู */
+.side-toggle {
+  display: flex; gap: .375rem;
+}
+.side-toggle button {
+  flex: 1; font-family: inherit; font-size: .75rem; font-weight: 600;
+  padding: .5rem .25rem; border-radius: .5rem; cursor: pointer;
+  border: 1px solid rgba(148,163,184,.25);
+  background: rgba(148,163,184,.12); color: #cbd5e1;
+  transition: background .15s;
+}
+.side-toggle button:hover { background: rgba(148,163,184,.22); color: #fff; }
+
+
+
+/* ══════════════ Skeleton ══════════════
+   หน้าจอว่าง ๆ ระหว่างรอ Apps Script ทำให้คนไม่รู้ว่าระบบค้างหรือกำลังโหลด
+   โครงร่างเทา ๆ ที่มีรูปทรงเท่าของจริง บอกทั้งว่า "กำลังมา" และ "หน้าตาจะเป็นแบบนี้" */
+.skel {
+  display: inline-block; height: 1em; min-width: 3rem; border-radius: var(--r-xs);
+  background: linear-gradient(90deg, #e9eef4 25%, #f4f7fa 50%, #e9eef4 75%);
+  background-size: 200% 100%;
+  animation: skelShift 1.2s ease-in-out infinite;
+}
+[data-theme="dark"] .skel {
+  background: linear-gradient(90deg, #1c2739 25%, #253247 50%, #1c2739 75%);
+  background-size: 200% 100%;
+}
+@keyframes skelShift { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+/* เครื่องที่ตั้งค่าลดการเคลื่อนไหวไว้ ต้องไม่โดนแถบวิ่งกวน */
+@media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
+
+/* ══════════════ ตาราง → การ์ด บนมือถือ ══════════════
+   ตาราง 9 คอลัมน์บนจอ 375px ต้องเลื่อนซ้ายขวาตลอด อ่านทีละแถวไม่ได้
+   บนมือถือจึงพับให้แต่ละแถวเป็นการ์ดใบหนึ่ง ป้ายหัวคอลัมน์มาจาก data-label ของ td เอง
+   ใช้ CSS ล้วน ไม่มี JS คอยสลับ — ไม่มีอะไรให้พังตอน resize */
+@media (max-width: 767px) {
+  table.as-cards thead { display: none; }
+  table.as-cards, table.as-cards tbody, table.as-cards tr, table.as-cards td { display: block; width: 100%; }
+  table.as-cards tr {
+    border: var(--bw-1) solid var(--line-strong);
+    border-radius: var(--r-md);
+    padding: .5rem .75rem;
+    margin-bottom: .625rem;
+    background: #fff;
+    box-shadow: var(--e1);
+  }
+  [data-theme="dark"] table.as-cards tr { background: var(--panel2); }
+  table.as-cards td {
+    border: 0; padding: .25rem 0;
+    display: flex; align-items: baseline; gap: .625rem;
+    text-align: left !important; max-width: none !important;
+    /* บนตารางต้องตัดข้อความด้วย ... เพราะช่องแคบ แต่บนการ์ดมีที่ทั้งบรรทัด ให้ตัดบรรทัดแทน
+       ไม่งั้นอาการเสียยาว ๆ จะถูกตัดทิ้งทั้งที่มีที่เหลือ */
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+  table.as-cards td > span,
+  table.as-cards td > .badge { flex: 0 0 auto; }
+  table.as-cards td::before {
+    content: attr(data-label);
+    flex: 0 0 6.5rem;
+    font-size: 11.5px; font-weight: 700; color: var(--muted);
+  }
+  /* ช่องที่ไม่มีป้าย (ลูกศร ปุ่มจัดการ) ไม่ต้องเว้นที่ให้ป้าย */
+  table.as-cards td:not([data-label]) { display: none; }
+  /* ช่องติ๊กต้องพับเป็นการ์ดด้วย — กฎ body.bulk-on ข้างบนตั้ง table-cell ไว้
+     ซึ่งชนะกฎการ์ดด้วย specificity แล้วทำให้แถวบนมือถือเพี้ยนไปช่องเดียว */
+  body.bulk-on table.as-cards td.bulk-col { display: flex; }
+  table.as-cards td.num { justify-content: flex-start; }
+  /* แถวว่าง/แถวข้อความอย่างเดียว ไม่ต้องพับเป็นการ์ด */
+  table.as-cards td[colspan] { display: block; }
+  table.as-cards td[colspan]::before { content: none; }
+}
+
+</style>

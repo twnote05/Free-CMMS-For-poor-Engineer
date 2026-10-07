@@ -1,0 +1,8 @@
+.clasp.json
+node_modules/
+*.log
+
+# ไฟล์ข้อมูลจริงของโรงงาน — อย่าเผลอ commit
+*.xlsx
+*.xls
+*.csv
