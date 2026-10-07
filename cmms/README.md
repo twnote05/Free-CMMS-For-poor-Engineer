@@ -112,7 +112,9 @@ You would have to build these yourself: spare-parts/stock integration · labour 
 
 ## Buy me a beer
 
-If this made your working life easier and you feel like it, PromptPay **0971636590** (Thailand).
+If this made your working life easier and you feel like it, scan to tip with PromptPay (Thailand).
+
+<img src="../assets/promptpay.svg" alt="PromptPay QR" width="180">
 
 Entirely optional. Using it is thanks enough.
 
