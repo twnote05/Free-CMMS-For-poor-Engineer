@@ -66,6 +66,8 @@ Do **not** start by reading `cmms/gas/Code.gs` (about 5,000 lines) or `cmms/gas/
 
 **Data lives in the sheets.** Settings, SLA targets, KPI weights, the machine register, holidays. If you are about to hardcode one of those, put it in a sheet instead.
 
+**Do not remove the `/*!` header at the top of a source file.** It carries the `Required Notice:` line that the licence obliges anyone redistributing this to keep. Tidying it away during a refactor strips attribution and breaches the licence.
+
 **Run the tests before you hand anything back.**
 
 ```bash
