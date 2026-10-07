@@ -1,0 +1,2180 @@
+<script>
+/* =========================================================================
+ *  คลังอะไหล่ (ดูได้ทุกคน · แก้ได้เฉพาะหัวหน้าช่างขึ้นไป)
+ * ========================================================================= */
+
+function viewInventory() {
+  const stockValue = S.parts.reduce((s, p) => s + p.value, 0);
+  $('view').innerHTML = `
+    <div class="h-full overflow-y-auto p-4">
+      ${S.dupes.length ? `<div class="rounded-xl bg-red-50 text-red-800 p-3 mb-3 text-sm">
+        <b>⚠ รหัสอะไหล่ซ้ำในชีต Parts:</b> ${S.dupes.map(esc).join(', ')}<br>
+        คงเหลือและมูลค่าของรหัสเหล่านี้ถูกนับซ้ำทุกแถว — เปิดชีต <b>Parts</b> ลบแถวที่เกินออกก่อนเชื่อตัวเลข
+        (รหัสที่ต่างกันแค่ตัวพิมพ์ใหญ่เล็กนับเป็นซ้ำ)
+      </div>` : ''}
+      <div class="flex flex-wrap gap-2 items-center mb-3">
+        <input id="inv-q" oninput="renderInv()" placeholder="ค้นรหัส / ชื่อ / ที่เก็บ…"
+               class="field w-64">
+        <select id="inv-loc" onchange="renderInv()" class="field w-44"></select>
+        <label class="flex items-center gap-2 text-sm"><input id="inv-low" type="checkbox" onchange="renderInv()"> ถึงจุดสั่งซื้อ</label>
+        <label class="flex items-center gap-2 text-sm"><input id="inv-exp" type="checkbox" onchange="renderInv()"> ใกล้/เลยวันหมดอายุ</label>
+        ${can('LEAD') ? `<button onclick="editPart()" class="btn btn-ink text-sm">+ เพิ่มอะไหล่</button>` : ''}
+        ${S.costHidden ? '' : `<span class="ml-auto text-sm text-slate-500">มูลค่าสต๊อกรวม: <b>${money(stockValue)}</b></span>`}
+      </div>
+      <div id="inv-list" class="space-y-2"></div>
+    </div>`;
+
+  // ตัวเลือกที่เก็บ สร้างจากของจริงในคลัง ไม่ใช่รายการตายตัว
+  const locs = {};
+  S.parts.forEach(p => { const k = p.location || NO_LOC; locs[k] = (locs[k] || 0) + 1; });
+  $('inv-loc').innerHTML = `<option value="">ที่เก็บ: ทั้งหมด (${S.parts.length})</option>` +
+    Object.keys(locs).sort(cmpLoc).map(k =>
+      `<option value="${esc(k)}"${S.invLoc === k ? ' selected' : ''}>📍 ${esc(k)} · ${locs[k]}</option>`).join('');
+  renderInv();
+}
+
+const NO_LOC = 'ยังไม่กำหนดที่เก็บ';
+
+// A1 < A2 < A10 — เรียงส่วนที่เป็นตัวเลขแบบตัวเลข ไม่งั้น A10 ไปอยู่ก่อน A2
+// และดันกองที่ยังไม่กำหนดที่เก็บไว้ท้ายสุดเสมอ
+function cmpLoc(a, b) {
+  if (a === NO_LOC) return 1;
+  if (b === NO_LOC) return -1;
+  const split = s => (String(s).match(/\d+|\D+/g) || []).map(x => /^\d/.test(x) ? +x : x);
+  const A = split(a), B = split(b);
+  for (let i = 0; i < Math.max(A.length, B.length); i++) {
+    if (A[i] === undefined) return -1;
+    if (B[i] === undefined) return 1;
+    if (A[i] === B[i]) continue;
+    return typeof A[i] === typeof B[i] ? (A[i] > B[i] ? 1 : -1) : String(A[i]).localeCompare(String(B[i]));
+  }
+  return 0;
+}
+
+// ช่อง Image ถูกเติมลิงก์ค้นรูปจาก "ชื่อ" ไว้ให้ทุกแถวแล้วตอนติดตั้ง
+// ค้นด้วยชื่อเท่านั้น ไม่เอารหัสปน — รหัสเป็นรหัสภายใน ใส่ไปแล้วค้นไม่เจอ
+// ถ้าเอาลิงก์รูปจริงไปวางทับ (Drive ฯลฯ) ปุ่มจะกลายเป็น "ดูรูป" เอง
+function imgHref(p) {
+  return p.image || ('https://www.google.com/search?udm=2&q=' + encodeURIComponent(p.name));
+}
+function isSearchLink(u) { return !u || u.indexOf('google.com/search') >= 0; }
+
+function renderInv() {
+  const q = ($('inv-q').value || '').trim().toLowerCase();
+  const lowOnly = $('inv-low').checked;
+  const expOnly = $('inv-exp').checked;
+  S.invLoc = $('inv-loc') ? $('inv-loc').value : '';
+  const badParts = new Set(S.batches.filter(b => b.status !== 'OK').map(b => b.part));
+
+  const list = S.parts.filter(p =>
+    (!lowOnly || p.low) && (!expOnly || badParts.has(p.part)) &&
+    (!S.invLoc || (p.location || NO_LOC) === S.invLoc) &&
+    (!q || p.name.toLowerCase().includes(q) || p.part.toLowerCase().includes(q) ||
+     String(p.location).toLowerCase().includes(q)));
+
+  const groups = {};
+  list.forEach(p => { const k = p.location || NO_LOC; (groups[k] = groups[k] || []).push(p); });
+  const keys = Object.keys(groups).sort(cmpLoc);
+  // ค้นหา/กรองอยู่ = กางให้เลย ไม่ต้องคลิกซ้ำ · ดูทั้งคลัง = พับไว้ ไม่งั้นได้ 997 แถวรวด
+  const openAll = !!(q || lowOnly || expOnly || S.invLoc);
+
+  $('inv-list').innerHTML = keys.length ? keys.map(loc => {
+    const items = groups[loc];
+    const low = items.filter(p => p.low).length;
+    return `
+    <details ${openAll ? 'open' : ''} class="card">
+      <summary class="p-3 cursor-pointer flex items-center gap-2 select-none">
+        <span class="font-semibold text-sm">${loc === NO_LOC ? '❓' : '📍'} ${esc(loc)}</span>
+        <span class="text-xs text-slate-400">· ${items.length} รายการ</span>
+        ${low ? `<span class="chip bg-red-100 text-red-700">ถึงจุดสั่งซื้อ ${low}</span>` : ''}
+      </summary>
+      <div class="px-2 pb-2 space-y-1">${items.map(p => partRow(p, badParts)).join('')}</div>
+    </details>`;
+  }).join('') : '<p class="text-slate-400">ไม่พบอะไหล่ที่ค้นหา</p>';
+}
+
+function partRow(p, badParts) {
+  const bs = S.batches.filter(b => b.part === p.part);
+  const color = { EXPIRED: 'bg-red-100 text-red-700', SOON: 'bg-amber-100 text-amber-800', OK: 'bg-slate-100 text-slate-600' };
+  return `
+    <details class="rounded-xl border border-slate-200 hover:border-slate-300 transition">
+      <summary class="p-2.5 flex items-center gap-3 cursor-pointer">
+        <div class="flex-1 min-w-0">
+          <div class="font-medium truncate">${esc(p.name)}
+            ${p.level ? `<span class="ml-2 chip ${
+              p.level === 'A' ? 'bg-teal-50 text-teal-700' : 'bg-slate-100 text-slate-600'
+            }" title="Level ความจำเป็น">${esc(p.level)}</span>` : ''}
+            ${p.low ? '<span class="ml-2 chip bg-red-100 text-red-700">ถึงจุดสั่งซื้อ</span>' : ''}
+            ${badParts.has(p.part) ? '<span class="ml-1 chip bg-amber-100 text-amber-800">หมดอายุ</span>' : ''}
+          </div>
+          <div class="text-xs text-slate-500">${esc(p.part)} · ${esc(p.category)}
+            ${p.machine ? ' · เครื่อง ' + esc(p.machine) : ''}</div>
+        </div>
+        <div class="text-right">
+          <div class="num font-bold ${p.low ? 'text-red-600' : ''}">${p.stock} ${esc(p.unit)}</div>
+          <div class="text-xs text-slate-400">Min ${p.min}${p.max ? ' / Max ' + p.max : ''}${p.moq ? ' · MOQ ' + p.moq : ''}
+            ${S.costHidden ? '' : ' · ' + money(p.value)}</div>
+        </div>
+      </summary>
+      <div class="px-3 pb-3 overflow-x-auto">
+        <div class="flex flex-wrap gap-2 mb-2">
+          <button onclick="openCard('${esc(p.part)}',this)" class="btn btn-soft px-3 text-xs">📄 บัตรสต๊อก</button>
+          <a href="${imgHref(p)}" target="_blank" rel="noopener" class="btn btn-soft px-3 text-xs">${isSearchLink(p.image) ? '🔎 หารูป' : '🖼️ ดูรูป'}</a>
+          ${can('LEAD') ? `
+          <button onclick="takePartPhoto('${esc(p.part)}')" class="btn btn-soft px-3 text-xs">📷 ถ่ายรูป</button>
+          <button onclick="tagThis('${esc(p.part)}')" class="btn btn-soft px-3 text-xs">🏷️ พิมพ์แท็ก</button>
+          <button onclick="editPart('${esc(p.part)}')" class="btn btn-soft px-3 text-xs">แก้ข้อมูลอะไหล่</button>
+          <button onclick="archivePartAsk(this,'${esc(p.part)}')" class="btn btn-danger px-3 text-xs">เลิกใช้</button>` : ''}
+        </div>
+        ${bs.length ? `<table class="w-full text-xs">
+          <tr class="text-left text-slate-500"><th class="py-1">Batch</th><th>รับเข้า</th><th>หมดอายุ</th>
+              <th class="text-right">คงเหลือ</th>${S.costHidden ? '' : '<th class="text-right">ต้นทุน</th>'}
+              <th>อ้างอิง</th><th></th>${can('LEAD') ? '<th></th>' : ''}</tr>
+          ${bs.map(b => `<tr class="border-t">
+            <td class="py-1 font-mono">${esc(b.id)}</td><td>${esc(b.received)}</td><td>${esc(b.expiry) || '—'}</td>
+            <td class="text-right font-semibold num">${b.left}/${b.qtyIn}</td>
+            ${S.costHidden ? '' : `<td class="text-right num">${money(b.cost)}</td>`}
+            <td class="truncate max-w-[10rem]">${esc(b.ref)}</td>
+            <td><span class="px-2 py-0.5 rounded ${color[b.status]}">${b.status}</span></td>
+            ${can('LEAD') ? `<td><button onclick="editBatch('${esc(b.id)}')" class="text-slate-400 hover:text-slate-700">✎</button></td>` : ''}
+          </tr>`).join('')}
+        </table>` : '<p class="text-xs text-slate-400">ยังไม่มีของในคลัง — รับเข้าที่แท็บรับเข้า</p>'}
+      </div>
+    </details>`;
+}
+
+
+/**
+ * สแกนด้วยกล้องแล้วยิงรหัสลงช่องที่ระบุ ใช้ตัวอ่านตัวเดียวกับหน้าเบิก
+ * onDone มีไว้ให้หน้าที่ต้องทำต่อเอง (เช่น นับสต๊อกใส่แถวให้เลย)
+ */
+function scanInto(inputId, onDone) {
+  SCAN_TARGET = { id: inputId, then: onDone || null };
+  openScanner();
+}
+
+function newPartForRecv() {
+  // เปิดฟอร์มเพิ่มอะไหล่ตัวเดิม — ไม่ทำฟอร์มซ้อนที่สอง เดี๋ยวกฎการออกรหัสจะต่างกัน
+  // พอบันทึกเสร็จ รหัสที่ออกจะถูกเติมลงบรรทัดรับเข้าที่ว่างอยู่ให้เอง
+  RECV_WANTS_CODE = true;
+  editPart();
+}
+
+function editPart(part) {
+  const p = part ? byPart(part) : { part: '', name: '', category: '', unit: 'ชิ้น', location: '',
+                                    cost: 0, min: 0, max: 0, moq: 0, level: '', supplier: '', machine: '', image: '' };
+  const f = (id, label, value, type) => `
+    <label class="block text-xs text-slate-500 mt-2">${label}</label>
+    <input id="pf-${id}" ${type ? `type="${type}" step="0.01" min="0"` : ''} value="${esc(value)}" class="field">`;
+  const sel = (id, list, cur, labelFn) => `
+    <select id="pf-${id}" onchange="previewCode()" class="field">
+      ${(S.codes[list] || []).map(x =>
+        `<option value="${esc(x.key)}" ${x.key === cur ? 'selected' : ''}>${esc(labelFn(x))}</option>`).join('')}
+    </select>`;
+  const dec = parseCode(p.part);
+
+  openModal(
+    `<h2 class="text-lg font-bold">${part ? 'แก้ข้อมูลอะไหล่' : 'เพิ่มอะไหล่ใหม่'}</h2>
+
+     ${part ? '' : `
+     <div class="rounded-xl bg-slate-100 p-3 mt-3">
+       <div class="text-sm font-semibold">ออกรหัสตามมาตรฐาน Code SP V1</div>
+       <p class="text-xs text-slate-400">เลือกสี่ช่อง ระบบหา Running ถัดไปของอักษรย่อนั้นให้เอง
+          — เลขจริงถูกจองตอนกดบันทึก สองคนกดพร้อมกันไม่ได้เลขซ้ำ</p>
+       <div class="grid grid-cols-2 gap-2 mt-2">
+         <div><label class="block text-xs text-slate-500">Item Group Main</label>
+           ${sel('gGroup', 'GROUP', '6', x => x.key + ' = ' + (x.en || x.th))}</div>
+         <div><label class="block text-xs text-slate-500">การใช้งาน</label>
+           ${sel('gUsage', 'USAGE', '00', x => x.key + (x.en ? ' = ' + x.en : ''))}</div>
+         <div><label class="block text-xs text-slate-500">Type</label>
+           ${sel('gType', 'TYPE', '01', x => x.key + ' = ' + (x.th || x.en))}</div>
+         <div><label class="block text-xs text-slate-500">หมวดชนิด</label>
+           <div class="flex gap-1">
+             <select id="pf-gCat" onchange="previewCode()" class="field flex-1 min-w-0">
+               <option value="">— เลือกหมวด —</option>
+               ${(S.codes.CATEGORY || []).map(x =>
+                 `<option value="${esc(x.code4)}">${esc(x.key)} · ${esc(x.en)}${x.th ? ' (' + esc(x.th) + ')' : ''} · ${esc(x.code4)}</option>`).join('')}
+             </select>
+             <button type="button" onclick="openNewCat()" title="เพิ่มหมวดชนิดใหม่"
+                     class="btn btn-soft px-3 shrink-0">+</button>
+           </div></div>
+       </div>
+       <div id="code-preview" class="mt-2 text-sm text-slate-500">เลือกหมวดชนิดเพื่อดูรหัส</div>
+     </div>`}
+
+     ${f('part', 'รหัสอะไหล่ (Part No. / บาร์โค้ด)', p.part)}
+     ${part
+       ? `<p class="text-xs text-slate-400">เปลี่ยนรหัสจะกลายเป็นอะไหล่ตัวใหม่${dec
+           ? ' · รหัสนี้คือ กลุ่ม ' + esc(dec.group) + ' · การใช้งาน ' + esc(dec.usage) +
+             ' · Type ' + esc(codeLabel('TYPE', dec.type)) + ' · หมวด ' + esc(dec.key3) +
+             ' ' + esc(dec.code4) + ' · ลำดับที่ ' + esc(dec.running)
+           : ' · รหัสนี้ไม่เข้าโครง Code SP V1 (รหัสเดิมก่อนใช้มาตรฐาน)'}</p>`
+       : '<p class="text-xs text-slate-400">ปล่อยว่างไว้ก็ได้ ถ้าเลือกหมวดด้านบนแล้ว — หรือพิมพ์รหัสเดิม/บาร์โค้ดผู้ผลิตทับลงไป</p>'}
+     ${f('name', 'ชื่ออะไหล่', p.name)}
+     <div class="grid grid-cols-2 gap-2">
+       <div>${f('category', 'หมวด', p.category)}</div>
+       <div>${f('unit', 'หน่วย', p.unit)}</div>
+       <div>${f('location', 'ที่จัดเก็บ (ชั้น/ช่อง)', p.location)}</div>
+       <div>${f('cost', 'ต้นทุนตั้งต้น', p.cost, 'number')}</div>
+       <div>${f('min', 'Min — จุดสั่งซื้อ', p.min, 'number')}</div>
+       <div>${f('max', 'Max — เติมถึง', p.max, 'number')}</div>
+       <div>${f('moq', 'MOQ — ขั้นต่ำที่ผู้ขายรับ', p.moq || 0, 'number')}</div>
+       <div>${f('supplier', 'ผู้ขาย', p.supplier)}</div>
+       <div>${f('machine', 'ใช้กับเครื่อง (คั่น ,)', p.machine)}</div>
+       <div>
+         <label class="block text-xs text-slate-500 mt-2">Level ความจำเป็น</label>
+         <select id="pf-level" class="field">
+           ${['', 'A', 'B', 'C'].map(v => `<option value="${v}" ${v === (p.level || '') ? 'selected' : ''}>${
+             v === 'A' ? 'A — ต้องมีในสต๊อกเสมอ (ของนอก)'
+             : v === 'B' ? 'B — มีหรือไม่มีได้ หาในประเทศได้'
+             : v === 'C' ? 'C — ไม่ค่อยจำเป็น' : '— ไม่ระบุ —'}</option>`).join('')}
+         </select>
+       </div>
+     </div>
+     <p class="text-xs text-slate-400 mt-2">Min คือจุดที่ขึ้นเตือนและถูกดึงเข้าใบสั่งซื้อ · Max คือจำนวนที่จะเติมขึ้นไปถึง
+        (ไม่ตั้ง Max ระบบใช้ 2 × Min) · MOQ ทำให้จำนวนในใบสั่งซื้อถูกปัดขึ้นเป็นจำนวนเท่า เช่น MOQ 25 ต้องการ 2 ก็สั่ง 25</p>`,
+    `<button onclick="closeModal()" class="btn btn-soft">ยกเลิก</button>
+     <button onclick="savePartForm(this)" class="btn btn-ink ml-auto px-5">บันทึก</button>`);
+}
+
+/** รหัสที่ preview เติมให้ล่าสุด — ถ้าผู้ใช้ไม่ได้แก้ทับ เซิร์ฟเวอร์จะออกเลขใหม่ให้ตอนบันทึก */
+let LAST_PREVIEW = '';
+
+/** ดูรหัสถัดไปแบบสด ๆ ตอนเลือกหมวด (เลขจริงจองตอนบันทึก) */
+function previewCode() {
+  const g = id => { const el = $('pf-' + id); return el ? el.value : ''; };
+  const box = $('code-preview');
+  if (!box) return;
+  if (!g('gCat')) { box.textContent = 'เลือกหมวดชนิดเพื่อดูรหัส'; return; }
+  box.textContent = 'กำลังหา Running…';
+  api('previewPartCode', { group: g('gGroup'), usage: g('gUsage'), type: g('gType'), category: g('gCat') })
+    .then(r => {
+      box.innerHTML = `รหัสที่จะได้: <b class="font-mono text-base">${esc(r.code)}</b>
+        <span class="text-xs">(ลำดับที่ ${r.running} ของ ${esc(r.category)})</span>`;
+      const pf = $('pf-part');
+      // เขียนทับให้เฉพาะตอนที่ยังว่าง หรือเป็นรหัสที่ระบบเพิ่งเติมเอง
+      if (pf && (!pf.value.trim() || pf.value.trim() === LAST_PREVIEW)) pf.value = r.code;
+      LAST_PREVIEW = r.code;
+      if (!$('pf-category').value.trim()) $('pf-category').value = r.category;
+    })
+    .catch(e => { box.textContent = e.message; });
+}
+
+let RECV_WANTS_CODE = false;
+
+
+/* ---- หมวดชนิดใหม่ -------------------------------------------------- *
+ * ซ้อนบนฟอร์มเพิ่มอะไหล่ จึงต้องจำค่าที่กรอกค้างไว้เอง ก่อนวาดฟอร์มทับ
+ * ไม่งั้นคนกรอกชื่ออะไหล่ไว้ครึ่งแล้วจะหายหมด */
+let CAT_RETURN = null;
+
+function openNewCat() {
+  const keep = {};
+  ['part', 'name', 'category', 'unit', 'location', 'cost', 'min', 'max', 'moq',
+   'level', 'supplier', 'machine', 'gGroup', 'gUsage', 'gType'].forEach(k => {
+    const el = $('pf-' + k); if (el) keep[k] = el.value;
+  });
+  CAT_RETURN = keep;
+
+  openModal(
+    `<h2 class="text-lg font-bold">เพิ่มหมวดชนิดใหม่</h2>
+     <p class="text-xs text-slate-400 mt-1">
+       Key 3 หลักระบบออกให้เอง — คุณกรอกแค่ชื่อกับอักษรย่อ 4 ตัวที่จะไปอยู่กลางรหัสอะไหล่
+     </p>
+
+     <label class="block text-xs text-slate-500 mt-3">ชื่อหมวด (อังกฤษ)</label>
+     <input id="nc-en" class="field" placeholder="เช่น Proximity Sensor">
+
+     <label class="block text-xs text-slate-500 mt-2">ชื่อหมวด (ไทย)</label>
+     <input id="nc-th" class="field" placeholder="เช่น พร็อกซิมิตี้เซนเซอร์">
+
+     <label class="block text-xs text-slate-500 mt-2">อักษรย่อ 4 ตัว *</label>
+     <input id="nc-code4" class="field font-mono uppercase" maxlength="4" placeholder="P010"
+            oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+     <p class="text-xs text-slate-400 mt-1">A-Z หรือ 0-9 รวม 4 ตัวพอดี · ต้องไม่ซ้ำกับหมวดที่มีอยู่ ระบบตรวจให้</p>
+
+     <div id="nc-msg" class="mt-2 text-sm"></div>`,
+    `<button onclick="backToPartForm()" class="btn btn-soft">ย้อนกลับ</button>
+     <button onclick="doAddCat(this)" class="btn btn-ink ml-auto px-5">เพิ่มหมวด</button>`);
+}
+
+/** กลับไปฟอร์มเดิมพร้อมค่าที่กรอกค้างไว้ — และเลือกหมวดที่เพิ่งสร้างให้เลยถ้ามี */
+function backToPartForm(pickCode4) {
+  const keep = CAT_RETURN || {};
+  CAT_RETURN = null;
+  editPart();
+  Object.keys(keep).forEach(k => { const el = $('pf-' + k); if (el) el.value = keep[k]; });
+  if (pickCode4) { const el = $('pf-gCat'); if (el) el.value = pickCode4; }
+  previewCode();
+}
+
+function doAddCat(btn) {
+  run(btn, async () => {
+    const code4 = ($('nc-code4').value || '').trim().toUpperCase();
+    const r = await api('addCodeCategory', $('nc-en').value, $('nc-th').value, code4);
+    S.codes = r.codes;
+    toast('เพิ่มหมวด ' + r.key + ' · ' + r.code4 + ' แล้ว', true);
+    backToPartForm(r.code4);
+    if (r.existing) {
+      toast('อักษรย่อนี้มีรหัสเดิมใช้อยู่ ' + r.existing + ' รายการ — เลขถัดไปคือ ' +
+            String(r.nextRunning).padStart(4, '0') + ' ไม่ได้เริ่มที่ 0001', true);
+    }
+  });
+}
+
+function savePartForm(btn) {
+  run(btn, async () => {
+    const v = id => { const el = $('pf-' + id); return el ? el.value : ''; };
+    const cat = await api('savePart', {
+      part: v('part'), name: v('name'), category: v('category'), unit: v('unit'),
+      location: v('location'), cost: v('cost'), min: v('min'), max: v('max'), moq: v('moq'),
+      level: v('level'), supplier: v('supplier'), machine: v('machine'),
+      // ให้เซิร์ฟเวอร์ออกรหัสเองเมื่อเลือกหมวดไว้ — Running ถูกจองใน lock เดียวกับที่เขียนแถว
+      // ถ้าผู้ใช้ไม่ได้แก้รหัสที่ preview เติมให้ ก็ออกใหม่อีกรอบ กัน preview ค้างจนเลขถูกคนอื่นใช้ไป
+      gen: v('gCat') ? { group: v('gGroup'), usage: v('gUsage'), type: v('gType'), category: v('gCat') } : null,
+      autoCode: !!v('gCat') && v('part').trim() === LAST_PREVIEW
+    });
+    const issued = cat.issued;
+    const code = (issued && issued.code) || v('part').trim();
+    takeCatalog(cat);
+    closeModal();
+    if (RECV_WANTS_CODE && code) {
+      RECV_WANTS_CODE = false;
+      const at = S.recv.findIndex(l => !String(l.part).trim());
+      if (at < 0) S.recv.push(Object.assign(blankRecvLine(), { part: code }));
+      else S.recv[at].part = code;
+    }
+    render();
+    toast(issued ? 'บันทึกแล้ว · รหัสที่ออกให้ ' + issued.code : 'บันทึกอะไหล่แล้ว', true);
+  });
+}
+
+function archivePartAsk(btn, part) {
+  openModal(`<p>เลิกใช้อะไหล่ <b>${esc(part)}</b> ? ประวัติและ batch ยังอยู่ แต่จะไม่ขึ้นในหน้าเบิก</p>`,
+    `<button onclick="closeModal()" class="btn btn-soft">ยกเลิก</button>
+     <button onclick="doArchivePart(this,'${esc(part)}')" class="btn btn-danger ml-auto px-5">เลิกใช้</button>`);
+}
+
+function doArchivePart(btn, part) {
+  run(btn, async () => {
+    takeCatalog(await api('archivePart', part));
+    closeModal();
+    render();
+    toast('เลิกใช้แล้ว', true);
+  });
+}
+
+function editBatch(id) {
+  const b = S.batches.find(x => x.id === id);
+  if (!b) return;
+  openModal(
+    `<h2 class="text-lg font-bold">แก้ batch ${esc(id)}</h2>
+     <p class="text-xs text-slate-400">แก้ได้แค่วันหมดอายุและต้นทุน — จำนวนเปลี่ยนได้ทางการนับสต๊อกเท่านั้น</p>
+     <label class="block text-xs text-slate-500 mt-3">วันหมดอายุ</label>
+     <input id="bf-exp" type="date" value="${esc(b.expiry)}" class="field">
+     <label class="block text-xs text-slate-500 mt-2">ต้นทุน/หน่วย</label>
+     <input id="bf-cost" type="number" step="0.01" min="0" value="${b.cost}" class="field">`,
+    `<button onclick="closeModal()" class="btn btn-soft">ยกเลิก</button>
+     <button onclick="saveBatchForm(this,'${esc(id)}')" class="btn btn-ink ml-auto px-5">บันทึก</button>`);
+}
+
+function saveBatchForm(btn, id) {
+  run(btn, async () => {
+    takeCatalog(await api('updateBatch', id, { expiry: $('bf-exp').value, cost: $('bf-cost').value }));
+    closeModal();
+    render();
+    toast('แก้ batch แล้ว', true);
+  });
+}
+
+/* =========================================================================
+ *  บัตรสต๊อก — ยกมา → รับ/จ่ายทีละรายการ → คงเหลือวิ่ง
+ *
+ *  อ่านจาก Stock_Moves ที่บันทึกทุกการเคลื่อนไหวไว้แล้ว ไม่มีตารางใหม่
+ *  ประโยชน์หลักคือบรรทัด "คงเหลือตามบัตร vs คงเหลือจริง" — ถ้าไม่ตรง
+ *  แปลว่ามีคนแก้จำนวนในชีตด้วยมือ
+ * ========================================================================= */
+
+let CARD = null;
+
+function openCard(part, btn) {
+  run(btn, async () => {
+    CARD = await api('getStockCard', part, daysAgoStr(89), todayStr());
+    renderCard();
+  });
+}
+
+function reloadCard(btn) {
+  run(btn, async () => {
+    CARD = await api('getStockCard', CARD.part, $('cd-from').value, $('cd-to').value);
+    renderCard();
+  });
+}
+
+/**
+ * รูปในบัตรสต๊อก: มีลิงก์รูปจริงก็แสดงรูป ไม่มีก็ให้ปุ่มค้น
+ * onerror สำคัญ — ลิงก์ Drive ที่ลืมแชร์จะโหลดไม่ขึ้น ต้องเห็นปุ่มแทน ไม่ใช่กรอบรูปแตก
+ */
+function cardImage(c) {
+  const href = c.image || ('https://www.google.com/search?udm=2&q=' + encodeURIComponent(c.name));
+  const real = c.image && c.image.indexOf('google.com/search') < 0;
+  return `
+    <div class="flex items-center gap-3 mt-3 p-2 rounded-xl bg-slate-50">
+      ${real ? `<img src="${esc(c.image)}" alt="${esc(c.name)}"
+            class="w-20 h-20 object-contain rounded-lg bg-white border border-slate-200"
+            onerror="this.replaceWith(Object.assign(document.createElement('div'),
+                     {className:'w-20 h-20 rounded-lg bg-white border border-slate-200 grid place-items-center text-2xl text-slate-300',
+                      textContent:'\u26a0'}))">`
+        : `<div class="w-20 h-20 rounded-lg bg-white border border-dashed border-slate-300 grid place-items-center text-2xl text-slate-300">📷</div>`}
+      <div class="text-xs text-slate-500 flex-1">
+        ${real ? 'รูปจากลิงก์ที่บันทึกไว้'
+               : 'ยังไม่ได้ผูกรูปจริง — อัปรูปขึ้น Drive แล้ววางลิงก์ในช่อง Image'}
+        <div class="mt-1">
+          <a href="${href}" target="_blank" rel="noopener" class="btn btn-soft px-3 text-xs">
+            ${real ? '🖼️ เปิดรูปเต็ม' : '🔎 หารูปจากชื่อ'}</a>
+          ${can('LEAD') ? `<button onclick="takePartPhoto('${esc(c.part)}')"
+            class="btn btn-soft px-3 text-xs">📷 ${real ? 'ถ่ายใหม่' : 'ถ่ายรูป'}</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderCard() {
+  const c = CARD;
+  const type = { RECEIVE: 'รับเข้า', ISSUE: 'เบิก', RETURN: 'คืน', ADJUST: 'ปรับจากการนับ', SCRAP: 'ตัดจำหน่าย' };
+  openModal(
+    `<h2 class="text-lg font-bold">บัตรสต๊อก · ${esc(c.name)}</h2>
+     <div class="text-xs text-slate-500">${esc(c.part)}${c.location ? ' · 📍 ' + esc(c.location) : ''}
+       · Min ${c.min}${c.max ? ' / Max ' + c.max : ''}${c.moq ? ' · MOQ ' + c.moq : ''}</div>
+     ${cardImage(c)}
+
+     <div class="flex flex-wrap gap-2 items-end mt-3">
+       <div><label class="block text-xs text-slate-500">ตั้งแต่</label>
+         <input id="cd-from" type="date" value="${esc(c.from)}" class="field w-36"></div>
+       <div><label class="block text-xs text-slate-500">ถึง</label>
+         <input id="cd-to" type="date" value="${esc(c.to)}" class="field w-36"></div>
+       <button onclick="reloadCard(this)" class="btn btn-soft text-sm">ดูใหม่</button>
+     </div>
+
+     <div class="grid grid-cols-4 gap-2 mt-3 text-center">
+       <div class="rounded-lg bg-slate-100 p-2"><div class="text-xs text-slate-500">ยกมา</div>
+         <div class="num font-bold">${c.opening}</div></div>
+       <div class="rounded-lg bg-slate-100 p-2"><div class="text-xs text-slate-500">รับ</div>
+         <div class="num font-bold text-teal-700">+${c.inTotal}</div></div>
+       <div class="rounded-lg bg-slate-100 p-2"><div class="text-xs text-slate-500">จ่าย</div>
+         <div class="num font-bold text-red-600">−${c.outTotal}</div></div>
+       <div class="rounded-lg bg-slate-100 p-2"><div class="text-xs text-slate-500">คงเหลือ</div>
+         <div class="num font-bold">${c.closing}</div></div>
+     </div>
+
+     ${c.ok ? `<p class="text-xs text-slate-400 mt-2">คงเหลือตามบัตรตรงกับผลรวม batch จริง (${c.onHand} ${esc(c.unit)})</p>`
+            : `<p class="mt-2 p-2 rounded-lg bg-red-50 text-red-800 text-sm">
+                 ⚠ คงเหลือตามบัตร <b>${c.closing}</b> ไม่ตรงกับผลรวม batch จริง <b>${c.onHand}</b> —
+                 มีการแก้จำนวนในชีตด้วยมือ หรือช่วงวันที่ตัดไม่ถึงปัจจุบัน ตรวจแล้วนับสต๊อกใหม่</p>`}
+
+     <div class="overflow-x-auto mt-3">
+       <table class="w-full text-xs">
+         <tr class="text-left text-slate-500">
+           <th class="py-1">วันเวลา</th><th>ประเภท</th><th>เอกสาร</th><th>รายละเอียด</th>
+           <th class="text-right">รับ</th><th class="text-right">จ่าย</th><th class="text-right">คงเหลือ</th><th>โดย</th></tr>
+         <tr class="border-t bg-slate-50"><td class="py-1" colspan="6"><i>ยอดยกมา ${esc(c.from)}</i></td>
+           <td class="text-right num font-semibold">${c.opening}</td><td></td></tr>
+         ${c.lines.map(l => `<tr class="border-t">
+           <td class="py-1 whitespace-nowrap">${esc(l.ts)}</td>
+           <td>${esc(type[l.type] || l.type)}</td>
+           <td class="font-mono">${esc(l.doc)}</td>
+           <td class="max-w-[12rem] truncate" title="${esc(l.reason)}">${esc(l.reason)}</td>
+           <td class="text-right num text-teal-700">${l.inQty || ''}</td>
+           <td class="text-right num text-red-600">${l.outQty || ''}</td>
+           <td class="text-right num font-semibold">${l.balance}</td>
+           <td class="text-slate-400">${esc(String(l.user).split('@')[0])}</td>
+         </tr>`).join('') || '<tr class="border-t"><td colspan="8" class="py-2 text-slate-400">ไม่มีการเคลื่อนไหวในช่วงนี้</td></tr>'}
+       </table>
+     </div>`,
+    `<button onclick="printCard()" class="btn btn-soft">🖨 พิมพ์บัตร</button>
+     <button onclick="closeModal()" class="btn btn-ink ml-auto px-5">ปิด</button>`);
+}
+
+function printCard() {
+  const c = CARD;
+  if (!c) return;
+  document.documentElement.style.setProperty('--slip-width', '190mm');   // A4 ตั้ง ไม่ใช่กระดาษความร้อน
+  $('print-area').innerHTML = `
+    <div style="text-align:center">
+      <img src="${logoSrc()}" alt="" style="height:9mm;margin:0 auto 1mm;display:block" onerror="this.remove()">
+      <div style="font-weight:700">${esc(CFG.SITE_NAME || 'คลังอะไหล่')} — บัตรสต๊อก</div>
+    </div>
+    <div>${esc(c.part)} · ${esc(c.name)} · หน่วย ${esc(c.unit)}${c.location ? ' · ที่เก็บ ' + esc(c.location) : ''}</div>
+    <div>ช่วง ${esc(c.from)} ถึง ${esc(c.to)} · ยกมา ${c.opening} · รับ ${c.inTotal} · จ่าย ${c.outTotal} · คงเหลือ ${c.closing}</div>
+    <hr>
+    <table>
+      <tr><th style="text-align:left">วันเวลา</th><th style="text-align:left">ประเภท</th>
+          <th style="text-align:left">เอกสาร</th><th class="r">รับ</th><th class="r">จ่าย</th><th class="r">คงเหลือ</th></tr>
+      <tr><td colspan="5"><i>ยอดยกมา</i></td><td class="r">${c.opening}</td></tr>
+      ${c.lines.map(l => `<tr>
+        <td>${esc(l.ts)}</td><td>${esc(l.type)}</td><td>${esc(l.doc)}</td>
+        <td class="r">${l.inQty || ''}</td><td class="r">${l.outQty || ''}</td>
+        <td class="r">${l.balance}</td></tr>`).join('')}
+    </table>
+    <hr>
+    <div>คงเหลือตามบัตร ${c.closing} · ผลรวม batch จริง ${c.onHand}${c.ok ? ' (ตรงกัน)' : ' — ไม่ตรงกัน'}</div>
+    <div style="margin-top:12px">ผู้ตรวจ ....................  วันที่ ....................</div>`;
+  window.print();
+  document.documentElement.style.setProperty('--slip-width', (CFG.SLIP_WIDTH || '80') + 'mm');
+}
+
+/* =========================================================================
+ *  รับเข้า + สั่งซื้อ
+ * ========================================================================= */
+
+function viewReceive() {
+  if (!S.recv.length) S.recv = [blankRecvLine()];
+  $('view').innerHTML = `
+    <div class="h-full overflow-y-auto p-4 space-y-4">
+
+
+      <section class="card p-4">
+        <h2 class="font-bold">รับอะไหล่เข้าคลัง</h2>
+        <p class="text-xs text-slate-400">ทุกครั้งที่รับเข้าจะสร้าง batch ใหม่ — ต้นทุนและวันหมดอายุผูกกับ batch นั้น</p>
+        <div class="grid sm:grid-cols-3 gap-2 mt-3">
+          <div><label class="block text-xs text-slate-500">ผู้ขาย</label>
+            <input id="rv-supplier" class="field"></div>
+          <div><label class="block text-xs text-slate-500">เลขที่บิล / ใบส่งของ</label>
+            <input id="rv-invoice" class="field"></div>
+          <div><label class="block text-xs text-slate-500">อ้างอิงใบสั่งซื้อ (ถ้ามี)</label>
+            <input id="rv-po" class="field" placeholder="PO..."></div>
+        </div>
+        <div id="recv-lines" class="mt-3 space-y-2"></div>
+        <div class="flex flex-wrap gap-2 items-center mt-3">
+          <button onclick="S.recv.push(blankRecvLine());renderRecv()" class="btn btn-soft text-sm">+ เพิ่มบรรทัด</button>
+        ${can('LEAD') ? `<button onclick="newPartForRecv()" class="btn btn-soft text-sm">
+          + เปิดรหัสอะไหล่ใหม่</button>` : ''}
+          <span id="recv-total" class="text-sm text-slate-500"></span>
+          <button onclick="doReceive(this)" class="btn btn-primary ml-auto px-5">รับเข้าคลัง</button>
+        </div>
+      </section>
+
+      <section class="card p-4">
+        <div class="flex flex-wrap gap-2 items-center">
+          <h2 class="font-bold">ใบสั่งซื้อที่ค้าง</h2>
+          <button onclick="doGeneratePO(this)" class="btn btn-ink text-sm">สร้างจากของที่ถึงจุดสั่งซื้อ</button>
+          <button onclick="loadPOs(this)" class="btn btn-soft text-sm">โหลดรายการ</button>
+        </div>
+        <div id="po-list" class="mt-3 text-sm text-slate-400">กด “โหลดรายการ” เพื่อดูใบสั่งซื้อที่ยังค้าง</div>
+      </section>
+    </div>`;
+  renderRecv();
+}
+
+function blankRecvLine() { return { part: '', qty: '', unitCost: '', expiry: '' }; }
+function setRecv(i, field, v) { S.recv[i][field] = v; if (field !== 'expiry' && field !== 'part') renderRecvTotal(); }
+function dropRecv(i) { S.recv.splice(i, 1); if (!S.recv.length) S.recv.push(blankRecvLine()); renderRecv(); }
+
+function renderRecv() {
+  $('recv-lines').innerHTML = S.recv.map((l, i) => `
+    <div class="grid gap-2" style="grid-template-columns:minmax(0,2fr) 44px 80px 110px 140px 44px">
+      <input id="rv-part-${i}" list="parts" value="${esc(l.part)}" oninput="setRecv(${i},'part',this.value)"
+             placeholder="สแกนหรือพิมพ์รหัส" class="field">
+      <button onclick="scanInto('rv-part-${i}', c => setRecv(${i},'part',c))" title="สแกนด้วยกล้อง"
+              class="btn btn-soft px-0">📷</button>
+      <input value="${esc(l.qty)}" oninput="setRecv(${i},'qty',this.value)" inputmode="numeric"
+             placeholder="จำนวน" class="field text-center num">
+      <input value="${esc(l.unitCost)}" oninput="setRecv(${i},'unitCost',this.value)" inputmode="decimal"
+             placeholder="ต้นทุน/หน่วย" class="field text-right num">
+      <input type="date" value="${esc(l.expiry)}" oninput="setRecv(${i},'expiry',this.value)"
+             title="วันหมดอายุ (เฉพาะของที่มีอายุ)" class="field">
+      <button onclick="dropRecv(${i})" class="btn btn-ghost px-0" aria-label="ลบบรรทัด">✕</button>
+    </div>`).join('');
+  renderRecvTotal();
+}
+
+function renderRecvTotal() {
+  const total = S.recv.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitCost) || 0), 0);
+  $('recv-total').textContent = 'มูลค่ารวม ' + money(total);
+}
+
+/** ref กันคีย์ซ้ำของฟอร์มรับเข้า เปลี่ยนเมื่อรับเข้าสำเร็จเท่านั้น */
+let RECV_REF = newRef();
+
+function doReceive(btn, force) {
+  run(btn, async () => {
+    const lines = S.recv.filter(l => String(l.part).trim() && Number(l.qty) > 0);
+    if (!lines.length) throw new Error('ยังไม่มีบรรทัดที่กรอกครบ');
+    const doc = {
+      supplier: $('rv-supplier').value.trim(),
+      invoice: $('rv-invoice').value.trim(),
+      poId: $('rv-po').value.trim(),
+      lines: lines, ref: RECV_REF, force: !!force
+    };
+    let r;
+    try {
+      r = await api('receive', doc);
+    } catch (e) {
+      // บิลใบเดิมเคยรับไปแล้ว — ให้คนตัดสินใจ ไม่ห้ามตาย เพราะของอีกล็อตที่ใช้เลขบิลเดิมมีจริง
+      if (/DUP_INVOICE/.test(e.message)) return askForceReceive(e.message.replace('DUP_INVOICE: ', ''));
+      throw e;
+    }
+    S.recv = [blankRecvLine()];
+    RECV_REF = newRef();
+    closeModal();
+    await refresh(false);
+    render();
+    toast(r.duplicate ? 'ฟอร์มนี้ถูกบันทึกไปแล้ว: ' + r.grn + ' (ไม่รับเข้าซ้ำ)'
+                      : 'รับเข้า ' + r.batches + ' batch · ' + money(r.totalCost), true);
+  });
+}
+
+function askForceReceive(message) {
+  openModal(
+    `<div class="text-center text-3xl">⚠</div>
+     <h2 class="text-lg font-bold text-center mt-1">รับบิลใบนี้ซ้ำ?</h2>
+     <p class="text-sm mt-2">${esc(message)}</p>
+     <p class="text-xs text-slate-400 mt-2">ถ้ากดยืนยัน สต๊อกจะเพิ่มอีกรอบตามจำนวนในฟอร์ม —
+        ทำเมื่อเป็นของอีกล็อตที่ผู้ขายออกเลขบิลเดิมจริงเท่านั้น</p>`,
+    `<button onclick="closeModal()" class="btn btn-soft">ยกเลิก</button>
+     <button onclick="doReceive(this,true)" class="btn btn-danger ml-auto px-5">ยืนยันรับซ้ำ</button>`);
+}
+
+function doGeneratePO(btn) {
+  run(btn, async () => {
+    const r = await api('generatePO');
+    if (!r.poId) { toast('ไม่มีอะไหล่ที่ถึงจุดสั่งซื้อ', true); return; }
+    S.pos = await api('getOpenPOs');
+    renderPOList();
+    toast('สร้าง ' + r.poId + ' — ' + r.lines.length + ' รายการ', true);
+  });
+}
+
+function loadPOs(btn) { run(btn, async () => { S.pos = await api('getOpenPOs'); renderPOList(); }); }
+
+function renderPOList() {
+  if (!S.pos.length) { $('po-list').innerHTML = '<p class="text-sm text-slate-400">ไม่มีใบสั่งซื้อค้าง</p>'; return; }
+  const groups = {};
+  S.pos.forEach(l => { (groups[l.poId] = groups[l.poId] || []).push(l); });
+  $('po-list').innerHTML = Object.keys(groups).map(poId => {
+    const lines = groups[poId];
+    const est = lines.reduce((s, l) => s + l.est, 0);
+    return `
+    <details class="rounded-xl bg-slate-100 p-3 mb-2">
+      <summary class="cursor-pointer flex items-center gap-2">
+        <b class="font-mono text-sm">${esc(poId)}</b>
+        <span class="text-xs text-slate-500">${lines.length} รายการ · ${money(est)}</span>
+        <span class="ml-auto flex gap-2">
+          <button onclick="event.preventDefault();poToReceiving('${esc(poId)}')" class="btn btn-soft px-3 text-xs">โหลดเข้าฟอร์มรับเข้า</button>
+          <button onclick="event.preventDefault();doCancelPO(this,'${esc(poId)}')" class="btn btn-danger px-3 text-xs">ยกเลิก</button>
+        </span>
+      </summary>
+      <table class="w-full text-xs mt-2">
+        <tr class="text-left text-slate-500"><th>รหัส</th><th>ชื่อ</th><th>ผู้ขาย</th>
+            <th class="text-right">คงเหลือ</th><th class="text-right">MOQ</th>
+            <th class="text-right">สั่ง</th><th class="text-right">ประมาณ</th></tr>
+        ${lines.map(l => `<tr class="border-t">
+          <td class="py-1 font-mono">${esc(l.part)}</td><td>${esc(l.name)}</td><td>${esc(l.supplier)}</td>
+          <td class="text-right num">${(byPart(l.part) || {}).stock ?? ''}</td>
+          <td class="text-right num text-slate-400">${(byPart(l.part) || {}).moq || ''}</td>
+          <td class="text-right num font-semibold">${l.qty}</td><td class="text-right num">${money(l.est)}</td></tr>`).join('')}
+      </table>
+    </details>`;
+  }).join('');
+}
+
+function poToReceiving(poId) {
+  S.recv = S.pos.filter(l => l.poId === poId)
+    .map(l => ({ part: l.part, qty: l.qty, unitCost: l.unitCost, expiry: '' }));
+  $('rv-po').value = poId;
+  renderRecv();
+  toast('โหลด ' + poId + ' เข้าฟอร์มแล้ว — แก้จำนวนจริงก่อนกดรับเข้า', true);
+}
+
+function doCancelPO(btn, poId) {
+  run(btn, async () => {
+    await api('cancelPO', poId);
+    S.pos = await api('getOpenPOs');
+    renderPOList();
+    toast('ยกเลิก ' + poId + ' แล้ว', true);
+  });
+}
+
+/* =========================================================================
+ *  นับสต๊อก + ตัดจำหน่าย
+ * ========================================================================= */
+
+function viewCount() {
+  const expired = S.batches.filter(b => b.status === 'EXPIRED');
+  $('view').innerHTML = `
+    <div class="h-full overflow-y-auto p-4 space-y-4">
+
+      <section class="card p-4">
+        <h2 class="font-bold">นับสต๊อก</h2>
+        <p class="text-xs text-slate-400">กรอกจำนวนที่นับได้จริง ระบบจะปรับส่วนต่าง — ขาดตัดจาก batch เก่าสุด เกินสร้าง batch ใหม่</p>
+        <div class="flex flex-wrap gap-2 items-center mt-3">
+          <input id="ct-part" list="parts" placeholder="สแกนหรือพิมพ์รหัสอะไหล่" class="field w-56"
+                 onkeydown="if(event.key==='Enter')addCount(this.value)">
+          <button onclick="scanInto('ct-part', addCount)" title="สแกนด้วยกล้อง"
+                  class="btn btn-ink text-lg px-3">📷</button>
+          <button onclick="addCount($('ct-part').value)" class="btn btn-soft text-sm">+ เพิ่ม</button>
+          <button onclick="addAllCount()" class="btn btn-soft text-sm">เพิ่มทุกตัวที่มีของ</button>
+        </div>
+        <div id="count-lines" class="mt-3 space-y-2"></div>
+        <div class="flex gap-2 items-center mt-3">
+          <span id="count-sum" class="text-sm text-slate-500"></span>
+          <button onclick="submitCount(this)" class="btn btn-primary ml-auto px-5">บันทึกผลนับ</button>
+        </div>
+      </section>
+
+      <section class="card p-4">
+        <h2 class="font-bold">ตัดจำหน่าย</h2>
+        <p class="text-xs text-slate-400">ของชำรุด หมดอายุ หรือสูญหาย — ต้องระบุสาเหตุทุกบรรทัด</p>
+        <div class="flex flex-wrap gap-2 items-center mt-3">
+          <input id="sc-part" list="parts" placeholder="สแกนหรือพิมพ์รหัส" class="field w-48">
+          <button onclick="scanInto('sc-part')" title="สแกนด้วยกล้อง"
+                  class="btn btn-ink text-lg px-3">📷</button>
+          <input id="sc-qty" inputmode="numeric" placeholder="จำนวน" class="field w-24 text-center">
+          <select id="sc-reason" class="field w-auto">
+            <option>ชำรุด</option><option>หมดอายุ</option><option>สูญหาย</option><option>อื่น ๆ</option>
+          </select>
+          <button onclick="addScrap()" class="btn btn-soft text-sm">+ เพิ่ม</button>
+          ${expired.length ? `<button onclick="queueAllExpired()" class="btn btn-danger text-sm">
+            ตัดของหมดอายุทั้งหมด (${expired.length} batch)</button>` : ''}
+        </div>
+        <div id="scrap-lines" class="mt-3 space-y-2"></div>
+        <div class="flex gap-2 items-center mt-3">
+          <span id="scrap-sum" class="text-sm text-slate-500"></span>
+          <button onclick="submitScrap(this)" class="btn btn-danger ml-auto px-5">ยืนยันตัดจำหน่าย</button>
+        </div>
+      </section>
+    </div>`;
+  renderCount();
+  renderScrap();
+}
+
+function addCount(part) {
+  part = String(part || '').trim();
+  const p = byPart(part);
+  if (!p) { toast('ไม่พบอะไหล่ ' + part); return; }
+  if (!S.count.some(c => c.part === part)) S.count.push({ part: part, physical: p.stock, note: '' });
+  $('ct-part').value = '';
+  renderCount();
+}
+
+function addAllCount() {
+  S.parts.filter(p => p.stock > 0).forEach(p => {
+    if (!S.count.some(c => c.part === p.part)) S.count.push({ part: p.part, physical: p.stock, note: '' });
+  });
+  renderCount();
+}
+
+function setCount(part, v) { const c = S.count.find(x => x.part === part); if (c) c.physical = v; renderCount(); }
+function dropCount(part) { S.count = S.count.filter(c => c.part !== part); renderCount(); }
+
+function renderCount() {
+  $('count-lines').innerHTML = S.count.map(c => {
+    const p = byPart(c.part) || { name: c.part, unit: '', stock: 0 };
+    const diff = (Number(c.physical) || 0) - p.stock;
+    return `
+    <div class="grid gap-2 items-center" style="grid-template-columns:minmax(0,1fr) 100px 90px 44px">
+      <div class="min-w-0"><div class="text-sm truncate">${esc(p.name)}</div>
+        <div class="text-xs text-slate-500">${esc(c.part)} · ระบบ ${p.stock} ${esc(p.unit)}</div></div>
+      <input value="${esc(c.physical)}" onchange="setCount('${esc(c.part)}',this.value)" inputmode="numeric"
+             class="field text-center num">
+      <span class="text-sm num text-center ${diff === 0 ? 'text-slate-400' : (diff < 0 ? 'text-red-600' : 'text-teal-700')}">
+        ${diff > 0 ? '+' : ''}${diff}</span>
+      <button onclick="dropCount('${esc(c.part)}')" class="btn btn-ghost px-0">✕</button>
+    </div>`;
+  }).join('') || '<p class="text-sm text-slate-400">ยังไม่มีรายการ</p>';
+  const off = S.count.filter(c => (Number(c.physical) || 0) !== (byPart(c.part) || {}).stock).length;
+  $('count-sum').textContent = S.count.length + ' รายการ · ไม่ตรง ' + off + ' รายการ';
+}
+
+function submitCount(btn) {
+  run(btn, async () => {
+    if (!S.count.length) throw new Error('ยังไม่มีรายการนับ');
+    const r = await api('auditStock', S.count.map(c => ({ part: c.part, physical: c.physical, note: c.note })));
+    const off = r.lines.filter(l => l.variance !== 0);
+    S.count = [];
+    await refresh(false);
+    render();
+    openModal(
+      `<h2 class="text-lg font-bold">บันทึกผลนับแล้ว</h2>
+       <p class="text-sm text-slate-500">${esc(r.auditId)} · ไม่ตรง ${off.length} รายการ
+         ${S.costHidden ? '' : '· ผลต่างมูลค่า ' + money(r.netValue)}</p>
+       ${off.length ? `<table class="w-full text-sm mt-3">
+         <tr class="text-left text-slate-500"><th>รหัส</th><th class="text-right">ระบบ</th>
+             <th class="text-right">นับได้</th><th class="text-right">ต่าง</th></tr>
+         ${off.map(l => `<tr class="border-t"><td class="py-1 font-mono">${esc(l.part)}</td>
+           <td class="text-right num">${l.system}</td><td class="text-right num">${l.physical}</td>
+           <td class="text-right num ${l.variance < 0 ? 'text-red-600' : 'text-teal-700'}">
+             ${l.variance > 0 ? '+' : ''}${l.variance}</td></tr>`).join('')}
+       </table>` : '<p class="mt-3 text-sm">ตรงกันทุกรายการ 👌</p>'}`);
+  });
+}
+
+function addScrap() {
+  const part = $('sc-part').value.trim();
+  const qty = Number($('sc-qty').value);
+  if (!byPart(part)) { toast('ไม่พบอะไหล่ ' + part); return; }
+  if (!(qty > 0)) { toast('จำนวนต้องมากกว่า 0'); return; }
+  S.scrapList.push({ part: part, qty: qty, reason: $('sc-reason').value });
+  $('sc-part').value = ''; $('sc-qty').value = '';
+  renderScrap();
+}
+
+function queueAllExpired() {
+  S.batches.filter(b => b.status === 'EXPIRED').forEach(b => {
+    S.scrapList.push({ part: b.part, qty: b.left, reason: 'หมดอายุ ' + b.expiry + ' (' + b.id + ')' });
+  });
+  renderScrap();
+  toast('ใส่ของหมดอายุเข้าคิวแล้ว — ตรวจแล้วกดยืนยัน', true);
+}
+
+function dropScrap(i) { S.scrapList.splice(i, 1); renderScrap(); }
+
+function renderScrap() {
+  $('scrap-lines').innerHTML = S.scrapList.map((l, i) => {
+    const p = byPart(l.part) || { name: l.part, unit: '', cost: 0 };
+    return `
+    <div class="flex items-center gap-2 rounded-xl bg-slate-100 p-2">
+      <div class="flex-1 min-w-0"><div class="text-sm truncate">${esc(p.name)}</div>
+        <div class="text-xs text-slate-500">${esc(l.part)} · ${esc(l.reason)}</div></div>
+      <span class="num font-semibold">${l.qty} ${esc(p.unit)}</span>
+      <button onclick="dropScrap(${i})" class="btn btn-ghost px-2">✕</button>
+    </div>`;
+  }).join('') || '<p class="text-sm text-slate-400">ยังไม่มีรายการ</p>';
+  const loss = S.scrapList.reduce((s, l) => s + l.qty * ((byPart(l.part) || {}).cost || 0), 0);
+  $('scrap-sum').textContent = S.scrapList.length + ' รายการ' + (S.costHidden ? '' : ' · ประมาณ ' + money(loss));
+}
+
+let SCRAP_REF = newRef();
+
+function submitScrap(btn) {
+  run(btn, async () => {
+    if (!S.scrapList.length) throw new Error('ยังไม่มีรายการตัดจำหน่าย');
+    const r = await api('scrap', S.scrapList, SCRAP_REF);
+    S.scrapList = [];
+    SCRAP_REF = newRef();
+    await refresh(false);
+    render();
+    toast(r.duplicate ? 'รายการนี้ถูกบันทึกไปแล้ว: ' + r.scrapId + ' (ไม่ตัดซ้ำ)'
+                      : 'ตัดจำหน่ายแล้ว' + (S.costHidden ? '' : ' · มูลค่า ' + money(r.loss)), true);
+  });
+}
+
+/* =========================================================================
+ *  เครื่องมือช่าง + ใบมีด — ของที่วนกลับมา ไม่ใช่ของที่เบิกแล้วหมดไป
+ *
+ *  ใบมีด: บันทึกแค่ "เกิดอะไรขึ้นวันไหน" แล้วจำนวนวันคำนวณเอง
+ *  เครื่องมือ: ทะเบียนว่าอะไรอยู่กับทีมไหน ใครรับผิดชอบ
+ * ========================================================================= */
+
+const BLADE_ACTS = {
+  INSTALL: { label: '⬇ ติดตั้ง', from: ['สำรอง'], need: true, cls: 'btn-primary' },
+  REMOVE:  { label: '⬆ ถอดออก', from: ['ติดตั้งอยู่'], cls: 'btn-soft' },
+  SEND:    { label: '✂ ส่งลับคม', from: ['ติดตั้งอยู่', 'สำรอง', 'ใช้ไม่ได้'], cls: 'btn-soft' },
+  RETURN:  { label: '↩ รับคืนจากลับคม', from: ['ส่งลับคม'], cls: 'btn-primary' },
+  NG:      { label: '✕ ใช้ไม่ได้', from: ['ติดตั้งอยู่', 'สำรอง', 'ส่งลับคม'], cls: 'btn-danger' },
+  SCRAP:   { label: '🗑 ปลดระวาง', from: ['สำรอง', 'ใช้ไม่ได้', 'ส่งลับคม'], role: 'ENG', cls: 'btn-danger' }
+};
+const BLADE_COLORS = {
+  'ติดตั้งอยู่': 'bg-teal-50 text-teal-700', 'สำรอง': 'bg-slate-100 text-slate-600',
+  'ส่งลับคม': 'bg-amber-100 text-amber-800', 'ใช้ไม่ได้': 'bg-red-100 text-red-700',
+  'ปลดระวาง': 'bg-slate-100 text-slate-400'
+};
+
+function viewAssets() {
+  const tab = (k, label, icon) => `
+    <button onclick="S.assetTab='${k}';viewAssets()"
+      class="flex items-center gap-1.5 px-3 rounded-lg text-sm whitespace-nowrap transition
+             ${S.assetTab === k ? 'bg-white shadow-sm font-semibold text-slate-800' : 'text-slate-500 hover:bg-white/70'}"
+      style="height:34px"><span>${icon}</span><span>${label}</span></button>`;
+
+  $('view').innerHTML = `
+    <div class="h-full overflow-y-auto p-4">
+      <div class="flex gap-1 p-1 rounded-xl bg-slate-100 w-fit mb-3">
+        ${tab('blades', 'ใบมีด', '🔪')}${tab('tools', 'เครื่องมือช่าง', '🧰')}
+      </div>
+      <div id="asset-body"></div>
+    </div>`;
+  if (S.assetTab === 'tools') loadTools(); else loadBlades();
+}
+
+/* ---- ใบมีด ------------------------------------------------------------- */
+
+function loadBlades() {
+  run(null, async () => {
+    const r = await api('getBlades');
+    S.blades = r.blades; S.bladeCounts = r.counts;
+    renderBlades();
+  });
+}
+
+// เรียงเครื่องตามชื่อ แต่เอากองที่ยังไม่ติดตั้งไว้ท้ายเสมอ
+const NO_MACHINE = 'คลังสำรอง · ยังไม่ติดตั้ง';
+
+function bladeMachines() {
+  const m = {};
+  S.blades.forEach(b => { const k = b.machine || NO_MACHINE; m[k] = (m[k] || 0) + 1; });
+  return Object.keys(m).sort((a, b) =>
+    a === NO_MACHINE ? 1 : b === NO_MACHINE ? -1 : a.localeCompare(b, 'th'))
+    .map(k => ({ name: k, n: m[k] }));
+}
+
+function renderBlades() {
+  const counts = S.bladeCounts;
+  const all = ['ทั้งหมด'].concat(Object.keys(BLADE_COLORS));
+  const machines = bladeMachines();
+  const list = S.blades.filter(b =>
+    (S.bladeFilter === 'ทั้งหมด' || b.status === S.bladeFilter) &&
+    (!S.bladeMachine || (b.machine || NO_MACHINE) === S.bladeMachine));
+
+  const groups = {};
+  list.forEach(b => { const k = b.machine || NO_MACHINE; (groups[k] = groups[k] || []).push(b); });
+  const names = Object.keys(groups).sort((a, b) =>
+    a === NO_MACHINE ? 1 : b === NO_MACHINE ? -1 : a.localeCompare(b, 'th'));
+
+  const mChip = (label, val, n) => `<button onclick="S.bladeMachine='${val}';renderBlades()"
+    class="chip ${S.bladeMachine === val ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-400'}"
+    style="height:32px">${esc(label)} <span class="opacity-60">${n}</span></button>`;
+
+  $('asset-body').innerHTML = `
+    <div class="flex flex-wrap gap-2 items-center mb-2">
+      ${mChip('ทุกเครื่อง', '', S.blades.length)}
+      ${machines.map(m => mChip((m.name === NO_MACHINE ? '📦 สำรอง' : '⚙️ ' + m.name), m.name, m.n)).join('')}
+      ${can('LEAD') ? '<button onclick="editBlade()" class="btn btn-ink text-sm ml-auto">+ เพิ่มใบมีด</button>' : ''}
+    </div>
+
+    <div class="flex flex-wrap gap-2 items-center mb-3 pb-3 border-b border-slate-100">
+      ${all.map(s => `<button onclick="S.bladeFilter='${s}';renderBlades()"
+        class="chip ${S.bladeFilter === s ? 'bg-slate-800 text-white' : (BLADE_COLORS[s] || 'bg-slate-100 text-slate-600')}"
+        style="height:30px">${esc(s)}${s === 'ทั้งหมด' ? ' ' + S.blades.length : ' ' + (counts[s] || 0)}</button>`).join('')}
+    </div>
+
+    ${names.length ? names.map(mc => {
+      const items = groups[mc].slice().sort((a, b) =>
+        (a.position || '￿').localeCompare(b.position || '￿'));
+      const onDuty = items.filter(b => b.status === 'ติดตั้งอยู่').length;
+      return `
+      <details open class="card mb-3">
+        <summary class="p-3 cursor-pointer flex items-center gap-2 select-none">
+          <span class="font-semibold text-sm">${mc === NO_MACHINE ? '📦' : '⚙️'} ${esc(mc)}</span>
+          <span class="text-xs text-slate-400">· ${items.length} ใบ</span>
+          ${onDuty ? `<span class="chip bg-teal-50 text-teal-700">ติดตั้งอยู่ ${onDuty}</span>` : ''}
+        </summary>
+        <div class="px-3 pb-3 space-y-2">${items.map(bladeCard).join('')}</div>
+      </details>`;
+    }).join('') : '<p class="text-slate-400">ไม่มีใบมีดตามที่เลือก</p>'}`;
+}
+
+function bladeCard(b) {
+  const acts = Object.keys(BLADE_ACTS).filter(k => {
+    const a = BLADE_ACTS[k];
+    return a.from.indexOf(b.status) >= 0 && (!a.role || can(a.role));
+  });
+  return `
+  <div class="rounded-xl border border-slate-200 p-3 flex flex-wrap items-center gap-3 hover:border-slate-300 transition">
+    <div class="w-16 shrink-0 text-center">
+      ${b.position
+        ? `<div class="font-mono font-bold text-sm text-slate-800">${esc(b.position)}</div>
+           <div class="text-[10px] text-slate-400">ตำแหน่ง</div>`
+        : '<div class="text-slate-300 text-xl">—</div>'}
+    </div>
+    <div class="flex-1 min-w-[12rem]">
+      <div class="font-mono text-sm break-all">${esc(b.id)}
+        <span class="chip ${BLADE_COLORS[b.status] || 'bg-slate-100'} ml-1">${esc(b.status)}</span>
+      </div>
+      <div class="text-xs text-slate-500">
+        ${b.spec ? esc(b.spec) + ' · ' : ''}
+        ${b.status === 'ติดตั้งอยู่'
+          ? 'ตั้งแต่ ' + esc(b.install) + ' — <b>' + b.runningDays + ' วัน</b>'
+          : 'อายุใช้งานรวม ' + b.days + ' วัน'}
+        ${b.sharpen ? ' · ลับคมมาแล้ว ' + b.sharpen + ' ครั้ง' + (b.last ? ' (ล่าสุด ' + esc(b.last) + ')' : '') : ''}
+      </div>
+      ${b.note ? `<div class="text-[11px] text-slate-400 mt-0.5 line-clamp-2">${esc(b.note)}</div>` : ''}
+    </div>
+    <div class="flex flex-wrap gap-1 justify-end">
+      ${acts.map(k => `<button onclick="askBlade('${esc(b.id)}','${k}')"
+          class="btn ${BLADE_ACTS[k].cls} px-3 text-xs">${BLADE_ACTS[k].label}</button>`).join('')}
+      <button onclick="showBladeLog('${esc(b.id)}',this)" class="btn btn-ghost px-2 text-xs">ประวัติ</button>
+    </div>
+  </div>`;
+}
+
+/** ปุ่มไหนก็มาลงที่นี่ — INSTALL ต้องถามเครื่องกับตำแหน่ง ที่เหลือแค่ยืนยัน */
+function askBlade(id, action) {
+  const a = BLADE_ACTS[action];
+  const b = S.blades.find(x => x.id === id) || {};
+  openModal(
+    `<h2 class="text-lg font-bold">${a.label.replace(/^[^ ]+ /, '')} · <span class="font-mono">${esc(id)}</span></h2>
+     ${a.need ? `
+       <label class="block text-xs text-slate-500 mt-3">เครื่อง *</label>
+       <input id="bl-machine" list="machines" class="field" placeholder="เช่น CS02">
+       <datalist id="machines">
+         ${S.machines.map(m => `<option value="${esc(m.code)}">${esc(m.name)}</option>`).join('')}
+       </datalist>
+       <label class="block text-xs text-slate-500 mt-2">ตำแหน่งติดตั้ง *</label>
+       <input id="bl-pos" class="field" placeholder="เช่น LM1L(S2) / CM2R">
+       <p class="text-xs text-slate-400 mt-1">หนึ่งตำแหน่งมีใบมีดได้ใบเดียว ถ้ามีใบอื่นอยู่ระบบจะเตือนให้ถอดก่อน</p>`
+      : ''}
+     ${b.status === 'ติดตั้งอยู่' && action !== 'INSTALL'
+       ? `<p class="mt-3 p-2 rounded-lg bg-slate-100 text-sm">นับอายุใช้งานให้อัตโนมัติจากวันติดตั้ง
+            ${esc(b.install)} — ตอนนี้ <b>${b.runningDays} วัน</b> จะถูกบวกเข้าอายุรวม</p>` : ''}
+     ${action === 'SEND' ? '<p class="text-xs text-slate-400 mt-2">นับเป็นการลับคมครั้งที่ ' + ((b.sharpen || 0) + 1) + '</p>' : ''}
+     <label class="block text-xs text-slate-500 mt-2">หมายเหตุ</label>
+     <input id="bl-note" class="field" placeholder="ไม่บังคับ">`,
+    `<button onclick="closeModal()" class="btn btn-soft">ยกเลิก</button>
+     <button onclick="doBlade(this,'${esc(id)}','${action}')" class="btn ${a.cls === 'btn-danger' ? 'btn-danger' : 'btn-primary'} ml-auto px-5">
+       ยืนยัน</button>`);
+}
+
+let BLADE_REF = newRef();
+
+function doBlade(btn, id, action) {
+  run(btn, async () => {
+    const r = await api('bladeAction', id, action, {
+      machine: $('bl-machine') ? $('bl-machine').value.trim() : '',
+      position: $('bl-pos') ? $('bl-pos').value.trim() : '',
+      note: $('bl-note').value.trim(), ref: BLADE_REF
+    });
+    BLADE_REF = newRef();
+    closeModal();
+    loadBlades();
+    toast(r.duplicate ? 'รายการนี้บันทึกไปแล้ว'
+                      : r.action + ' · ' + id + (r.days ? ' (ใช้งาน ' + r.days + ' วัน)' : ''), true);
+  });
+}
+
+function showBladeLog(id, btn) {
+  run(btn, async () => {
+    const rows = await api('getBladeLog', id, 60);
+    openModal(
+      `<h2 class="text-lg font-bold">ประวัติใบมีด <span class="font-mono">${esc(id)}</span></h2>
+       ${rows.length ? `<table class="w-full text-xs mt-3">
+         <tr class="text-left text-slate-500"><th class="py-1">วันเวลา</th><th>เหตุการณ์</th>
+             <th>เครื่อง/ตำแหน่ง</th><th class="text-right">วัน</th><th>โดย</th></tr>
+         ${rows.map(r => `<tr class="border-t">
+           <td class="py-1 whitespace-nowrap">${esc(r.ts)}</td><td>${esc(r.action)}</td>
+           <td>${esc(r.machine)}${r.position ? ' / ' + esc(r.position) : ''}</td>
+           <td class="text-right num">${r.days || ''}</td>
+           <td class="text-slate-400">${esc(String(r.user).split('@')[0])}</td>
+         </tr>${r.note ? `<tr><td colspan="5" class="text-slate-400 pb-1">↳ ${esc(r.note)}</td></tr>` : ''}`).join('')}
+       </table>` : '<p class="text-sm text-slate-400 mt-3">ยังไม่มีประวัติ</p>'}`);
+  });
+}
+
+function editBlade(id) {
+  const b = id ? S.blades.find(x => x.id === id) : { id: '', spec: '', note: '' };
+  openModal(
+    `<h2 class="text-lg font-bold">${id ? 'แก้ข้อมูลใบมีด' : 'เพิ่มใบมีดเข้าคลัง'}</h2>
+     <label class="block text-xs text-slate-500 mt-2">รหัสใบมีด</label>
+     <input id="bf-id" value="${esc(b.id)}" ${id ? 'readonly' : ''} class="field" placeholder="เช่น BLD-0001">
+     <label class="block text-xs text-slate-500 mt-2">สเปก / ขนาด</label>
+     <input id="bf-spec" value="${esc(b.spec)}" class="field">
+     <label class="block text-xs text-slate-500 mt-2">หมายเหตุ</label>
+     <input id="bf-note" value="${esc(b.note)}" class="field">
+     ${id ? '' : '<p class="text-xs text-slate-400 mt-2">ใบใหม่เข้าเป็นของ "สำรอง" ก่อนเสมอ การติดตั้งเป็นอีกเหตุการณ์หนึ่ง</p>'}`,
+    `<button onclick="closeModal()" class="btn btn-soft">ยกเลิก</button>
+     <button onclick="doSaveBlade(this)" class="btn btn-ink ml-auto px-5">บันทึก</button>`);
+}
+
+function doSaveBlade(btn) {
+  run(btn, async () => {
+    const r = await api('saveBlade', { id: $('bf-id').value.trim(), spec: $('bf-spec').value.trim(),
+                                       note: $('bf-note').value.trim() });
+    S.blades = r.blades; S.bladeCounts = r.counts;
+    closeModal();
+    renderBlades();
+    toast('บันทึกใบมีดแล้ว', true);
+  });
+}
+
+/* ---- เครื่องมือช่าง ----------------------------------------------------- */
+
+const TOOL_COLORS = {
+  'ใช้งาน': 'bg-teal-50 text-teal-700', 'ชำรุด': 'bg-amber-100 text-amber-800',
+  'ส่งซ่อม': 'bg-amber-100 text-amber-800', 'สูญหาย': 'bg-red-100 text-red-700',
+  'ปลดระวาง': 'bg-slate-100 text-slate-400'
+};
+
+function loadTools() {
+  run(null, async () => { S.tools = await api('getTools'); renderTools(); });
+}
+
+function renderTools() {
+  const q = S.toolQ.toLowerCase();
+  const list = S.tools.filter(t => !q || t.name.toLowerCase().includes(q) ||
+    t.holder.toLowerCase().includes(q) || t.team.toLowerCase().includes(q) || t.id.toLowerCase().includes(q));
+  const NO_TEAM = '— ไม่ระบุทีม —';
+  const teams = Array.from(new Set(list.map(t => t.team || NO_TEAM)));
+  const bad = S.tools.filter(t => t.status === 'สูญหาย' || t.status === 'ชำรุด').length;
+  // ค้นอยู่ = กางให้เลย · ดูเฉยๆ = กางทีมแรกทีมเดียว พอให้เห็นว่าข้างในมีอะไร
+  const openIf = i => (q || i === 0) ? 'open' : '';
+
+  $('asset-body').innerHTML = `
+    <div class="flex flex-wrap gap-2 items-center mb-3">
+      <input value="${esc(S.toolQ)}" oninput="S.toolQ=this.value;renderTools()"
+             placeholder="ค้นชื่อ / ผู้รับผิดชอบ / ทีม…" class="field w-72">
+      <span class="text-sm text-slate-500">${S.tools.length} รายการ · ${teams.length} ทีม
+        ${bad ? '· <b class="text-red-600">ชำรุด/สูญหาย ' + bad + '</b>' : ''}</span>
+      ${can('LEAD') ? '<button onclick="editTool()" class="btn btn-ink text-sm ml-auto">+ เพิ่มเครื่องมือ</button>' : ''}
+    </div>
+
+    ${teams.map((team, i) => {
+      const items = list.filter(t => (t.team || NO_TEAM) === team);
+      const holders = Array.from(new Set(items.map(t => t.holder).filter(Boolean)));
+      const teamBad = items.filter(t => t.status === 'สูญหาย' || t.status === 'ชำรุด').length;
+      return `
+      <details ${openIf(i)} class="card mb-2">
+        <summary class="p-3 cursor-pointer flex flex-wrap items-center gap-2 select-none">
+          <span class="font-semibold text-sm">🧰 ${esc(team)}</span>
+          <span class="text-xs text-slate-400">· ${items.length} รายการ</span>
+          ${teamBad ? `<span class="chip bg-red-100 text-red-700">ชำรุด/สูญหาย ${teamBad}</span>` : ''}
+          ${holders.length ? `<span class="ml-auto text-xs text-slate-400 truncate max-w-[18rem]"
+            title="${esc(holders.join(', '))}">👤 ${esc(holders.slice(0, 3).join(' · '))}${holders.length > 3 ? ' +' + (holders.length - 3) : ''}</span>` : ''}
+        </summary>
+        <div class="px-3 pb-3 overflow-x-auto">
+          <table class="w-full text-sm">
+            <tr class="text-left text-slate-500 border-b">
+                <th class="py-1.5">รหัส</th><th>รายการ</th>
+                <th class="text-right">จำนวน</th><th>ผู้รับผิดชอบ</th><th>รับมอบ</th>
+                ${S.costHidden ? '' : '<th class="text-right">ราคา</th>'}<th>สถานะ</th>${can('LEAD') ? '<th></th>' : ''}</tr>
+            ${items.map(t => `<tr class="border-t hover:bg-slate-50">
+              <td class="py-1.5 font-mono text-xs text-slate-400">${esc(t.id)}</td>
+              <td class="font-medium">${esc(t.name)}${t.note ? `<div class="text-xs text-slate-400 font-normal">${esc(t.note)}</div>` : ''}</td>
+              <td class="text-right num whitespace-nowrap">${t.qty} ${esc(t.unit)}</td>
+              <td class="whitespace-nowrap">${esc(t.holder) || '<span class="text-slate-300">—</span>'}</td>
+              <td class="text-xs text-slate-500 whitespace-nowrap">${esc(t.date) || '—'}</td>
+              ${S.costHidden ? '' : `<td class="text-right num">${t.price ? money(t.price) : ''}</td>`}
+              <td><span class="chip ${TOOL_COLORS[t.status] || 'bg-slate-100 text-slate-600'}">${esc(t.status)}</span></td>
+              ${can('LEAD') ? `<td class="text-right"><button onclick="editTool('${esc(t.id)}')"
+                class="btn btn-ghost px-2 text-xs">แก้</button></td>` : ''}
+            </tr>`).join('')}
+          </table>
+        </div>
+      </details>`;
+    }).join('') || '<p class="text-slate-400">ยังไม่มีเครื่องมือในทะเบียน</p>'}`;
+}
+
+function editTool(id) {
+  const t = id ? S.tools.find(x => x.id === id)
+              : { id: '', name: '', qty: 1, unit: 'ชิ้น', team: '', holder: '', date: todayStr(),
+                  price: 0, status: 'ใช้งาน', note: '' };
+  const teams = Array.from(new Set(S.tools.map(x => x.team).filter(Boolean)));
+  openModal(
+    `<h2 class="text-lg font-bold">${id ? 'แก้ข้อมูลเครื่องมือ' : 'เพิ่มเครื่องมือ'}</h2>
+     ${id ? `<p class="text-xs text-slate-400 mt-1">รหัส <span class="font-mono">${esc(t.id)}</span></p>` : ''}
+     <label class="block text-xs text-slate-500 mt-2">รายการเครื่องมือ</label>
+     <input id="tf-name" value="${esc(t.name)}" class="field">
+     <div class="grid grid-cols-2 gap-2">
+       <div><label class="block text-xs text-slate-500 mt-2">จำนวน</label>
+         <input id="tf-qty" type="number" min="0" value="${t.qty}" class="field"></div>
+       <div><label class="block text-xs text-slate-500 mt-2">หน่วย</label>
+         <input id="tf-unit" value="${esc(t.unit)}" class="field"></div>
+       <div><label class="block text-xs text-slate-500 mt-2">ทีม</label>
+         <input id="tf-team" list="teams" value="${esc(t.team)}" class="field" placeholder="เช่น ช่าง Ext">
+         <datalist id="teams">${teams.map(x => `<option value="${esc(x)}">`).join('')}</datalist></div>
+       <div><label class="block text-xs text-slate-500 mt-2">ผู้รับผิดชอบ</label>
+         <input id="tf-holder" value="${esc(t.holder)}" class="field"></div>
+       <div><label class="block text-xs text-slate-500 mt-2">วันที่รับมอบ</label>
+         <input id="tf-date" type="date" value="${esc(t.date)}" class="field"></div>
+       <div><label class="block text-xs text-slate-500 mt-2">ราคา</label>
+         <input id="tf-price" type="number" min="0" step="0.01" value="${t.price}" class="field"></div>
+     </div>
+     <label class="block text-xs text-slate-500 mt-2">สถานะ</label>
+     <select id="tf-status" class="field">
+       ${['ใช้งาน', 'ชำรุด', 'ส่งซ่อม', 'สูญหาย', 'ปลดระวาง'].map(s =>
+         `<option ${s === t.status ? 'selected' : ''}>${s}</option>`).join('')}
+     </select>
+     <label class="block text-xs text-slate-500 mt-2">หมายเหตุ</label>
+     <input id="tf-note" value="${esc(t.note)}" class="field">`,
+    `<button onclick="closeModal()" class="btn btn-soft">ยกเลิก</button>
+     <button onclick="doSaveTool(this,'${esc(id || '')}')" class="btn btn-ink ml-auto px-5">บันทึก</button>`);
+}
+
+function doSaveTool(btn, id) {
+  run(btn, async () => {
+    const v = k => $('tf-' + k).value;
+    S.tools = await api('saveTool', { id: id, name: v('name'), qty: v('qty'), unit: v('unit'),
+      team: v('team'), holder: v('holder'), date: v('date'), price: v('price'),
+      status: v('status'), note: v('note') });
+    closeModal();
+    renderTools();
+    toast('บันทึกเครื่องมือแล้ว', true);
+  });
+}
+
+/* =========================================================================
+ *  รายงาน + คืนอะไหล่
+ * ========================================================================= */
+
+function viewReports() {
+  $('view').innerHTML = `
+    <div class="h-full overflow-y-auto p-4 space-y-4">
+      <div class="flex flex-wrap gap-2 items-end">
+        <div><label class="block text-xs text-slate-500">ตั้งแต่</label>
+          <input id="rp-from" type="date" value="${daysAgoStr(29)}" class="field w-40"></div>
+        <div><label class="block text-xs text-slate-500">ถึง</label>
+          <input id="rp-to" type="date" value="${todayStr()}" class="field w-40"></div>
+        <button onclick="setRange(this,6)" class="btn btn-soft text-sm">7 วัน</button>
+        <button onclick="setRange(this,29)" class="btn btn-soft text-sm">30 วัน</button>
+        <button onclick="loadReport(this)" class="btn btn-ink text-sm">ดูรายงาน</button>
+        <button onclick="openReturn()" class="btn btn-soft text-sm ml-auto">↩ คืนอะไหล่</button>
+      </div>
+      <div id="health"></div>
+      <div id="disk"></div>
+      <div id="report">${S.report ? '' : '<p class="text-slate-400">เลือกช่วงวันแล้วกด “ดูรายงาน”</p>'}</div>
+    </div>`;
+  renderHealth();
+  renderStorage();
+  if (S.report) renderReport();
+}
+
+/**
+ * ทีมนี้ไม่มีแอดมินคอยมอนิเตอร์ ระบบจึงต้องบอกเองว่ามีอะไรค้างอยู่
+ * คิดจากข้อมูลที่โหลดมาแล้วทั้งหมด ไม่ยิงเซิร์ฟเวอร์เพิ่ม
+ */
+/* ---- พื้นที่เก็บข้อมูล ------------------------------------------------- */
+
+const DISK_TONE = {
+  OK:     { bar: 'bg-teal-500',  chip: 'bg-teal-50 text-teal-700',   word: 'ยังเหลือเยอะ' },
+  WARN:   { bar: 'bg-amber-500', chip: 'bg-amber-100 text-amber-800', word: 'เริ่มเยอะแล้ว' },
+  URGENT: { bar: 'bg-red-500',   chip: 'bg-red-100 text-red-700',     word: 'ต้องจัดการด่วน' }
+};
+
+function loadStorage(btn) {
+  run(btn, async () => { S.disk = await api('getStorageHealth'); renderStorage(); });
+}
+
+function renderStorage() {
+  const d = S.disk;
+  if (!d) {
+    $('disk').innerHTML = `<section class="card p-4 mb-4">
+      <div class="flex items-center gap-2">
+        <h3 class="font-bold text-sm">💾 พื้นที่เก็บข้อมูล</h3>
+        <button onclick="loadStorage(this)" class="btn btn-soft px-3 text-xs ml-auto">ตรวจสอบ</button>
+      </div></section>`;
+    return;
+  }
+  const tone = DISK_TONE[d.level] || DISK_TONE.OK;
+  const fmt = n => Number(n).toLocaleString('en-US');
+
+  $('disk').innerHTML = `
+    <section class="card p-4 mb-4">
+      <div class="flex flex-wrap items-center gap-2">
+        <h3 class="font-bold text-sm">💾 พื้นที่เก็บข้อมูล</h3>
+        <span class="chip ${tone.chip}">${d.pct}% · ${tone.word}</span>
+        <button onclick="loadStorage(this)" class="btn btn-ghost px-2 text-xs ml-auto">ตรวจใหม่</button>
+      </div>
+
+      <div class="h-2.5 rounded-full bg-slate-100 mt-3 overflow-hidden">
+        <div class="h-full ${tone.bar} transition-all" style="width:${Math.max(1, Math.min(100, d.pct))}%"></div>
+      </div>
+      <div class="text-xs text-slate-500 mt-1">
+        ใช้ไป ${fmt(d.used)} จาก ${fmt(d.limit)} ช่อง
+        ${d.oldest ? ' · บันทึกเก่าสุด ' + esc(d.oldest) : ''}
+      </div>
+
+      ${d.level === 'OK' ? '' : `
+        <div class="mt-3 p-3 rounded-xl ${d.level === 'URGENT' ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-900'} text-sm">
+          <b>${d.level === 'URGENT' ? 'ต้องจัดการแล้ว' : 'ควรเริ่มวางแผน'}</b> —
+          ถ้าเต็ม ระบบจะ<b>เบิกและรับเข้าไม่ได้ทั้งหมด</b> ไม่ใช่แค่ประวัติหาย
+          สำรองบันทึกเก่าออกเป็นไฟล์ก่อน แล้วค่อยตัดออกจากชีต
+        </div>`}
+
+      <table class="w-full text-sm mt-3">
+        <tr class="text-left text-slate-500 border-b">
+          <th class="py-1.5">ชีต</th><th class="text-right">แถว</th>
+          <th class="text-right">ช่อง</th><th></th></tr>
+        ${d.sheets.filter(s => s.rows > 0 || s.trimmable).map(s => `
+        <tr class="border-t">
+          <td class="py-1.5">${esc(s.name)}${s.label ? `<div class="text-xs text-slate-400">${esc(s.label)}</div>` : ''}</td>
+          <td class="text-right num">${fmt(s.rows)}</td>
+          <td class="text-right num text-slate-500">${fmt(s.cells)}</td>
+          <td class="text-right">${s.trimmable && can('ENG')
+            ? `<button onclick="askTrim('${esc(s.name)}',${s.rows})" class="btn btn-soft px-3 text-xs">สำรอง & ตัด</button>`
+            : ''}</td>
+        </tr>`).join('')}
+      </table>
+    </section>`;
+}
+
+function askTrim(sheet, rows) {
+  openModal(
+    `<h2 class="text-lg font-bold">สำรอง &amp; ตัด · <span class="font-mono">${esc(sheet)}</span></h2>
+     <p class="text-sm text-slate-500 mt-1">ตอนนี้ ${Number(rows).toLocaleString('en-US')} แถว</p>
+
+     <label class="block text-xs text-slate-500 mt-3">เก็บข้อมูลย้อนหลังไว้กี่วัน</label>
+     <select id="tr-days" class="field">
+       <option value="365">1 ปี (แนะนำ)</option>
+       <option value="730">2 ปี</option>
+       <option value="180">6 เดือน</option>
+       <option value="90">3 เดือน</option>
+     </select>
+
+     <div class="mt-3 p-3 rounded-xl bg-slate-100 text-sm space-y-1">
+       <div>1. แถวที่เก่ากว่านั้นถูกเขียนเป็นไฟล์ CSV ลง Drive ก่อน</div>
+       <div>2. เขียนไฟล์สำเร็จแล้ว จึงลบออกจากชีต</div>
+       <div class="text-slate-500">ถ้าเขียนไฟล์ไม่สำเร็จ จะไม่ลบอะไรเลย</div>
+     </div>
+     <p class="text-xs text-amber-700 mt-2">
+       ยอดคงเหลือไม่เปลี่ยน — ยอดมาจาก batch ไม่ได้มาจากชีตนี้
+       แต่<b>บัตรสต๊อกจะย้อนได้ไม่เกินช่วงที่เก็บไว้</b>
+     </p>`,
+    `<button onclick="closeModal()" class="btn btn-soft">ยกเลิก</button>
+     <button onclick="doTrim('${esc(sheet)}',this)" class="btn btn-danger ml-auto px-5">สำรองแล้วตัด</button>`);
+}
+
+function doTrim(sheet, btn) {
+  run(btn, async () => {
+    const r = await api('backupAndTrim', sheet, Number($('tr-days').value));
+    closeModal();
+    if (!r.moved) { toast('ไม่มีแถวที่เก่าพอจะตัด', true); return; }
+    toast('ย้ายออก ' + r.moved.toLocaleString('en-US') + ' แถว · สำรองไว้แล้ว', true);
+    S.disk = await api('getStorageHealth');
+    renderStorage();
+    $('disk').insertAdjacentHTML('afterbegin', `
+      <div class="card p-3 mb-2 text-sm bg-teal-50">
+        สำรองเป็นไฟล์ <b>${esc(r.file)}</b> แล้ว
+        <a href="${esc(r.url)}" target="_blank" rel="noopener" class="underline ml-1">เปิดดู</a>
+      </div>`);
+  });
+}
+
+function renderHealth() {
+  const bad = S.batches.filter(b => b.status !== 'OK');
+  const low = S.parts.filter(p => p.low);
+  const noMin = S.parts.filter(p => !p.min);
+  const items = [
+    { n: S.dupes.length, txt: 'รหัสอะไหล่ซ้ำในชีต — คงเหลือถูกนับซ้ำ', go: "go('inv')", bad: true },
+    { n: noMin.length, txt: 'อะไหล่ที่ยังไม่ตั้ง Min — ระบบเตือนของใกล้หมดไม่ได้', go: "go('inv')" },
+    { n: low.length, txt: 'ถึงจุดสั่งซื้อ — ควรเปิดใบสั่งซื้อ', go: "go('recv')" },
+    { n: bad.length, txt: 'batch ใกล้/เลยวันหมดอายุ', go: "go('count')" },
+    { n: (S.report && S.report.dead.length) || 0, txt: 'ของนอนไม่มีการเบิก — เงินจมบนชั้น', go: '' }
+  ].filter(x => x.n > 0);
+
+  $('health').innerHTML = items.length ? `
+    <section class="card p-4 mb-4">
+      <h3 class="font-bold text-sm">สุขภาพระบบ — สิ่งที่ต้องมีคนตัดสินใจ</h3>
+      <div class="mt-2 space-y-1">
+        ${items.map(x => `<div class="flex items-center gap-2 text-sm">
+          <span class="chip ${x.bad ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'}"
+                style="min-width:2.5rem;justify-content:center">${x.n}</span>
+          <span class="flex-1">${x.txt}</span>
+          ${x.go ? `<button onclick="${x.go}" class="btn btn-ghost px-2 text-xs">ไปดู →</button>` : ''}
+        </div>`).join('')}
+      </div>
+      <p class="text-xs text-slate-400 mt-2">รายการนี้ยังถูกส่งเป็นอีเมลทุกเช้า 08:00 ให้หัวหน้าช่างและวิศวกรด้วย</p>
+    </section>` : `
+    <section class="card p-4 mb-4">
+      <h3 class="font-bold text-sm">สุขภาพระบบ</h3>
+      <p class="text-sm text-slate-500 mt-1">ไม่มีอะไรค้าง 👌 ตั้ง Min ครบ ไม่มีรหัสซ้ำ ไม่มีของหมดอายุ</p>
+    </section>`;
+}
+
+function setRange(btn, days) {
+  $('rp-from').value = daysAgoStr(days);
+  $('rp-to').value = todayStr();
+  loadReport(btn);
+}
+
+function loadReport(btn) {
+  run(btn, async () => {
+    S.report = await api('getReport', $('rp-from').value, $('rp-to').value);
+    renderReport();
+  });
+}
+
+function renderReport() {
+  const r = S.report;
+  const tile = (label, value, sub) => `
+    <div class="card p-3">
+      <div class="text-xs text-slate-500">${label}</div>
+      <div class="num num-lg mt-1">${value}</div>
+      ${sub ? `<div class="text-xs text-slate-400">${sub}</div>` : ''}
+    </div>`;
+
+  const table = (title, rows, cols) => `
+    <section class="card p-4">
+      <h3 class="font-bold text-sm">${title}</h3>
+      ${rows.length ? `<table class="w-full text-sm mt-2">
+        <tr class="text-left text-slate-500">${cols.map(c => `<th class="${c.r ? 'text-right' : ''} py-1">${c.h}</th>`).join('')}</tr>
+        ${rows.map(x => `<tr class="border-t">${cols.map(c =>
+          `<td class="${c.r ? 'text-right num' : ''} py-1">${c.f(x)}</td>`).join('')}</tr>`).join('')}
+      </table>` : '<p class="text-sm text-slate-400 mt-2">ไม่มีข้อมูลในช่วงนี้</p>'}
+    </section>`;
+
+  const peak = Math.max(1, ...r.series.map(s => s.value));
+
+  $('report').innerHTML = `
+    <div class="grid gap-3 mb-4" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+      ${tile('เบิกออก', money(r.issue.value), r.issue.lines + ' บรรทัด')}
+      ${tile('คืนเข้า', money(r.ret.value), r.ret.lines + ' บรรทัด')}
+      ${tile('รับเข้า', money(r.recv.value), r.recv.lines + ' บรรทัด')}
+      ${tile('ตัดจำหน่าย', money(r.scrap.value), r.scrap.lines + ' บรรทัด')}
+      ${tile('มูลค่าสต๊อกวันนี้', money(r.stockValue), 'ปรับจากการนับ ' + money(r.adjustValue))}
+    </div>
+
+    ${r.series.length ? `<section class="card p-4 mb-4">
+      <h3 class="font-bold text-sm">มูลค่าการเบิกต่อวัน</h3>
+      <div class="flex items-end gap-1 mt-3" style="height:120px">
+        ${r.series.map(s => `<div class="flex-1 bg-teal-600 rounded-t" title="${esc(s.date)} · ${money(s.value)}"
+          style="height:${Math.round(s.value / peak * 100)}%;min-height:2px"></div>`).join('')}
+      </div>
+      <div class="flex justify-between text-xs text-slate-400 mt-1">
+        <span>${esc(r.from)}</span><span>${esc(r.to)}</span></div>
+    </section>` : ''}
+
+    <div class="grid lg:grid-cols-2 gap-4">
+      ${table('เบิกตามเครื่องจักร', r.byMachine, [
+        { h: 'เครื่อง', f: x => esc(x.machine) },
+        { h: 'ใบแจ้งซ่อม', r: 1, f: x => x.jobs || 0 },
+        { h: 'จำนวน', r: 1, f: x => x.qty },
+        { h: 'มูลค่า', r: 1, f: x => money(x.value) }])}
+      ${table('เบิกตามผู้เบิก', r.byUser, [
+        { h: 'ผู้เบิก', f: x => esc(x.user) },
+        { h: 'จำนวน', r: 1, f: x => x.qty },
+        { h: 'มูลค่า', r: 1, f: x => money(x.value) }])}
+      ${table('อะไหล่ที่ใช้มากสุด', r.byPart.slice(0, 20), [
+        { h: 'รหัส', f: x => esc(x.part) },
+        { h: 'ชื่อ', f: x => esc(x.name) },
+        { h: 'จำนวน', r: 1, f: x => x.qty },
+        { h: 'มูลค่า', r: 1, f: x => money(x.value) }])}
+      ${table('ของนอน — ไม่ถูกเบิกเกิน ' + r.deadDays + ' วัน', r.dead.slice(0, 30), [
+        { h: 'รหัส', f: x => esc(x.part) },
+        { h: 'ชื่อ', f: x => esc(x.name) },
+        { h: 'คงเหลือ', r: 1, f: x => x.stock + ' ' + esc(x.unit) },
+        { h: 'มูลค่าจม', r: 1, f: x => money(x.value) },
+        { h: 'เบิกครั้งสุดท้าย', r: 1, f: x => esc(x.lastIssue) || 'ไม่เคย' }])}
+    </div>`;
+}
+
+/* ---- คืนอะไหล่: ย้อนใบเบิก กลับเข้า batch เดิม ---------------------------- */
+
+function openReturn() {
+  run(null, async () => {
+    S.issues = await api('getIssues', 25);
+    openModal(
+      `<h2 class="text-lg font-bold">คืนอะไหล่</h2>
+       <p class="text-xs text-slate-400">ของคืนกลับเข้า batch เดิมที่มันออกไป ต้นทุนจึงไม่เพี้ยน</p>
+       <label class="block text-xs text-slate-500 mt-3">เลขที่ใบเบิก</label>
+       <div class="flex gap-2">
+         <input id="rt-id" class="field flex-1" placeholder="IS...">
+         <button onclick="loadIssue(this)" class="btn btn-soft px-4">ค้นหา</button>
+       </div>
+       <h3 class="text-xs text-slate-500 mt-3">ใบเบิกล่าสุด</h3>
+       <div class="space-y-1 mt-1">
+         ${S.issues.map(i => `<button onclick="pickIssue('${esc(i.issueId)}',this)"
+            class="w-full text-left rounded-lg bg-slate-100 hover:bg-slate-200 p-2 text-sm">
+            <b class="font-mono">${esc(i.issueId)}</b>
+            <span class="text-xs text-slate-500">· ${esc(i.ts)} · ${esc(i.machine)} · ${esc(i.requester)}
+              · ${i.lines} รายการ${i.returned ? ' · คืนแล้ว ' + i.returned : ''}</span>
+          </button>`).join('') || '<p class="text-sm text-slate-400">ยังไม่มีใบเบิก</p>'}
+       </div>
+       <div id="rt-detail" class="mt-3"></div>`);
+  });
+}
+
+function pickIssue(id, btn) { $('rt-id').value = id; loadIssue(btn); }
+
+function loadIssue(btn) {
+  run(btn, async () => {
+    S.issue = await api('findIssue', $('rt-id').value.trim());
+    renderReturn();
+  });
+}
+
+function setReturnQty(part, v) {
+  const l = S.issue.lines.find(x => x.part === part);
+  if (!l) return;
+  l.returnQty = Math.min(Math.max(0, Number(v) || 0), l.returnable);
+  renderReturn();
+}
+
+function renderReturn() {
+  const s = S.issue;
+  const total = s.lines.reduce((t, l) => t + l.returnQty, 0);
+  $('rt-detail').innerHTML = `
+    <div class="rounded-xl bg-slate-100 p-3">
+      <div class="text-sm"><b class="font-mono">${esc(s.issueId)}</b> · ${esc(s.ts)}</div>
+      <div class="text-xs text-slate-500">เครื่อง ${esc(s.machine)}
+        ${s.jobNo ? ' · ใบแจ้งซ่อม ' + esc(s.jobNo) : ''} · ผู้เบิก ${esc(s.requester)}</div>
+      <table class="w-full text-sm mt-2">
+        <tr class="text-left text-slate-500"><th>อะไหล่</th><th class="text-right">เบิก</th>
+            <th class="text-right">คืนได้</th><th class="text-right">คืนครั้งนี้</th></tr>
+        ${s.lines.map(l => `<tr class="border-t">
+          <td class="py-1">${esc(l.name)}<div class="text-xs text-slate-400">${esc(l.part)}</div></td>
+          <td class="text-right num">${l.qty}</td>
+          <td class="text-right num">${l.returnable}</td>
+          <td class="text-right">
+            <input value="${l.returnQty}" onchange="setReturnQty('${esc(l.part)}',this.value)"
+                   inputmode="numeric" class="field text-center num" style="width:72px">
+          </td></tr>`).join('')}
+      </table>
+      <label class="block text-xs text-slate-500 mt-2">สาเหตุที่คืน</label>
+      <input id="rt-reason" value="เบิกเกิน" class="field">
+      <div class="flex items-center gap-2 mt-3">
+        <span class="text-sm text-slate-500">คืนรวม ${total} หน่วย</span>
+        <button onclick="doReturn(this)" class="btn btn-primary ml-auto px-5" ${total ? '' : 'disabled'}>
+          ยืนยันการคืน</button>
+      </div>
+    </div>`;
+}
+
+function doReturn(btn) {
+  run(btn, async () => {
+    const lines = S.issue.lines.filter(l => l.returnQty > 0).map(l => ({ part: l.part, qty: l.returnQty }));
+    const r = await api('returnParts', S.issue.issueId, lines, $('rt-reason').value.trim());
+    S.issue = null;
+    closeModal();
+    await refresh(false);
+    render();
+    toast('คืนเข้าคลังแล้ว ' + r.lines + ' รายการ', true);
+  });
+}
+
+/* =========================================================================
+ *  แท็กติดหน้าช่องเก็บอะไหล่ — Code128 / QR พิมพ์ลงกระดาษสติกเกอร์
+ *
+ *  รหัสของที่นี่เป็นตัวอักษรผสมตัวเลขและมีขีด (60002022MIX2-0001) ทำ EAN-13
+ *  ไม่ได้เลย จึงใช้ **Code128** ซึ่งรับทุกอย่างที่พิมพ์ลงช่อง Part_No ได้
+ *  และมี **QR** ให้เลือก สำหรับทีมที่สแกนด้วยกล้องมือถือ
+ *
+ *  เนื้อใน QR = รหัสอะไหล่เปล่า ๆ ไม่ใส่ URL — สแกนแล้วจะได้ข้อความรหัสลงในช่อง
+ *  สแกนของหน้าเบิกทันที ถ้าใส่ URL มือถือจะเปิดเบราว์เซอร์แทนที่จะกรอกให้
+ * ========================================================================= */
+
+const LABEL_SHEETS = {
+  'A4-8':    { name: 'A4 · 8 ดวง (105×74mm) — ป้ายช่องใหญ่', page: 'A4', cols: 2, rows: 4, w: 105, h: 74,   gapX: 0,   gapY: 0, padX: 0,   padY: 0.5 },
+  'A4-12':   { name: 'A4 · 12 ดวง (105×48mm)',               page: 'A4', cols: 2, rows: 6, w: 105, h: 48,   gapX: 0,   gapY: 0, padX: 0,   padY: 4.5 },
+  'A4-24':   { name: 'A4 · 24 ดวง (70×37mm)',                page: 'A4', cols: 3, rows: 8, w: 70,  h: 37,   gapX: 0,   gapY: 0, padX: 0,   padY: 6.5 },
+  'A4-40':   { name: 'A4 · 40 ดวง (48×25mm)',                page: 'A4', cols: 4, rows: 10, w: 48.5, h: 25.4, gapX: 0, gapY: 0, padX: 8,   padY: 21.5 },
+  'A4-65':   { name: 'A4 · 65 ดวง (38×21mm) — เล็กสุด',      page: 'A4', cols: 5, rows: 13, w: 38,  h: 21.2, gapX: 2.5, gapY: 0, padX: 4.7, padY: 10.7 },
+  'ROLL-50': { name: 'ม้วน · 50×25mm',                       page: '50mm 25mm', cols: 1, rows: 1, w: 50, h: 25, gapX: 0, gapY: 0, padX: 0, padY: 0 }
+};
+
+const LB = {
+  sheet: 'A4-24', mode: 'part', code: 'CODE128', queue: [], offX: 0, offY: 0,
+  showName: true, showLoc: true, showMin: true, showMachine: false, showCode: true,
+  showLogo: false            // สติกเกอร์เล็กพื้นที่มีค่ากว่า — เปิดเองตอนใช้ป้ายใหญ่
+};
+
+function viewLabels() {
+  const s = LABEL_SHEETS[LB.sheet];
+  const perSheet = s.cols * s.rows;
+  const total = LB.queue.reduce((n, q) => n + q.count, 0);
+  const locs = Array.from(new Set(S.parts.map(p => p.location).filter(Boolean))).sort();
+
+  $('view').innerHTML = `
+    <div class="h-full flex flex-col lg:flex-row min-h-0">
+
+      <section class="lg:w-[400px] shrink-0 border-b lg:border-b-0 lg:border-r bg-white flex flex-col min-h-0">
+        <div class="p-3 border-b space-y-2">
+          <div class="flex gap-1 p-1 rounded-xl bg-slate-100">
+            ${[['part', 'ป้ายอะไหล่'], ['loc', 'ป้ายช่องเก็บ']].map(([k, label]) => `
+              <button onclick="LB.mode='${k}';LB.queue=[];viewLabels()"
+                class="flex-1 rounded-lg text-sm font-semibold transition
+                       ${LB.mode === k ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500'}"
+                style="height:34px">${label}</button>`).join('')}
+          </div>
+
+          ${LB.mode === 'part' ? `
+            <input id="lb-q" list="parts" placeholder="สแกนหรือพิมพ์รหัสอะไหล่"
+                   onkeydown="if(event.key==='Enter')addLabel()" class="field text-sm">
+            <div class="flex gap-2">
+              <button onclick="addLabel()" class="btn btn-ink flex-1 text-sm">เพิ่ม</button>
+              <button onclick="addLabelsLow()" class="btn btn-soft text-sm">ที่ถึงจุดสั่งซื้อ</button>
+            </div>
+            <div class="flex gap-2">
+              <select id="lb-loc" class="field text-sm">
+                <option value="">— เลือกช่องเก็บ —</option>
+                ${locs.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join('')}
+              </select>
+              <button onclick="addLabelsByLoc()" class="btn btn-soft text-sm whitespace-nowrap">เพิ่มทั้งช่อง</button>
+            </div>
+            <button onclick="addLabelsAll()" class="btn btn-soft w-full text-sm">
+              เพิ่มทุกตัวที่มีของในคลัง (${S.parts.filter(p => p.stock > 0).length})</button>`
+          : `
+            <p class="text-xs text-slate-400">ป้ายชื่อช่อง/ชั้นวาง — สแกนแล้วได้รหัสช่อง
+               ใช้ตอนนับสต๊อกเพื่อบอกว่ากำลังยืนอยู่ช่องไหน</p>
+            <div class="flex gap-2">
+              <input id="lb-newloc" placeholder="พิมพ์รหัสช่อง เช่น A1" class="field text-sm"
+                     onkeydown="if(event.key==='Enter')addLocLabel()">
+              <button onclick="addLocLabel()" class="btn btn-ink text-sm">เพิ่ม</button>
+            </div>
+            <button onclick="addAllLocLabels()" class="btn btn-soft w-full text-sm">
+              เพิ่มทุกช่องที่มีในคลัง (${locs.length})</button>`}
+        </div>
+
+        <div id="lb-queue" class="flex-1 overflow-y-auto p-3 space-y-2 min-h-0"></div>
+
+        <div class="p-3 border-t space-y-2">
+          <div class="flex gap-2">
+            <div class="flex-1">
+              <label class="block text-xs text-slate-500">ขนาดสติกเกอร์</label>
+              <select onchange="LB.sheet=this.value;viewLabels()" class="field text-sm">
+                ${Object.keys(LABEL_SHEETS).map(k =>
+                  `<option value="${k}" ${k === LB.sheet ? 'selected' : ''}>${LABEL_SHEETS[k].name}</option>`).join('')}
+              </select>
+            </div>
+            <div style="width:120px">
+              <label class="block text-xs text-slate-500">ชนิดรหัส</label>
+              <select onchange="LB.code=this.value;viewLabels()" class="field text-sm">
+                <option value="CODE128" ${LB.code === 'CODE128' ? 'selected' : ''}>บาร์โค้ด</option>
+                <option value="QR" ${LB.code === 'QR' ? 'selected' : ''}>QR</option>
+                <option value="BOTH" ${LB.code === 'BOTH' ? 'selected' : ''}>ทั้งคู่</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-x-3 gap-y-1 text-sm pt-1">
+            ${[['showCode', 'พิมพ์ตัวรหัส'], ['showName', 'ชื่ออะไหล่'], ['showLoc', 'ช่องเก็บ'],
+               ['showMin', 'Min'], ['showMachine', 'เครื่อง'], ['showLogo', 'โลโก้']]
+              .filter(([k]) => LB.mode === 'part' || k === 'showCode' || k === 'showLogo')
+              .map(([k, label]) => `<label class="flex items-center gap-1.5">
+                <input type="checkbox" ${LB[k] ? 'checked' : ''}
+                       onchange="LB.${k}=this.checked;viewLabels()"><span>${label}</span></label>`).join('')}
+          </div>
+
+          <label class="block text-xs text-slate-500 pt-1">ขยับแผ่น (มม.) — เครื่องพิมพ์แต่ละตัวเพี้ยนไม่เท่ากัน</label>
+          <div class="flex gap-2 items-center">
+            <span class="text-xs text-slate-400 w-8">ขวา</span>
+            <input type="number" step="0.5" value="${LB.offX}" class="field text-right text-sm" style="width:80px"
+                   onchange="LB.offX=Number(this.value)||0;renderLabelSheet()">
+            <span class="text-xs text-slate-400 w-8">ลง</span>
+            <input type="number" step="0.5" value="${LB.offY}" class="field text-right text-sm" style="width:80px"
+                   onchange="LB.offY=Number(this.value)||0;renderLabelSheet()">
+          </div>
+
+          <div class="flex gap-2 pt-1">
+            <button onclick="LB.queue=[];viewLabels()" class="btn btn-soft text-sm">ล้างแผ่น</button>
+            <button onclick="printLabels()" ${total ? '' : 'disabled'} class="btn btn-primary flex-1">
+              🖨 พิมพ์</button>
+          </div>
+          <p class="text-xs text-slate-400">
+            ${total} ดวง · ${Math.ceil(total / perSheet) || 0} แผ่น<br>
+            <b>ลองพิมพ์ลงกระดาษเปล่าก่อน</b> แล้วทาบกับกระดาษสติกเกอร์ ถ้าเหลื่อมค่อยตั้งค่าขยับแผ่นทีเดียว
+          </p>
+        </div>
+      </section>
+
+      <section class="flex-1 overflow-auto p-4 min-h-0" style="background:#e9edf3">
+        <div id="label-preview"></div>
+      </section>
+    </div>`;
+
+  renderLabelQueue();
+  renderLabelSheet();
+  const box = $('lb-q') || $('lb-newloc');
+  if (box) box.focus();
+}
+
+/** ทางลัดจากหน้าคลัง: เอาตัวนี้ตัวเดียวขึ้นแผ่นแล้วเด้งไปหน้าแท็กเลย */
+function tagThis(part) {
+  LB.mode = 'part';
+  LB.queue = [{ key: part, count: 1 }];
+  go('labels');
+}
+
+/* ---- คิวที่จะพิมพ์ ------------------------------------------------------- */
+
+function pushLabel(key, count) {
+  const row = LB.queue.filter(q => q.key === key)[0];
+  if (row) row.count += (count || 1); else LB.queue.push({ key: key, count: count || 1 });
+}
+
+function addLabel(part) {
+  const box = $('lb-q');
+  const raw = part || (box ? box.value.trim() : '');
+  if (!raw) return;
+  const p = byPart(raw) || S.parts.filter(x => x.part.toLowerCase() === raw.toLowerCase())[0];
+  if (!p) { toast('ไม่พบอะไหล่ ' + raw); return; }
+  if (box) box.value = '';
+  pushLabel(p.part);
+  viewLabels();
+}
+
+function addLabelsByLoc() {
+  const loc = $('lb-loc').value;
+  if (!loc) { toast('เลือกช่องเก็บก่อน'); return; }
+  const hits = S.parts.filter(p => p.location === loc);
+  hits.forEach(p => pushLabel(p.part));
+  viewLabels();
+  toast('เพิ่ม ' + hits.length + ' ดวงจากช่อง ' + loc, true);
+}
+
+function addLabelsLow() {
+  const hits = S.parts.filter(p => p.low);
+  hits.forEach(p => pushLabel(p.part));
+  viewLabels();
+  toast('เพิ่ม ' + hits.length + ' ดวง', true);
+}
+
+function addLabelsAll() {
+  S.parts.filter(p => p.stock > 0).forEach(p => pushLabel(p.part));
+  viewLabels();
+}
+
+function addLocLabel() {
+  const box = $('lb-newloc');
+  const v = box.value.trim();
+  if (!v) return;
+  box.value = '';
+  pushLabel(v);
+  viewLabels();
+}
+
+function addAllLocLabels() {
+  Array.from(new Set(S.parts.map(p => p.location).filter(Boolean))).sort().forEach(l => pushLabel(l));
+  viewLabels();
+}
+
+function setLabelCount(key, n) {
+  const row = LB.queue.filter(q => q.key === key)[0];
+  if (!row) return;
+  row.count = Math.max(0, Math.floor(Number(n) || 0));
+  if (!row.count) LB.queue = LB.queue.filter(q => q.key !== key);
+  viewLabels();
+}
+
+function renderLabelQueue() {
+  $('lb-queue').innerHTML = LB.queue.length ? LB.queue.map(q => {
+    const p = LB.mode === 'part' ? (byPart(q.key) || { name: q.key, location: '' }) : null;
+    return `
+    <div class="flex items-center gap-2 p-2 rounded-xl bg-slate-100">
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-medium truncate">${esc(p ? p.name : 'ช่อง ' + q.key)}</div>
+        <div class="text-xs text-slate-500 font-mono truncate">${esc(q.key)}${
+          p && p.location ? ' · 📍 ' + esc(p.location) : ''}</div>
+      </div>
+      <button onclick="setLabelCount('${esc(q.key)}',${q.count - 1})" class="btn btn-soft px-0" style="width:38px">−</button>
+      <input value="${q.count}" onchange="setLabelCount('${esc(q.key)}',this.value)"
+             class="field text-center num" style="width:56px">
+      <button onclick="setLabelCount('${esc(q.key)}',${q.count + 1})" class="btn btn-soft px-0" style="width:38px">+</button>
+    </div>`;
+  }).join('') : `
+    <div class="h-full grid place-items-center text-center px-4">
+      <div>
+        <div class="text-5xl opacity-30">🏷️</div>
+        <p class="text-slate-500 font-medium mt-2">ยังไม่มีอะไรบนแผ่น</p>
+        <p class="text-slate-400 text-sm">เลือกจากด้านบน แล้วกดพิมพ์</p>
+      </div>
+    </div>`;
+}
+
+/* ---- แผ่นสติกเกอร์ ------------------------------------------------------ */
+
+function labelSheetHtml() {
+  const s = LABEL_SHEETS[LB.sheet];
+  // แผ่นที่กว้างเกินหน้ากระดาษจะพิมพ์คอลัมน์หนึ่งหายไปเฉย ๆ — จับตรงนี้ ไม่ใช่
+  // หลังจากใครป้อนกระดาษสติกเกอร์แผ่นจริงเข้าไปแล้ว
+  const sheetW = s.cols * s.w + (s.cols - 1) * s.gapX + s.padX * 2;
+  if (s.page === 'A4' && sheetW > 210.5) {
+    return '<p style="color:#b91c1c;padding:2rem;text-align:center">⚠ ' + s.name +
+           ' = ' + sheetW.toFixed(1) + 'mm กว้างเกินหน้า A4</p>';
+  }
+  const perSheet = s.cols * s.rows;
+
+  const flat = [];
+  LB.queue.forEach(q => {
+    const item = LB.mode === 'part'
+      ? (byPart(q.key) || { part: q.key, name: q.key, location: '', min: 0, unit: '', machine: '' })
+      : { part: q.key, name: '', location: q.key, min: 0, unit: '', machine: '', isLoc: true };
+    for (let i = 0; i < q.count; i++) flat.push(item);
+  });
+  if (!flat.length) return '';
+
+  const pages = [];
+  for (let i = 0; i < flat.length; i += perSheet) pages.push(flat.slice(i, i + perSheet));
+
+  // ขนาดตัวอักษรไล่ตามความสูงสติกเกอร์ — ป้ายใหญ่ต้องอ่านจากระยะห่างได้
+  const nameSize = Math.max(6, Math.min(13, s.h / 4.5));
+  const subSize = Math.max(5, Math.min(10, s.h / 6.5));
+  const locSize = Math.max(10, Math.min(40, s.h / (LB.mode === 'loc' ? 2 : 4)));
+
+  return pages.map((page, pi) => `
+    <div class="sheet" style="
+        width:${sheetW}mm;
+        padding:${s.padY + LB.offY}mm ${s.padX}mm ${s.padY}mm ${s.padX + LB.offX}mm;
+        grid-template-columns:repeat(${s.cols}, ${s.w}mm);
+        column-gap:${s.gapX}mm; row-gap:${s.gapY}mm;
+        ${pi ? 'break-before:page;page-break-before:always;' : ''}">
+      ${page.map((p, i) => `
+        <div class="label" style="width:${s.w}mm;height:${s.h}mm">
+          ${LB.showLogo ? `<img src="${logoSrc()}" alt="" style="height:${Math.max(3, s.h / 9)}mm;width:auto" onerror="this.remove()">` : ''}
+          ${p.isLoc
+            ? `<div class="loc" style="font-size:${locSize}px">${esc(p.location)}</div>`
+            : `${LB.showName ? `<div class="nm" style="font-size:${nameSize}px;max-height:${nameSize * 2.5}px">${esc(p.name)}</div>` : ''}
+               ${LB.showLoc && p.location ? `<div class="loc" style="font-size:${locSize}px">📍${esc(p.location)}</div>` : ''}`}
+          <div class="code" data-code="${esc(p.part)}" data-i="${pi}-${i}"></div>
+          ${!p.isLoc && (LB.showMin || LB.showMachine) ? `<div class="sub" style="font-size:${subSize}px">${
+            [LB.showMin && p.min ? 'Min ' + p.min + ' ' + esc(p.unit) : '',
+             LB.showMachine && p.machine ? esc(p.machine) : ''].filter(Boolean).join(' · ')}</div>` : ''}
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+/**
+ * วาดรหัสหลังมาร์กอัปลงจอแล้ว รหัสที่วาดไม่ได้จะขึ้นเตือนเป็นสีแดง
+ * ไม่ใช่ปล่อยให้เป็นช่องว่าง — สติกเกอร์เปล่าหนึ่งดวงคือของที่หาไม่เจอทั้งปี
+ */
+function drawLabelCodes(root) {
+  const s = LABEL_SHEETS[LB.sheet];
+  const both = LB.code === 'BOTH';
+  const barH = Math.max(16, Math.min(60, s.h * (both ? 0.5 : 0.9)));
+  const qrPx = Math.round(Math.max(48, Math.min(180, (both ? s.h * 1.3 : s.h * 2))));
+
+  root.querySelectorAll('.code').forEach(box => {
+    const code = box.getAttribute('data-code');
+    box.innerHTML = '';
+    box.style.display = 'flex';
+    box.style.alignItems = 'center';
+    box.style.justifyContent = 'center';
+    box.style.gap = '1.5mm';
+    box.style.maxWidth = '100%';
+    try {
+      if (LB.code === 'QR' || both) {
+        const holder = document.createElement('div');
+        box.appendChild(holder);
+        new QRCode(holder, { text: code, width: qrPx, height: qrPx,
+                             correctLevel: QRCode.CorrectLevel.M });
+      }
+      if (LB.code === 'CODE128' || both) {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        box.appendChild(svg);
+        JsBarcode(svg, code, {
+          format: 'CODE128', width: both ? 1.1 : 1.4, height: barH, margin: 0,
+          displayValue: LB.showCode, fontSize: 11, textMargin: 0,
+          font: 'Inter, monospace'
+        });
+      }
+      if (LB.code === 'QR' && LB.showCode) {
+        const t = document.createElement('div');
+        t.textContent = code;
+        t.style.cssText = 'font:9px/1.1 Inter,monospace;text-align:center';
+        box.style.flexDirection = 'column';
+        box.appendChild(t);
+      }
+    } catch (e) {
+      box.innerHTML = '<div style="font-size:8px;color:#b91c1c">⚠ ' + esc(code) + '</div>';
+    }
+  });
+}
+
+function renderLabelSheet() {
+  const box = $('label-preview');
+  if (!box) return;
+  const html = labelSheetHtml();
+  box.className = 'labels';                 // ใช้กฎเดียวกับตอนพิมพ์เป็นตัวอย่างบนจอ
+  box.innerHTML = html || '<p class="text-slate-400 text-sm text-center py-12">ยังไม่มีอะไรบนแผ่น</p>';
+  if (html) drawLabelCodes(box);
+}
+
+function printLabels() {
+  const area = $('print-area');
+  area.className = 'labels';
+  area.innerHTML = labelSheetHtml();
+  drawLabelCodes(area);
+
+  // ขนาดหน้ากระดาษเป็นของ preset จึงตั้งเฉพาะตอนพิมพ์ครั้งนี้
+  let style = $('label-page-style');
+  if (!style) {
+    style = document.createElement('style');
+    style.id = 'label-page-style';
+    document.head.appendChild(style);
+  }
+  style.textContent = '@media print { @page { size: ' + LABEL_SHEETS[LB.sheet].page + '; margin: 0; } }';
+
+  window.print();
+
+  // คืน print-area ให้ใบเบิก
+  setTimeout(() => { area.className = ''; area.innerHTML = ''; style.textContent = ''; }, 500);
+}
+
+/* =========================================================================
+ *  ตั้งค่า — ผู้ใช้ / สิทธิ์ / เครื่องจักร / ค่าระบบ / ประวัติการแก้ไข
+ * ========================================================================= */
+
+
+/** ดึงรูปจากโฟลเดอร์ Drive มาผูกกับอะไหล่ตามชื่อไฟล์ */
+function doLinkImages(btn) {
+  const url = ($('img-folder').value || '').trim();
+  if (!url) { toast('วางลิงก์โฟลเดอร์ก่อน', true); return; }
+  run(btn, async () => {
+    const r = await api('linkPartImages', url, $('img-over').checked);
+    $('img-result').innerHTML = `
+      <div class="p-2 rounded-lg bg-teal-50 text-teal-800">
+        โฟลเดอร์ <b>${esc(r.folder)}</b> · ไฟล์ทั้งหมด ${r.scanned} ·
+        <b>ผูกรูปได้ ${r.linked}</b> รายการ${r.kept ? ' · คงรูปเดิมไว้ ' + r.kept : ''}
+        ${r.linked ? '' : '<div class="text-xs mt-1">ชื่อไฟล์ไม่ตรงกับรหัสอะไหล่เลย — ตั้งชื่อไฟล์ขึ้นต้นด้วยรหัส</div>'}
+      </div>`;
+    if (r.linked) await refresh();
+  });
+}
+
+/** ล็อก/ปลดชีตหลักฐาน — ปลดไว้เฉพาะตอนต้องซ่อมข้อมูลในชีตด้วยมือ */
+function doProtect(on, btn) {
+  run(btn, async () => {
+    const r = await api('protectSheets', on);
+    $('prot-result').innerHTML = `
+      <div class="p-2 rounded-lg ${on ? 'bg-teal-50 text-teal-800' : 'bg-amber-50 text-amber-900'}">
+        ${on ? 'ล็อกแล้ว' : 'ปลดแล้ว'} ${r.count} ชีต
+        <div class="text-xs font-mono mt-0.5">${r.sheets.map(esc).join(' · ')}</div>
+        ${on ? '' : '<div class="text-xs mt-1">ซ่อมเสร็จแล้วกดล็อกกลับด้วย</div>'}
+      </div>`;
+  });
+}
+
+function viewSettings() {
+  const keys = ['SITE_NAME', 'SITE_ADDRESS', 'CURRENCY', 'EXPIRY_WARN_DAYS', 'DEAD_STOCK_DAYS',
+                'REQUIRE_JOB_NO', 'SHOW_COST_TO_TECH', 'ALERT_EMAILS', 'SLIP_WIDTH', 'SLIP_FOOTER',
+                'LOGO_URL'];
+  const label = {
+    SITE_NAME: 'ชื่อคลัง', SITE_ADDRESS: 'ที่อยู่ / แผนก', CURRENCY: 'สกุลเงิน',
+    EXPIRY_WARN_DAYS: 'เตือนหมดอายุล่วงหน้า (วัน)', DEAD_STOCK_DAYS: 'ของนอนเมื่อไม่เบิกเกิน (วัน)',
+    REQUIRE_JOB_NO: 'บังคับเลขใบแจ้งซ่อม (1/0)', SHOW_COST_TO_TECH: 'ให้ช่างเห็นต้นทุน (1/0)',
+    ALERT_EMAILS: 'อีเมลรับแจ้งเตือน', SLIP_WIDTH: 'ความกว้างใบเบิก (mm)', SLIP_FOOTER: 'ท้ายใบเบิก',
+    LOGO_URL: 'ลิงก์โลโก้ (ว่าง = ใช้โลโก้กลางที่ฝังในโค้ด)'
+  };
+
+  $('view').innerHTML = `
+    <div class="h-full overflow-y-auto p-4 space-y-4">
+
+      <section class="card p-4">
+        <h2 class="font-bold">🖼️ รูปอะไหล่</h2>
+        <p class="text-sm text-slate-500 mt-1">
+          ถ่ายรูปอะไหล่ → ตั้งชื่อไฟล์ขึ้นต้นด้วยรหัสอะไหล่ → โยนเข้าโฟลเดอร์เดียว → กดปุ่มนี้
+        </p>
+        <div class="mt-2 text-xs text-slate-500 space-y-0.5">
+          <div>✓ <span class="font-mono">60002048M006-0005.jpg</span></div>
+          <div>✓ <span class="font-mono">60002048M006-0005 ปะเก็น.jpg</span> — มีชื่อต่อท้ายก็ได้</div>
+          <div class="text-amber-700">⚠ โฟลเดอร์ต้องแชร์แบบ “ทุกคนที่มีลิงก์” ไม่งั้นรูปจะขึ้นเฉพาะเครื่องคุณ</div>
+        </div>
+        <div class="flex flex-wrap gap-2 items-end mt-3">
+          <div class="flex-1 min-w-[16rem]">
+            <label class="block text-xs text-slate-500">ลิงก์โฟลเดอร์ Drive</label>
+            <input id="img-folder" class="field" placeholder="https://drive.google.com/drive/folders/...">
+          </div>
+          <label class="flex items-center gap-2 text-sm pb-2">
+            <input id="img-over" type="checkbox"> ทับรูปที่ผูกไว้แล้ว
+          </label>
+          <button onclick="doLinkImages(this)" class="btn btn-ink">ดึงรูปมาผูก</button>
+        </div>
+        <div id="img-result" class="mt-2 text-sm"></div>
+      </section>
+
+      <section class="card p-4">
+        <div class="flex flex-wrap items-center gap-2">
+          <h2 class="font-bold">🔒 ล็อกชีตหลังบ้าน</h2>
+          <button onclick="doProtect(true,this)" class="btn btn-ink text-sm ml-auto">ล็อก</button>
+          <button onclick="doProtect(false,this)" class="btn btn-soft text-sm">ปลด</button>
+        </div>
+        <p class="text-sm text-slate-500 mt-1">
+          กันคนเปิด Google Sheets แล้วพิมพ์ทับยอดใน
+          <span class="font-mono text-xs">Batches_FIFO</span> และชีตบันทึกย้อนหลัง —
+          ระบบยังเขียนได้ตามปกติ เจ้าของไฟล์ก็ยังแก้ได้
+        </p>
+        <div id="prot-result" class="mt-2 text-sm"></div>
+      </section>
+
+      <section class="card p-4">
+        <div class="flex items-center gap-2">
+          <h2 class="font-bold">ผู้ใช้และสิทธิ์</h2>
+          <button onclick="editUser()" class="btn btn-ink text-sm ml-auto">+ เพิ่มผู้ใช้</button>
+        </div>
+        <p class="text-xs text-slate-400 mt-1">
+          <b>ช่าง</b> — สแกนเบิกเองได้ ดูสต๊อกได้ แก้ข้อมูลไม่ได้ ·
+          <b>เจ้าหน้าที่คลัง</b> — รับเข้า นับสต๊อก ตัดจำหน่าย แก้ข้อมูลอะไหล่ ·
+          <b>ผู้ดูแลระบบ</b> — ทุกอย่าง</p>
+        <div id="user-list" class="mt-3 text-sm text-slate-400">กำลังโหลด…</div>
+        <p id="pin-warn" class="hidden mt-2 p-2 rounded-lg bg-amber-50 text-amber-800 text-sm"></p>
+      </section>
+
+      <section class="card p-4">
+        <div class="flex items-center gap-2">
+          <h2 class="font-bold">เครื่องจักร / หน่วยงาน</h2>
+          <button onclick="editMachine()" class="btn btn-ink text-sm ml-auto">+ เพิ่ม</button>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2">
+          ${S.machines.map(m => `<button onclick="editMachine('${esc(m.code)}')"
+            class="chip bg-slate-100 text-slate-600 hover:bg-slate-200" style="height:32px">
+            <b>${esc(m.code)}</b> ${esc(m.name)}</button>`).join('') ||
+            '<p class="text-sm text-slate-400">ยังไม่มีเครื่องจักร</p>'}
+        </div>
+      </section>
+
+      <section class="card p-4">
+        <h2 class="font-bold">ค่าระบบ</h2>
+        <div class="grid sm:grid-cols-2 gap-2 mt-3">
+          ${keys.map(k => `<div>
+            <label class="block text-xs text-slate-500">${label[k] || k}</label>
+            <input id="st-${k}" value="${esc(CFG[k] || '')}" class="field">
+          </div>`).join('')}
+        </div>
+        <div class="flex flex-wrap gap-2 mt-3">
+          <button onclick="saveSettingsForm(this)" class="btn btn-primary px-5">บันทึกค่าระบบ</button>
+          <button onclick="doInstallTriggers(this)" class="btn btn-soft text-sm">ตั้งอีเมลเตือน 08:00</button>
+          <button onclick="doArchiveBatches(this)" class="btn btn-soft text-sm">ย้าย batch ที่หมดแล้ว (เก่ากว่า 180 วัน)</button>
+        </div>
+      </section>
+
+      <section class="card p-4">
+        <div class="flex items-center gap-2">
+          <h2 class="font-bold">ประวัติการแก้ไข</h2>
+          <button onclick="loadAudit(this)" class="btn btn-soft text-sm ml-auto">โหลด 60 รายการล่าสุด</button>
+        </div>
+        <div id="audit-list" class="mt-3 text-sm text-slate-400">ใครแก้ราคา แก้สิทธิ์ แก้ batch — อยู่ที่นี่</div>
+      </section>
+    </div>`;
+  loadUsers();
+}
+
+function loadUsers() {
+  run(null, async () => {
+    S.users = await api('getUsers');
+    renderUsers();
+  });
+}
+
+function renderUsers() {
+  $('user-list').innerHTML = `
+    <table class="w-full text-sm">
+      <tr class="text-left text-slate-500"><th class="py-1">ชื่อ</th><th>อีเมล</th><th>สิทธิ์</th>
+          <th>PIN</th><th></th></tr>
+      ${S.users.map(u => `<tr class="border-t">
+        <td class="py-1">${esc(u.name || '—')}</td>
+        <td class="text-slate-500">${esc(u.email)}</td>
+        <td><span class="chip bg-slate-100 text-slate-600">${esc(ROLE_TH[u.role] || u.role)}</span>
+            ${u.active ? '' : '<span class="chip bg-red-100 text-red-700">ปิดใช้</span>'}</td>
+        <td>${u.hasPin ? '✅' : '<span class="text-amber-700">ยังไม่ตั้ง</span>'}</td>
+        <td class="text-right whitespace-nowrap">
+          <button onclick="editUser('${esc(u.email)}')" class="btn btn-ghost px-2 text-xs">แก้</button>
+          <button onclick="askPin('${esc(u.email)}')" class="btn btn-ghost px-2 text-xs">PIN</button>
+        </td></tr>`).join('')}
+    </table>`;
+  const open = S.users.filter(u => u.active && !u.hasPin);
+  const warn = $('pin-warn');
+  if (open.length) {
+    warn.classList.remove('hidden');
+    warn.textContent = 'ยังมี ' + open.length + ' บัญชีที่ไม่มี PIN — ใครที่รู้อีเมลนั้นยึดบัญชีได้ตอนเข้าครั้งแรก ตั้ง PIN ให้เลย';
+  } else warn.classList.add('hidden');
+}
+
+function editUser(email) {
+  const u = email ? S.users.find(x => x.email === email) : { email: '', name: '', role: 'TECH', active: true, photo: '' };
+  openModal(
+    `<h2 class="text-lg font-bold">${email ? 'แก้ผู้ใช้' : 'เพิ่มผู้ใช้'}</h2>
+     <label class="block text-xs text-slate-500 mt-2">อีเมล</label>
+     <input id="uf-email" value="${esc(u.email)}" ${email ? 'readonly' : ''} class="field">
+     <label class="block text-xs text-slate-500 mt-2">ชื่อที่แสดง (ใช้เป็นชื่อผู้เบิก)</label>
+     <input id="uf-name" value="${esc(u.name)}" class="field">
+     <label class="block text-xs text-slate-500 mt-2">สิทธิ์</label>
+     <select id="uf-role" class="field">
+       ${['TECH', 'LEAD', 'ENG'].map(r =>
+         `<option value="${r}" ${u.role === r ? 'selected' : ''}>${ROLE_TH[r]} (${r})</option>`).join('')}
+     </select>
+     <label class="block text-xs text-slate-500 mt-2">ลิงก์รูป (ไม่บังคับ)</label>
+     <input id="uf-photo" value="${esc(u.photo)}" class="field">
+     <label class="flex items-center gap-2 mt-3 text-sm">
+       <input id="uf-active" type="checkbox" ${u.active ? 'checked' : ''}><span>เปิดใช้งาน</span></label>`,
+    `<button onclick="closeModal()" class="btn btn-soft">ยกเลิก</button>
+     <button onclick="saveUserForm(this)" class="btn btn-ink ml-auto px-5">บันทึก</button>`);
+}
+
+function saveUserForm(btn) {
+  run(btn, async () => {
+    S.users = await api('saveUser', {
+      email: $('uf-email').value.trim(), name: $('uf-name').value.trim(),
+      role: $('uf-role').value, photo: $('uf-photo').value.trim(), active: $('uf-active').checked
+    });
+    closeModal();
+    renderUsers();
+    toast('บันทึกผู้ใช้แล้ว', true);
+  });
+}
+
+function askPin(email) {
+  openModal(
+    `<h2 class="text-lg font-bold">ตั้ง PIN ให้ ${esc(email)}</h2>
+     <p class="text-xs text-slate-400">เว้นว่างแล้วกดบันทึก = ล้าง PIN ให้เจ้าตัวตั้งใหม่เองตอนเข้าครั้งถัดไป</p>
+     <input id="pf-pin" inputmode="numeric" maxlength="8" placeholder="4–8 หลัก"
+            class="field mt-3 text-center text-xl tracking-[0.3em]">`,
+    `<button onclick="closeModal()" class="btn btn-soft">ยกเลิก</button>
+     <button onclick="doSetPin(this,'${esc(email)}')" class="btn btn-ink ml-auto px-5">บันทึก</button>`);
+}
+
+function doSetPin(btn, email) {
+  run(btn, async () => {
+    await api('setPin', email, $('pf-pin').value.trim());
+    S.users = await api('getUsers');
+    closeModal();
+    renderUsers();
+    toast('ตั้ง PIN แล้ว', true);
+  });
+}
+
+function editMachine(code) {
+  const m = code ? S.machines.find(x => x.code === code) : { code: '', name: '', area: '' };
+  openModal(
+    `<h2 class="text-lg font-bold">${code ? 'แก้เครื่องจักร' : 'เพิ่มเครื่องจักร / หน่วยงาน'}</h2>
+     <label class="block text-xs text-slate-500 mt-2">รหัส</label>
+     <input id="mf-code" value="${esc(m.code)}" class="field">
+     <label class="block text-xs text-slate-500 mt-2">ชื่อ</label>
+     <input id="mf-name" value="${esc(m.name)}" class="field">
+     <label class="block text-xs text-slate-500 mt-2">ไลน์ / พื้นที่</label>
+     <input id="mf-area" value="${esc(m.area)}" class="field">
+     <label class="flex items-center gap-2 mt-3 text-sm">
+       <input id="mf-active" type="checkbox" checked><span>เปิดใช้งาน</span></label>`,
+    `<button onclick="closeModal()" class="btn btn-soft">ยกเลิก</button>
+     <button onclick="saveMachineForm(this)" class="btn btn-ink ml-auto px-5">บันทึก</button>`);
+}
+
+function saveMachineForm(btn) {
+  run(btn, async () => {
+    takeCatalog(await api('saveMachine', {
+      code: $('mf-code').value.trim(), name: $('mf-name').value.trim(),
+      area: $('mf-area').value.trim(), active: $('mf-active').checked
+    }));
+    closeModal();
+    render();
+    toast('บันทึกเครื่องจักรแล้ว', true);
+  });
+}
+
+function saveSettingsForm(btn) {
+  run(btn, async () => {
+    const map = {};
+    ['SITE_NAME', 'SITE_ADDRESS', 'CURRENCY', 'EXPIRY_WARN_DAYS', 'DEAD_STOCK_DAYS',
+     'REQUIRE_JOB_NO', 'SHOW_COST_TO_TECH', 'ALERT_EMAILS', 'SLIP_WIDTH', 'SLIP_FOOTER', 'LOGO_URL']
+      .forEach(k => { map[k] = $('st-' + k).value; });
+    CFG = await api('saveSettings', map);
+    await refresh(false);
+    render();
+    toast('บันทึกค่าระบบแล้ว', true);
+  });
+}
+
+function doInstallTriggers(btn) {
+  run(btn, async () => toast(await api('installTriggers'), true));
+}
+
+function doArchiveBatches(btn) {
+  run(btn, async () => {
+    const r = await api('archiveEmptyBatches', 180);
+    toast('ย้ายออก ' + r.moved + ' batch · เหลือ ' + r.left, true);
+  });
+}
+
+function loadAudit(btn) {
+  run(btn, async () => {
+    const rows = await api('getAuditLog', 60);
+    $('audit-list').innerHTML = rows.length ? `
+      <table class="w-full text-xs">
+        <tr class="text-left text-slate-500"><th class="py-1">เวลา</th><th>ใคร</th><th>ทำอะไร</th>
+            <th>เป้าหมาย</th><th>ช่อง</th><th>จาก</th><th>เป็น</th></tr>
+        ${rows.map(a => `<tr class="border-t">
+          <td class="py-1 whitespace-nowrap">${esc(a.ts)}</td><td>${esc(a.user)}</td>
+          <td class="font-mono">${esc(a.action)}</td><td>${esc(a.target)}</td>
+          <td>${esc(a.field)}</td><td class="text-slate-400">${esc(a.from)}</td><td>${esc(a.to)}</td>
+        </tr>`).join('')}
+      </table>` : '<p class="text-sm text-slate-400">ยังไม่มีประวัติ</p>';
+  });
+}
+</script>

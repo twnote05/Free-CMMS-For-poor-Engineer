@@ -1,0 +1,11 @@
+# ข้อมูลจริงของโรงงาน — ห้ามขึ้น repo สาธารณะ
+# มีชื่อพนักงาน รายการอะไหล่ทั้งคลัง ซัพพลายเออร์ และโลโก้บริษัท
+private/
+
+# clasp ผูกกับ Script ID ของแต่ละคน — แจกไม่ได้ ใช้ .clasp.json.example เป็นต้นแบบ
+.clasp.json
+
+node_modules/
+*.log
+.DS_Store
+Thumbs.db

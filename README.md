@@ -9,7 +9,7 @@ Both are in daily production use at a ~50-person UPVC/SPC flooring plant. All co
 | | What it does | Status |
 |---|---|---|
 | **[cmms/](cmms/)** | Work orders, preventive maintenance, daily checklists, machine parameters, KPIs | Ready |
-| **stock/** | Spare parts, tools and blades — FIFO batches, real cost per issue | Coming |
+| **[stock/](stock/)** | Spare parts, tools and blades — FIFO batches, real cost per issue | Ready |
 
 Pick one or run both. They are **separate Apps Script projects**: each has its own `.clasp.json` and its own deployment. The only thing they share is the `Users` sheet — see **[SHARED-USERS.md](SHARED-USERS.md)** before you run both.
 
@@ -18,6 +18,7 @@ Pick one or run both. They are **separate Apps Script projects**: each has its o
 ## Start here
 
 - **Just want the maintenance system?** → [cmms/README.md](cmms/README.md)
+- **Just want the stock system?** → [stock/README.md](stock/README.md) (Thai only)
 - **Running both?** → read [SHARED-USERS.md](SHARED-USERS.md) first, then set up CMMS, then Stock
 
 ```bash

@@ -1,0 +1,295 @@
+<!--
+  ระบบ Stock อะไหล่ — โครงหน้าเว็บ
+  ตรรกะอยู่ใน App.js.html (แกนกลาง + หน้าเบิกอะไหล่) และ Admin.js.html (หลังบ้าน)
+-->
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap">
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- แท็กติดหน้าช่องเก็บ: บาร์โค้ดวาดด้วยไลบรารี ไม่วาดมือ —
+     ลาย Code128 ที่ผิดหนึ่งเส้น = สติกเกอร์ทั้งแผ่นที่สแกนไม่ออก -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  /* =====================================================================
+     DESIGN TOKENS
+     สีหลักหนึ่งสี ไล่เทาหนึ่งชุด จังหวะระยะหนึ่งชุด กฎด้านล่างชี้คลาส Tailwind
+     ที่หน้าจอใช้อยู่แล้วมาที่ตัวแปรนี้ — เปลี่ยน --accent ทีเดียวเปลี่ยนทั้งระบบ
+     ===================================================================== */
+  :root {
+    --accent: #0f766e; --accent-dark: #115e59; --accent-soft: #ecfdf5; --accent-ink: #115e59;
+    --ink: #1e293b; --bg: #f1f5f9; --surface: #ffffff; --chip: #f1f5f9;
+    --text: #1e293b; --muted: #64748b; --line: #e2e8f0;
+
+    --tap: 44px;                       /* เล็กสุดที่นิ้วควรต้องกด */
+    --r-sm: 8px; --r-md: 12px; --r-lg: 16px;
+    --shadow-1: 0 1px 2px rgba(15,23,42,.06), 0 1px 3px rgba(15,23,42,.08);
+    --shadow-2: 0 4px 12px rgba(15,23,42,.08), 0 2px 4px rgba(15,23,42,.04);
+    --shadow-3: 0 20px 40px rgba(15,23,42,.16);
+  }
+
+  html, body { height: 100%; }
+  body {
+    overscroll-behavior: none;
+    background-color: var(--bg); color: var(--text);
+    font-family: 'Inter', 'Noto Sans Thai', system-ui, -apple-system, sans-serif;
+    font-variant-numeric: tabular-nums;      /* ตัวเลขเรียงตรงหลัก */
+    -webkit-tap-highlight-color: transparent;
+  }
+  input, select, textarea, button { color: inherit; font: inherit; font-variant-numeric: tabular-nums; }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  /* กรอบโฟกัสสำหรับคนใช้คีย์บอร์ดและเครื่องสแกน — ไม่เคยถอดออก */
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+  /* ===== ท่อสี ===== */
+  .bg-teal-600, .bg-teal-500  { background-color: var(--accent) !important; }
+  .hover\:bg-teal-700:hover   { background-color: var(--accent-dark) !important; }
+  .bg-teal-50                 { background-color: var(--accent-soft) !important; }
+  .text-teal-700              { color: var(--accent-ink) !important; }
+  .text-teal-600              { color: var(--accent) !important; }
+  .ring-teal-500              { --tw-ring-color: var(--accent); }
+  .bg-slate-800               { background-color: var(--ink) !important; }
+  .bg-white                   { background-color: var(--surface) !important; }
+  .bg-slate-100, .bg-slate-50 { background-color: var(--chip) !important; }
+  .hover\:bg-slate-200:hover  { filter: brightness(.94); }
+  .text-slate-800             { color: var(--text) !important; }
+  .text-slate-600             { color: var(--text) !important; opacity: .8; }
+  .text-slate-500, .text-slate-400, .text-slate-300 { color: var(--muted) !important; }
+  .border, .border-t, .border-b, .border-l, .border-r { border-color: var(--line) !important; }
+  .shadow-sm { box-shadow: var(--shadow-1) !important; }
+  .shadow-md, .hover\:shadow-md:hover { box-shadow: var(--shadow-2) !important; }
+  .shadow-lg { box-shadow: var(--shadow-3) !important; }
+
+  /* ===== components =====
+     เขียนที่นี่ครั้งเดียว แทนการซ้ำคลาส Tailwind ยี่สิบตัวต่อปุ่มหนึ่งปุ่ม */
+  .tap        { min-height: var(--tap); min-width: var(--tap); }
+  .btn        { display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+                min-height: var(--tap); padding: 0 1rem; border-radius: var(--r-md);
+                font-weight: 600; transition: transform .06s ease, filter .12s ease; }
+  .btn:active { transform: scale(.97); }
+  .btn[disabled] { opacity: .45; pointer-events: none; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-dark); }
+  .btn-ink     { background: var(--ink); color: #fff; }
+  .btn-soft    { background: var(--chip); color: var(--text); }
+  .btn-ghost   { background: transparent; color: var(--muted); }
+  .btn-ghost:hover { background: var(--chip); }
+  .btn-danger  { background: #fef2f2; color: #b91c1c; }
+
+  .card       { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-1); }
+  .field      { width: 100%; min-height: var(--tap); padding: .5rem .75rem;
+                background: var(--chip); border-radius: var(--r-md); outline: none; }
+  .field:focus { box-shadow: 0 0 0 2px var(--accent); }
+  .chip       { display: inline-flex; align-items: center; gap: .35rem; padding: .25rem .6rem;
+                border-radius: 999px; font-size: 12px; font-weight: 600; }
+
+  input[type=checkbox], input[type=radio] { width: 18px; height: 18px; accent-color: var(--accent); }
+  input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea { min-height: 40px; }
+
+  .num        { font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .num-xl     { font-size: 2rem; line-height: 1.1; font-weight: 700; }
+  .num-lg     { font-size: 1.25rem; font-weight: 700; }
+
+  /* บรรทัดที่สแกนเข้ามาจะกะพริบ เพื่อให้ช่างเห็นว่ามันลงแล้ว */
+  @keyframes flash-in { from { background: var(--accent-soft); } to { background: var(--chip); } }
+  .flash { animation: flash-in .7s ease-out; }
+
+  /* =====================================================================
+     จอเล็ก
+     จุดสแกนจริงคือแท็บเล็ตแนวนอนหรือมือถือที่ช่างถือ ต่ำกว่า 1024px
+     ตะกร้าเบิกจะเลื่อนทับเข้ามาแทนการกินความกว้างครึ่งจอ
+     ===================================================================== */
+  #cart-bar, #cart-scrim { display: none; }
+
+  @media (max-width: 1023px) {
+    #cart-aside {
+      position: fixed; top: 0; right: 0; bottom: 0; z-index: 40;
+      width: min(420px, 92vw); transform: translateX(101%);
+      transition: transform .22s ease; box-shadow: var(--shadow-3);
+    }
+    #cart-aside.open { transform: none; }
+    #cart-bar { display: flex; }
+    #cart-scrim.open { display: block; }
+  }
+
+  /* มือถือ: modal กลายเป็น bottom sheet ซึ่งเป็นที่ที่นิ้วโป้งอยู่แล้ว */
+  @media (max-width: 639px) {
+    #modal { align-items: flex-end; padding: 0; }
+    #modal-card { max-width: none; max-height: 94vh; border-radius: 20px 20px 0 0; }
+    #modal-foot { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .flash { animation: none; }
+    .btn:active { transform: none; }
+  }
+
+  /* =====================================================================
+     แท็กติดหน้าช่องเก็บอะไหล่
+     ทุกขนาดเป็นมิลลิเมตร เพราะกระดาษสติกเกอร์เป็นมิลลิเมตร และตัวอย่างบนจอ
+     คือขนาดนั้นจริง ๆ — สิ่งที่เล็งบนจอจึงเท่ากับสิ่งที่ออกจากเครื่องพิมพ์
+     ===================================================================== */
+  /* กฎชุดนี้ผูกกับคลาส .labels ไม่ใช่ #print-area — ตัวอย่างบนจอกับของที่พิมพ์
+     จึงใช้กฎก้อนเดียวกันจริง ๆ ถ้าแยกกัน ตัวอย่างจะโกหก (เคยพลาดมาแล้ว:
+     display:grid อยู่ฝั่งพิมพ์อย่างเดียว ตัวอย่างบนจอเลยเรียงลงแนวตั้ง) */
+  .labels { width: auto; padding: 0; font-family: 'Inter', 'Noto Sans Thai', sans-serif; color: #000; }
+  .labels .sheet { display: grid; box-sizing: border-box; }
+  .labels .label {
+    box-sizing: border-box; overflow: hidden; break-inside: avoid; page-break-inside: avoid;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 1mm; gap: .3mm;
+  }
+  /* ทุกบรรทัดกว้างเท่าสติกเกอร์ ตัดคำได้ และห้ามยืดจนล้นขอบ */
+  .labels .label > * { max-width: 100%; }
+  .labels .label .loc { width: 100%; font-weight: 800; line-height: 1; letter-spacing: -.02em;
+                        overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .labels .label .nm  { width: 100%; font-weight: 600; line-height: 1.15;
+                        overflow: hidden; overflow-wrap: anywhere; }
+  .labels .label .sub { width: 100%; line-height: 1.1; opacity: .75;
+                        overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .labels .label .code { max-width: 100%; overflow: hidden; }
+  .labels .label svg, .labels .label canvas, .labels .label img { display: block; max-width: 100%; }
+  /* qrcodejs วาดทั้ง canvas และ img — เอาแค่ canvas (เจาะจงในกล่องรหัส ไม่โดนโลโก้) */
+  .labels .label .code img { display: none; }
+
+  #label-preview .sheet { background: #fff; box-shadow: var(--shadow-2); margin: 0 auto 8mm; }
+  #label-preview .label { outline: 1px dashed #cbd5e1; outline-offset: -1px; }
+
+  /* ===== ใบเบิกอะไหล่ที่พิมพ์ — ตอนพิมพ์ซ่อนทุกอย่างที่ไม่ใช่มัน ===== */
+  #print-area { display: none; }
+  @media print {
+    body > *:not(#print-area) { display: none !important; }
+    body { background: #fff !important; }
+    #print-area.labels { display: block; }
+    #print-area.labels .sheet { box-shadow: none; }
+    #print-area.labels .label { outline: none; }
+    #print-area:not(.labels) { display: block; width: var(--slip-width, 80mm); margin: 0; padding: 3mm;
+                  font: 11px/1.45 'Noto Sans Thai', 'Courier New', monospace; color: #000; }
+    #print-area table { width: 100%; border-collapse: collapse; }
+    #print-area th, #print-area td { padding: 1px 0; vertical-align: top; }
+    #print-area .r { text-align: right; }
+    #print-area hr { border: 0; border-top: 1px dashed #000; margin: 4px 0; }
+    @page { margin: 0; }
+  }
+</style>
+
+<div id="app" class="h-full flex flex-col text-slate-800">
+
+  <header class="bg-white border-b shrink-0">
+    <div class="flex items-center gap-3 px-3 sm:px-4 overflow-x-auto" style="height:56px">
+
+      <!-- บนมือถือเหลือแค่โลโก้ ชื่อระบบกินที่จนแถบแท็บโดนเบียดออกนอกจอ -->
+      <div class="flex items-center gap-2 min-w-0 shrink-0">
+        <img id="logo" alt="" class="h-7 w-auto shrink-0" style="display:none">
+        <span id="site-name" class="font-bold truncate hidden md:inline">&#128295; คลังอะไหล่</span>
+      </div>
+
+      <!-- อยู่ที่ไหน: หนึ่งตัวควบคุมสองสถานะ ไม่ใช่สองปุ่มแย่งกัน -->
+      <nav id="seg" class="flex gap-1 p-1 rounded-xl bg-slate-100 shrink-0"></nav>
+
+      <div class="flex-1 min-w-0"></div>
+
+      <button id="alert-badge" class="hidden chip bg-amber-100 text-amber-800 whitespace-nowrap shrink-0"
+              style="height:32px;padding:0 .7rem"></button>
+      <button id="whoami" onclick="viewProfile()" title="โปรไฟล์"
+              class="flex items-center gap-2 pl-1 pr-2 rounded-full hover:bg-slate-100 shrink-0"
+              style="height:40px"></button>
+      <button id="reload-btn" onclick="refresh()" title="โหลดใหม่"
+              class="rounded-lg text-lg text-slate-400 hover:bg-slate-100 shrink-0"
+              style="width:36px;height:36px">&#8635;</button>
+    </div>
+
+    <!-- เมนูหลังบ้าน: เป็นชั้นรอง จึงเป็นแถบสีอ่อนกว่าแถวบน -->
+    <div id="subnav" class="hidden gap-1 px-3 sm:px-4 overflow-x-auto border-t bg-slate-50"
+         style="height:46px;align-items:center"></div>
+  </header>
+
+  <main id="view" class="flex-1 min-h-0 overflow-hidden">
+    <div class="p-6 text-slate-400">กำลังโหลด…</div>
+  </main>
+</div>
+
+<!-- ตัวเลือกอะไหล่ที่ใช้ร่วมกันทุกหน้า -->
+<datalist id="parts"></datalist>
+
+<!-- modal กลาง -->
+<div id="modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-[2px] items-center justify-center p-4 z-50">
+  <div id="modal-card" class="bg-white rounded-2xl w-full max-w-lg max-h-[92vh] flex flex-col shadow-lg">
+    <div id="modal-body" class="p-6 overflow-y-auto"></div>
+    <div id="modal-foot" class="p-4 border-t flex gap-2"></div>
+  </div>
+</div>
+
+<div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-3 rounded-xl text-white shadow-lg z-50 font-medium"></div>
+
+<!-- ใบเบิกที่ render แล้ว มองเห็นได้เฉพาะเครื่องพิมพ์ -->
+<div id="print-area"></div>
+
+<script>
+/* =========================================================================
+ *  กับดักข้อผิดพลาด — ต้องอยู่ "ก่อน" สคริปต์อื่นทุกตัว จึงจะดักตอนสคริปต์
+ *  ถัดไปพังตั้งแต่ตอน parse ได้
+ *
+ *  ทีมนี้ไม่มีแอดมินคอยเปิด console ให้ จอที่ค้างอยู่ที่ "กำลังโหลด…" เงียบ ๆ
+ *  คือจอที่ไม่มีใครรู้ว่าต้องทำอะไรต่อ — ทุกความผิดพลาดต้องขึ้นบนจอเสมอ
+ * ========================================================================= */
+(function () {
+  var shown = false;
+  function paint(title, detail) {
+    if (shown) return;
+    shown = true;
+    var v = document.getElementById('view');
+    if (!v) return;
+    var esc = function (s) {
+      return String(s).replace(/[&<>]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
+      });
+    };
+    v.innerHTML =
+      '<div style="padding:24px;max-width:760px;margin:0 auto;font-family:inherit">' +
+      '<div style="font-size:34px">&#9888;&#65039;</div>' +
+      '<h2 style="font-weight:700;font-size:18px;margin:8px 0">' + esc(title) + '</h2>' +
+      '<pre style="white-space:pre-wrap;background:#fef2f2;color:#b91c1c;padding:12px;' +
+      'border-radius:12px;font-size:12px;line-height:1.6">' + esc(detail) + '</pre>' +
+      '<p style="font-size:13px;color:#64748b;margin-top:12px">' +
+      'ถ่ายหน้าจอนี้ส่งให้คนดูแลระบบได้เลย &middot; กด &#8635; มุมขวาบนเพื่อลองใหม่</p></div>';
+  }
+  window.addEventListener('error', function (e) {
+    paint('หน้าจอโหลดไม่สำเร็จ',
+          (e.message || 'ไม่ทราบสาเหตุ') + '\n' + (e.filename || '') + ' บรรทัด ' + (e.lineno || '?'));
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    paint('คำสั่งไปเซิร์ฟเวอร์ล้มเหลว', (e.reason && e.reason.message) || e.reason || 'ไม่ทราบสาเหตุ');
+  });
+  /* ยังค้างที่ "กำลังโหลด…" หลัง 20 วินาที = มีอะไรผิดที่ไม่ได้ throw ออกมาให้ดัก */
+  setTimeout(function () {
+    var v = document.getElementById('view');
+    if (v && v.textContent.indexOf('กำลังโหลด') >= 0) {
+      paint('โหลดนานผิดปกติ — หน้าจอค้างเกิน 20 วินาที', [
+        'สาเหตุที่พบบ่อย เรียงตามความน่าจะเป็น:',
+        '',
+        '1. Deploy ยังเป็นเวอร์ชันเก่า',
+        '   Deploy → Manage deployments → ✏️ → Version: New version → Deploy',
+        '',
+        '2. ไฟล์ HTML ตั้งชื่อผิด — ต้องเป็น Index, App.js, Admin.js',
+        '   (ไม่ต้องพิมพ์ .html ต่อท้าย ระบบเติมให้เอง)',
+        '',
+        '3. ยังไม่ได้รัน setup() ในตัวแก้ไข Apps Script',
+        '',
+        '4. ชีตมีข้อมูลเยอะมากจนอ่านไม่ทัน — กด ↻ ลองใหม่อีกครั้ง',
+        '',
+        'ดูข้อความจริง: กด F12 → แท็บ Console'
+      ].join('\n'));
+    }
+  }, 20000);
+})();
+</script>
+
+<?!= include('App.js') ?>
+<?!= include('Admin.js') ?>
+<script>boot();</script>

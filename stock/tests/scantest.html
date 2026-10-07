@@ -1,0 +1,73 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>scan test</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+<body style="font:14px monospace">
+<h3>พิมพ์แท็กออกมาแบบไหน ต้องสแกนกลับได้แบบนั้น</h3>
+<div id="out">กำลังทดสอบ…</div>
+<canvas id="bc"></canvas>
+<div id="qr" style="display:none"></div>
+<script>
+// รหัสจริงจากคลัง — มีตัวเลข ตัวอักษร และขีดกลาง ครบแบบที่ Code128 ต้องเจอ
+const CODES = ['60002048M006-0005', 'MTD3SL1-023', '60101009EXT3-0002', 'MTD26811-0002'];
+const log = [];
+let fails = 0;
+
+function say(ok, msg) { log.push((ok ? '✓ ' : '✗ ') + msg); if (!ok) fails++; }
+
+async function run() {
+  const reader = new ZXing.BrowserMultiFormatReader();
+
+  // ---- Code128 (บาร์โค้ดบนแท็ก) ----
+  for (const code of CODES) {
+    const cv = document.getElementById('bc');
+    JsBarcode(cv, code, { format: 'CODE128', width: 2, height: 80, displayValue: false, margin: 12 });
+    try {
+      const r = await reader.decodeFromImageUrl(cv.toDataURL('image/png'));
+      say(r.getText() === code, 'Code128 ' + code + ' → ' + r.getText());
+    } catch (e) { say(false, 'Code128 ' + code + ' → อ่านไม่ออก (' + e.name + ')'); }
+  }
+
+  // ---- QR ----
+  for (const code of CODES.slice(0, 2)) {
+    const box = document.getElementById('qr');
+    box.innerHTML = '';
+    new QRCode(box, { text: code, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
+    await new Promise(r => setTimeout(r, 120));
+    const img = box.querySelector('img') || box.querySelector('canvas');
+    const url = img.tagName === 'IMG' ? img.src : img.toDataURL('image/png');
+    try {
+      const r = await reader.decodeFromImageUrl(url);
+      say(r.getText() === code, 'QR ' + code + ' → ' + r.getText());
+    } catch (e) { say(false, 'QR ' + code + ' → อ่านไม่ออก (' + e.name + ')'); }
+  }
+
+  // ---- ย่อรูปแล้วยังอ่านออกไหม (เหมือนที่ photoScan ทำจริง) ----
+  const cv = document.getElementById('bc');
+  JsBarcode(cv, CODES[0], { format: 'CODE128', width: 2, height: 80, displayValue: false, margin: 12 });
+  const big = cv.toDataURL('image/png');
+  const shrunk = await new Promise(ok => {
+    const im = new Image();
+    im.onload = () => {
+      const s = Math.min(1, 1600 / Math.max(im.width, im.height));
+      const c2 = document.createElement('canvas');
+      c2.width = Math.round(im.width * s); c2.height = Math.round(im.height * s);
+      c2.getContext('2d').drawImage(im, 0, 0, c2.width, c2.height);
+      ok(c2.toDataURL('image/jpeg', 0.82));
+    };
+    im.src = big;
+  });
+  try {
+    const r = await reader.decodeFromImageUrl(shrunk);
+    say(r.getText() === CODES[0], 'ย่อ+บีบ JPEG แล้วยังอ่านออก → ' + r.getText());
+  } catch (e) { say(false, 'ย่อ+บีบ JPEG แล้วอ่านไม่ออก (' + e.name + ')'); }
+
+  document.getElementById('out').innerHTML =
+    log.join('<br>') + '<br><br><b>' + (fails ? '*** ไม่ผ่าน ' + fails + ' จุด ***' : 'ผ่านหมด') + '</b>';
+  document.title = fails ? 'FAIL' : 'PASS';
+}
+run().catch(e => { document.getElementById('out').textContent = 'พัง: ' + e; document.title = 'FAIL'; });
+</script>
+</body>

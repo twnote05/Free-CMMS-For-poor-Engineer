@@ -1,0 +1,885 @@
+<script>
+/* =========================================================================
+ *  แกนกลาง + หน้าเบิกอะไหล่
+ *  หลังบ้าน (คลัง, รับเข้า, นับสต๊อก, รายงาน, ตั้งค่า) อยู่ใน Admin.js.html
+ * ========================================================================= */
+
+let CFG = {};                       // ชีต Settings โหลดตอน boot
+let ROLE = 'TECH';
+
+/**
+ * ref กันคีย์ซ้ำ: หนึ่งค่าต่อหนึ่งตะกร้า/หนึ่งฟอร์ม เปลี่ยนเมื่อบันทึกสำเร็จเท่านั้น
+ * เน็ตหลุดตอนเซิร์ฟเวอร์ตอบกลับแล้วผู้ใช้กดยืนยันใหม่ → ref เดิมถูกส่งไป
+ * เซิร์ฟเวอร์รู้ว่าเคยบันทึกแล้วและไม่ตัดสต๊อกอีกรอบ
+ */
+const newRef = () => 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+const S = {
+  tab: 'issue', lastAdmin: null,
+  parts: [], batches: [], machines: [], costHidden: false, dupes: [],
+  codes: { GROUP: [], TYPE: [], USAGE: [], CATEGORY: [] },
+  cart: {}, ref: newRef(),          // part -> {part,name,unit,qty,note}
+  target: { machine: '', jobNo: '', dept: '', note: '', requester: '' },
+  flash: null, filter: '', cat: 'ทั้งหมด',
+  count: [], scrapList: [], recv: [], pos: [],
+  report: null, issues: [], issue: null, users: [],
+  assetTab: 'blades', blades: [], bladeCounts: {}, bladeFilter: 'ทั้งหมด', tools: [], toolQ: '',
+  busy: false
+};
+
+/** [key, ป้าย, สิทธิ์ต่ำสุด, ไอคอน] — ช่างเห็นสองแท็บแรก ที่เหลือคือหลังบ้าน */
+const TABS = [
+  ['issue',    'เบิกอะไหล่',           'TECH', '🔧'],
+  ['inv',      'คลังอะไหล่',           'TECH', '📦'],
+  ['assets',   'เครื่องมือ & ใบมีด',    'TECH', '🗜️'],
+  ['recv',     'รับเข้า & สั่งซื้อ',    'LEAD', '🚚'],
+  ['count',    'นับสต๊อก & ตัดจำหน่าย', 'LEAD', '📋'],
+  ['reports',  'รายงาน & คืนของ',       'LEAD', '📈'],
+  ['labels',   'แท็กติดช่องเก็บ',       'LEAD', '🏷️'],
+  ['settings', 'ตั้งค่าและผู้ใช้',      'ENG',  '⚙️']
+];
+/** สามแท็บแรกคือหน้างานของช่าง ที่เหลือรวมอยู่ใต้ปุ่ม "หลังบ้าน" */
+const FLOOR = ['issue', 'inv', 'assets'];
+const BACK_OFFICE = TABS.filter(x => FLOOR.indexOf(x[0]) < 0);
+const RANK = { TECH: 1, LEAD: 2, ENG: 3 };
+const can = min => (RANK[ROLE] || 0) >= RANK[min];
+
+const $ = id => document.getElementById(id);
+const money = n => (CFG.CURRENCY || '฿') + (Number(n) || 0).toFixed(2);
+/** ต้นทุนที่ช่างไม่มีสิทธิ์เห็น เซิร์ฟเวอร์ส่งมาเป็น 0 อยู่แล้ว UI แค่ไม่ต้องโชว์ช่องว่าง */
+const cost = n => S.costHidden ? '—' : money(n);
+
+/**
+ * ลิงก์แชร์ของ Google Drive ชี้ไปที่ "หน้าดูไฟล์" ไม่ใช่รูป เอาไปใส่ <img src> ตรง ๆ
+ * จะไม่ขึ้นอะไร ดึง id ออกมาแล้วชี้ไปที่ host รูปของ Drive แทน URL อื่นส่งผ่านตามเดิม
+ */
+const imgUrl = u => {
+  const m = String(u || '').trim()
+    .match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:[^#]*&)?id=)([\w-]{10,})/);
+  return m ? 'https://lh3.googleusercontent.com/d/' + m[1] : String(u || '').trim();
+};
+
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g,
+  c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/**
+ * โลโก้บนหัวกระดาษใบเบิกและมุมบนแอป — ค่าตั้งต้นเป็นรูปกลาง SVG เปล่า ๆ
+ * ไม่พึ่งไฟล์หรือลิงก์ภายนอก — Apps Script เสิร์ฟไฟล์รูปเองไม่ได้ และลิงก์ที่พังวันหนึ่ง
+ * หมายถึงใบเบิกทุกใบไม่มีหัวกระดาษ ถ้าจะเปลี่ยนโลโก้: ตั้ง LOGO_URL ในชีต Settings ทับได้
+ */
+const LOGO_DATA = 'data:image/svg+xml;utf8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 160 40%22%3E%3Crect width=%22160%22 height=%2240%22 rx=%226%22 fill=%22%23e2e8f0%22/%3E%3Cpath d=%22M14 27V16l10-5 10 5v11z%22 fill=%22none%22 stroke=%22%23475569%22 stroke-width=%222%22/%3E%3Cpath d=%22M20 27v-6h8v6%22 fill=%22none%22 stroke=%22%23475569%22 stroke-width=%222%22/%3E%3Ctext x=%2244%22 y=%2225%22 font-family=%22sans-serif%22 font-size=%2213%22 fill=%22%23475569%22%3ESPARE PARTS%3C/text%3E%3C/svg%3E';
+const logoSrc = () => (CFG.LOGO_URL ? imgUrl(CFG.LOGO_URL) : LOGO_DATA);
+
+/** อ่านรหัสมาตรฐาน Code SP V1 เพื่อ "แสดง" เท่านั้น — เลขจริงออกที่เซิร์ฟเวอร์ */
+const parseCode = c => {
+  const m = /^(\d)(\d{2})(\d{2})(\d{3})([A-Za-z0-9]{4})-(\d{4})$/.exec(String(c || '').trim());
+  return m ? { group: m[1], usage: m[2], type: m[3], key3: m[4], code4: m[5], running: m[6] } : null;
+};
+const codeLabel = (list, key) => {
+  const hit = (S.codes[list] || []).filter(x => x.key === key)[0];
+  return hit ? (hit.th || hit.en || key) : key;
+};
+const r2 = n => Math.round((Number(n) || 0) * 100) / 100;
+const byPart = p => S.parts.find(x => x.part === p);
+const todayStr = () => new Date().toISOString().slice(0, 10);
+const daysAgoStr = n => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+
+/**
+ * ทุกคำขอไปเซิร์ฟเวอร์ผ่านประตูเดียวใน Auth.gs พร้อม session token
+ * session ที่ตายแล้วเด้งกลับหน้าล็อกทันที ไม่ใช่โผล่เป็น error งง ๆ บนหน้าที่เปิดอยู่
+ */
+let TOKEN = '';
+try { TOKEN = localStorage.getItem('spare_token') || ''; } catch (e) {}
+
+const API_TIMEOUT = 45000;      // ชีตพันแถวอ่านนานได้ แต่ไม่ควรเกินนี้
+
+/**
+ * ถ้า Apps Script ไม่เรียก callback กลับมาเลย (deploy ค้าง / เน็ตหลุดกลางคัน)
+ * Promise จะค้างตลอดกาลและหน้าจอค้างที่ "กำลังทำ…" เงียบ ๆ — timeout ทำให้มัน
+ * กลายเป็นข้อความที่อ่านรู้เรื่องแทน
+ */
+const api = (fn, ...args) => new Promise((ok, fail) => {
+  let done = false;
+  const timer = setTimeout(() => {
+    if (done) return;
+    done = true;
+    fail(new Error('เซิร์ฟเวอร์ไม่ตอบใน ' + (API_TIMEOUT / 1000) + ' วินาที (' + fn + ') — ' +
+                   'ตรวจว่า Deploy เวอร์ชันล่าสุดแล้วหรือยัง และอินเทอร์เน็ตยังต่ออยู่ไหม'));
+  }, API_TIMEOUT);
+  const settle = f => v => { if (done) return; done = true; clearTimeout(timer); f(v); };
+  google.script.run
+    .withSuccessHandler(settle(ok))
+    .withFailureHandler(settle(e => {
+      if (/SESSION_EXPIRED/.test(e.message)) { clearToken(); viewLogin('หมดเวลาใช้งาน — เข้าระบบอีกครั้ง'); }
+      fail(new Error(e.message));
+    }))
+    .call(TOKEN, fn, args);
+});
+
+function setToken(tok) {
+  TOKEN = tok || '';
+  try { tok ? localStorage.setItem('spare_token', tok) : localStorage.removeItem('spare_token'); } catch (e) {}
+}
+function clearToken() { setToken(''); }
+
+let toastTimer;
+function toast(msg, ok) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-xl text-white shadow-lg z-50 max-w-[90vw] ' +
+                 (ok ? 'bg-teal-600' : 'bg-red-600');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 5000);
+}
+
+function openModal(bodyHtml, footHtml) {
+  $('modal-body').innerHTML = bodyHtml;
+  $('modal-foot').innerHTML = footHtml ||
+    '<button onclick="closeModal()" class="btn btn-ink ml-auto px-5">ปิด</button>';
+  $('modal').classList.replace('hidden', 'flex');
+}
+function closeModal() {
+  $('modal').classList.replace('flex', 'hidden');
+  if (S.tab === 'issue' && $('scan')) $('scan').focus();
+}
+
+/** ครอบทุกการเขียน: ทำทีละอย่าง, error โผล่ให้เห็น, ปุ่มถูกล็อกระหว่างทำ */
+async function run(btn, fn) {
+  if (S.busy) return;
+  S.busy = true;
+  const label = btn && btn.innerHTML;
+  if (btn) { btn.disabled = true; btn.innerHTML = 'กำลังทำ…'; }
+  try { await fn(); }
+  catch (e) { toast(e.message); }
+  finally {
+    S.busy = false;
+    if (btn && btn.isConnected) { btn.disabled = false; btn.innerHTML = label; }
+  }
+}
+
+/* =========================================================================
+ *  ใครกำลังใช้อยู่
+ * ========================================================================= */
+
+let ME = { email: '', name: '', photo: '', role: '' };
+
+const ROLE_TH = { TECH: 'ช่าง', LEAD: 'หัวหน้าช่าง', ENG: 'วิศวกรปฏิบัติการ' };
+
+/** มีรูปก็ใช้รูป ไม่มีก็ตัวอักษรแรกบนวงกลมสี */
+function avatarHtml(person, size) {
+  const px = size || 28;
+  const initial = esc(String(person.name || person.email || '?').trim().charAt(0).toUpperCase());
+  return person.photo
+    ? `<img src="${esc(imgUrl(person.photo))}" alt="" style="width:${px}px;height:${px}px"
+            class="rounded-full object-cover bg-slate-100 shrink-0"
+            onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rounded-full bg-teal-600 text-white grid place-items-center font-bold shrink-0',style:'width:${px}px;height:${px}px',textContent:'${initial}'}))">`
+    : `<div class="rounded-full bg-teal-600 text-white grid place-items-center font-bold shrink-0"
+            style="width:${px}px;height:${px}px;font-size:${Math.round(px * 0.45)}px">${initial}</div>`;
+}
+
+function renderWhoami() {
+  $('whoami').innerHTML = avatarHtml(ME, 30) +
+    `<span class="text-sm text-slate-600 whitespace-nowrap hidden lg:inline max-w-[9rem] truncate">${esc(ME.name)}</span>`;
+}
+
+/** แตะรูป: ใครเข้าอยู่ และสองอย่างที่ทำได้เกี่ยวกับมัน */
+function viewProfile() {
+  openModal(
+    `<div class="flex items-center gap-4">
+       ${avatarHtml(ME, 64)}
+       <div class="min-w-0">
+         <div class="text-lg font-bold truncate">${esc(ME.name)}</div>
+         <div class="text-sm text-slate-500 truncate">${esc(ME.email)}</div>
+         <span class="inline-block mt-1 px-2 py-0.5 rounded bg-slate-100 text-xs font-semibold">
+           ${esc(ROLE_TH[ME.role] || ME.role)}</span>
+       </div>
+     </div>
+     <hr class="my-4">
+     <h3 class="font-semibold text-sm">เปลี่ยน PIN ของฉัน</h3>
+     <label class="block text-xs text-slate-500 mt-2">PIN เดิม</label>
+     <input id="pp-old" type="password" inputmode="numeric" maxlength="8"
+            class="field text-center tracking-[0.3em]">
+     <label class="block text-xs text-slate-500 mt-2">PIN ใหม่</label>
+     <input id="pp-new" type="password" inputmode="numeric" maxlength="8"
+            class="field text-center tracking-[0.3em]">
+     <button onclick="doChangePin(this)" class="btn btn-soft w-full mt-3">บันทึก PIN ใหม่</button>`,
+    `<button onclick="doLogout()" class="btn btn-danger">ออกจากระบบ</button>
+     <button onclick="closeModal()" class="btn btn-ink ml-auto px-5">ปิด</button>`);
+}
+
+function doChangePin(btn) {
+  run(btn, async () => {
+    await api('changeMyPin', $('pp-old').value.trim(), $('pp-new').value.trim());
+    closeModal();
+    toast('บันทึก PIN แล้ว', true);
+  });
+}
+
+/* =========================================================================
+ *  หน้าล็อก — PIN ต่อคน
+ * ========================================================================= */
+
+function viewLogin(message) {
+  $('seg').innerHTML = '';
+  $('subnav').innerHTML = '';
+  $('subnav').className = 'hidden';
+  $('whoami').innerHTML = '';
+  $('alert-badge').classList.add('hidden');
+  $('view').innerHTML = `
+    <div class="h-full grid place-items-center p-4 overflow-y-auto">
+      <div class="card p-6 w-full max-w-sm">
+        <div class="text-center text-4xl">🔒</div>
+        <h2 class="text-xl font-bold text-center mt-2">${esc(CFG.SITE_NAME || 'คลังอะไหล่')}</h2>
+        <p class="text-center text-sm text-slate-500">เข้าระบบเพื่อเบิกอะไหล่</p>
+        ${message ? `<p class="mt-3 p-2 rounded-lg bg-amber-50 text-amber-800 text-sm text-center">${esc(message)}</p>` : ''}
+
+        <label class="block text-xs text-slate-500 mt-4">อีเมล</label>
+        <input id="lg-email" type="email" autocomplete="username" value="${esc(lastEmail())}" class="field">
+
+        <label class="block text-xs text-slate-500 mt-2">PIN</label>
+        <input id="lg-pin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password"
+               onkeydown="if(event.key==='Enter')doLogin(document.getElementById('lg-btn'))"
+               class="field text-center text-2xl tracking-[0.4em]">
+
+        <div class="grid grid-cols-3 gap-2 mt-3">
+          ${[1,2,3,4,5,6,7,8,9].map(n => `<button onclick="pinKey('${n}')" class="btn btn-soft text-lg">${n}</button>`).join('')}
+          <button onclick="pinKey('back')" class="btn btn-soft">⌫</button>
+          <button onclick="pinKey('0')" class="btn btn-soft text-lg">0</button>
+          <button onclick="pinKey('clear')" class="btn btn-soft text-sm">C</button>
+        </div>
+
+        <button id="lg-btn" onclick="doLogin(this)" class="btn btn-primary w-full mt-4 text-lg"
+                style="min-height:52px">เข้าระบบ</button>
+        <p class="text-xs text-slate-400 mt-3 text-center">เข้าครั้งแรกคือการตั้ง PIN ของคุณเอง · ลืมแล้วให้ผู้ดูแลระบบรีเซ็ต</p>
+      </div>
+    </div>`;
+  $('lg-' + (lastEmail() ? 'pin' : 'email')).focus();
+}
+
+function lastEmail() {
+  try { return localStorage.getItem('spare_last_email') || ''; } catch (e) { return ''; }
+}
+
+function pinKey(k) {
+  const el = $('lg-pin');
+  if (k === 'back') el.value = el.value.slice(0, -1);
+  else if (k === 'clear') el.value = '';
+  else if (el.value.length < 8) el.value += k;
+}
+
+function doLogin(btn) {
+  run(btn, async () => {
+    const email = $('lg-email').value.trim();
+    const pin = $('lg-pin').value.trim();
+    const r = await api('login', email, pin);
+    setToken(r.token);
+    try { localStorage.setItem('spare_last_email', email); } catch (e) {}
+    await boot();
+    toast(r.enrolled ? 'ตั้ง PIN แล้ว — เก็บไว้กับตัว' : 'สวัสดี ' + r.name, true);
+  });
+}
+
+function doLogout() {
+  const token = TOKEN;
+  clearToken();
+  S.tab = 'issue'; S.lastAdmin = null; S.cart = {};
+  S.target = { machine: '', jobNo: '', dept: '', note: '', requester: '' };
+  closeModal();
+  viewLogin();
+  api('logout', token).catch(() => {});     // ทำเท่าที่ได้ token ฝั่งนี้หายไปแล้ว
+}
+
+/* =========================================================================
+ *  BOOT + เปลือกหน้าจอ
+ * ========================================================================= */
+
+async function boot() {
+  try {
+    // viewLogin() เคยอยู่นอก try — ถ้ามันพัง จอจะค้างที่ "กำลังโหลด…" โดยไม่มีใครรู้
+    if (!TOKEN) return viewLogin();
+    const b = await api('getBoot');
+    CFG = b.settings;
+    ROLE = b.role;
+    takeCatalog(b.catalog);
+    const logo = $('logo');
+    logo.src = logoSrc();
+    logo.style.display = '';
+    logo.onerror = function () { this.style.display = 'none'; };   // ลิงก์ที่ตั้งทับแล้วพัง = กลับไปมีแต่ชื่อ
+    $('site-name').textContent = CFG.SITE_NAME || 'คลังอะไหล่';
+    ME = { email: b.user, name: b.name || b.user, photo: b.photo || '', role: ROLE };
+    S.target.requester = ME.name;
+    renderWhoami();
+    if (!can('TECH')) throw new Error('ไม่มีสิทธิ์เข้าใช้');
+    render();
+  } catch (e) {
+    if (/SESSION_EXPIRED/.test(e.message)) return;          // หน้าล็อกขึ้นไปแล้ว
+    $('view').innerHTML = '<div class="p-6 text-red-600">' + esc(e.message) +
+      '<div class="text-slate-500 text-sm mt-2">ถ้าเป็นการรันครั้งแรก เปิด Apps Script แล้วรัน <code>setup()</code> จากนั้นโหลดหน้าใหม่</div></div>';
+  }
+}
+
+function takeCatalog(cat) {
+  S.parts = cat.parts;
+  S.batches = cat.batches;
+  S.machines = cat.machines || [];
+  S.costHidden = !!cat.costHidden;
+  S.dupes = cat.dupes || [];
+  if (cat.codes) S.codes = cat.codes;
+  $('parts').innerHTML = S.parts.map(p =>
+    `<option value="${esc(p.part)}">${esc(p.name)}</option>`).join('');
+  const low = S.parts.filter(p => p.low).length;
+  const bad = S.batches.filter(b => b.status !== 'OK').length;
+  const badge = $('alert-badge');
+  if (!low && !bad && !S.dupes.length) { badge.classList.add('hidden'); return; }
+  badge.classList.remove('hidden');
+  // จอแคบเอาแค่ตัวเลข ข้อความเต็มกินที่จนปุ่มโปรไฟล์โดนดันตกขอบ
+  badge.innerHTML = S.dupes.length
+    ? '⚠ <span class="hidden sm:inline">รหัสซ้ำ </span>' + S.dupes.length
+    : '⚠ <span class="hidden sm:inline">ถึงจุดสั่งซื้อ </span>' + low +
+      '<span class="hidden sm:inline"> · หมดอายุ ' + bad + '</span>';
+  badge.onclick = () => go('inv');
+}
+
+async function refresh(rerender) {
+  takeCatalog(await api('getCatalog'));
+  if (rerender !== false) render();
+}
+
+function go(tab) {
+  S.tab = tab;
+  if (BACK_OFFICE.some(x => x[0] === tab)) S.lastAdmin = tab;
+  render();
+}
+
+function render() {
+  const admin = BACK_OFFICE.filter(x => can(x[2]));
+  const inBack = BACK_OFFICE.some(x => x[0] === S.tab);
+
+  const seg = (key, icon, label, active) => `
+    <button onclick="go('${key}')" aria-current="${active ? 'page' : 'false'}"
+      class="flex items-center gap-1.5 px-3 rounded-lg text-sm font-semibold whitespace-nowrap transition
+             ${active ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-800'}"
+      style="height:36px">
+      <span class="text-base leading-none">${icon}</span>
+      <span class="hidden sm:inline">${label}</span></button>`;
+
+  $('seg').innerHTML =
+    seg('issue', '🔧', 'เบิกอะไหล่', S.tab === 'issue') +
+    seg('inv', '📦', 'คลังอะไหล่', S.tab === 'inv') +
+    seg('assets', '🗜️', 'เครื่องมือ & ใบมีด', S.tab === 'assets') +
+    (admin.length ? seg(S.lastAdmin || admin[0][0], '🗂️', 'หลังบ้าน', inBack) : '');
+
+  const sub = $('subnav');
+  sub.className = inBack ? 'flex gap-1 px-3 sm:px-4 overflow-x-auto border-t bg-slate-50' : 'hidden';
+  sub.innerHTML = !inBack ? '' : admin.map(([k, label, role, icon]) => `
+    <button onclick="go('${k}')" aria-current="${k === S.tab ? 'page' : 'false'}"
+      class="flex items-center gap-1.5 px-3 rounded-lg text-sm whitespace-nowrap transition
+             ${k === S.tab ? 'bg-white shadow-sm font-semibold text-slate-800' : 'text-slate-500 hover:bg-white/70'}"
+      style="height:32px">
+      <span class="opacity-80">${icon}</span><span>${label}</span></button>`).join('');
+
+  const views = { issue: viewIssue, inv: viewInventory, assets: viewAssets, recv: viewReceive,
+                  count: viewCount, reports: viewReports, labels: viewLabels, settings: viewSettings };
+  (views[S.tab] || viewIssue)();
+}
+
+/* =========================================================================
+ *  หน้าเบิกอะไหล่ — จุดที่ช่างสแกนตัดสต๊อกเอง
+ *
+ *  ซ้าย: ช่องสแกน + รายการอะไหล่  ·  ขวา: ตะกร้าเบิก + ปลายทาง + ปุ่มยืนยัน
+ *  ต่ำกว่า 1024px ตะกร้าเลื่อนทับเข้ามา และมีแถบสรุปอยู่ล่างจอ
+ * ========================================================================= */
+
+const cartLines = () => Object.keys(S.cart).map(k => S.cart[k]);
+const cartQty = () => cartLines().reduce((s, l) => s + l.qty, 0);
+
+function viewIssue() {
+  const cats = ['ทั้งหมด'].concat(Array.from(new Set(S.parts.map(p => p.category))).sort());
+  if (cats.indexOf(S.cat) < 0) S.cat = 'ทั้งหมด';
+
+  $('view').innerHTML = `
+    <div class="h-full flex">
+      <section class="flex-1 min-w-0 flex flex-col">
+        <div class="p-3 border-b bg-white flex flex-wrap gap-2 items-center">
+          <input id="scan" autocomplete="off" placeholder="สแกนบาร์โค้ด / พิมพ์รหัสหรือชื่ออะไหล่"
+                 class="field flex-1 min-w-[12rem] text-lg" style="min-height:52px">
+          <button onclick="SCAN_TARGET=null;openScanner()" title="สแกนด้วยกล้อง"
+                  class="btn btn-ink shrink-0 text-xl" style="min-height:52px;width:56px">📷</button>
+          <select id="cat" onchange="S.cat=this.value;renderParts()" class="field w-auto">
+            ${cats.map(c => `<option ${c === S.cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}
+          </select>
+        </div>
+        <div id="part-grid" class="flex-1 overflow-y-auto p-3"></div>
+      </section>
+
+      <aside id="cart-aside" class="w-[380px] shrink-0 bg-white border-l flex flex-col">
+        <div class="p-3 border-b flex items-center gap-2">
+          <h2 class="font-bold">ตะกร้าเบิก</h2>
+          <span id="cart-count" class="chip bg-slate-100 text-slate-600"></span>
+          <button onclick="toggleCart(false)" class="btn btn-ghost ml-auto lg:hidden px-2">✕</button>
+        </div>
+
+        <div id="cart-lines" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
+
+        <div class="p-3 border-t space-y-2">
+          <div>
+            <label class="block text-xs text-slate-500">เครื่องจักร / หน่วยงานที่ใช้ *</label>
+            <input id="tg-machine" list="machines" value="${esc(S.target.machine)}"
+                   oninput="S.target.machine=this.value" placeholder="เลือกหรือพิมพ์รหัสเครื่อง" class="field">
+            <datalist id="machines">
+              ${S.machines.map(m => `<option value="${esc(m.code)}">${esc(m.name)} · ${esc(m.area)}</option>`).join('')}
+            </datalist>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs text-slate-500">เลขใบแจ้งซ่อม${CFG.REQUIRE_JOB_NO === '1' ? ' *' : ''}</label>
+              <input id="tg-job" value="${esc(S.target.jobNo)}" oninput="S.target.jobNo=this.value" class="field">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500">แผนก</label>
+              <input id="tg-dept" value="${esc(S.target.dept)}" oninput="S.target.dept=this.value" class="field">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs text-slate-500">ผู้เบิก</label>
+            ${can('LEAD')
+              ? `<input id="tg-req" value="${esc(S.target.requester || ME.name)}" oninput="S.target.requester=this.value"
+                        placeholder="ชื่อคนที่มารับของ" class="field">
+                 <p class="text-xs text-slate-400 mt-1">จ่ายแทนคนอื่นได้ — ระบบบันทึกว่าคุณเป็นคนคีย์</p>`
+              : `<div class="field flex items-center gap-2 text-slate-600">
+                   ${avatarHtml(ME, 22)}<span class="truncate">${esc(ME.name)}</span>
+                 </div>
+                 <p class="text-xs text-slate-400 mt-1">ชื่อผู้เบิกมาจากบัญชีที่เข้าระบบ แก้ไม่ได้</p>`}
+          </div>
+
+          <div class="flex items-baseline justify-between pt-1">
+            <span class="text-sm text-slate-500">มูลค่ารวม</span>
+            <span id="cart-total" class="num num-lg"></span>
+          </div>
+          <button id="issue-btn" onclick="doIssue(this)" class="btn btn-primary w-full text-lg" style="min-height:52px">
+            ยืนยันการเบิก</button>
+        </div>
+      </aside>
+    </div>
+
+    <!-- จอเล็ก: แถบสรุป + ฉากหลังทึบ -->
+    <div id="cart-scrim" onclick="toggleCart(false)" class="fixed inset-0 bg-slate-900/40 z-30"></div>
+    <button id="cart-bar" onclick="toggleCart(true)"
+            class="fixed bottom-0 left-0 right-0 z-20 bg-slate-800 text-white items-center gap-3 px-4"
+            style="height:60px">
+      <span id="bar-count" class="font-semibold"></span>
+      <span class="ml-auto btn btn-primary px-5">เบิก</span>
+    </button>`;
+
+  const box = $('scan');
+  // สแกนติด = เคลียร์ช่องรอตัวต่อไป, สแกนไม่ติด = คงคำค้นไว้ให้เห็นว่าค้นด้วยอะไร
+  box.addEventListener('keydown', e => { if (e.key === 'Enter' && readScan(box.value)) box.value = ''; });
+  box.addEventListener('input', () => { S.filter = box.value.trim(); renderParts(); });
+  box.focus();
+  renderParts();
+  renderCart();
+}
+
+function toggleCart(open) {
+  $('cart-aside').classList.toggle('open', open);
+  $('cart-scrim').classList.toggle('open', open);
+}
+
+/**
+ * รูปบนการ์ดอะไหล่
+ * ช่อง Image เก็บได้สองแบบ: ลิงก์รูปจริง (แสดงรูป) หรือลิงก์ค้นหา (ไม่ใช่รูป)
+ * ไม่มีรูปจริงก็ไม่ปล่อยช่องว่าง — ใช้อักษรต้นชื่อบนสีที่คงที่ต่อรหัส
+ * ช่างจำสีได้เร็วกว่าอ่านรหัส 17 หลัก
+ * onerror สำคัญ — ลิงก์ Drive ที่ลืมแชร์จะโหลดไม่ขึ้น ต้องตกไปที่อักษร ไม่ใช่กรอบรูปแตก
+ */
+const THUMB_TINT = ['bg-slate-100 text-slate-500', 'bg-teal-50 text-teal-600', 'bg-amber-50 text-amber-700',
+                    'bg-sky-50 text-sky-700', 'bg-rose-50 text-rose-600', 'bg-violet-50 text-violet-600'];
+
+function hasPhoto(url) { return !!url && url.indexOf('google.com/search') < 0; }
+
+function partThumb(p) {
+  if (hasPhoto(p.image)) {
+    return `<img src="${esc(p.image)}" alt="" loading="lazy"
+      class="w-full h-24 object-contain rounded-lg bg-white border border-slate-100"
+      onerror="this.replaceWith(initialsTile(${JSON.stringify(esc(p.name))}))">`;
+  }
+  return initialsTile(p.name).outerHTML;
+}
+
+function initialsTile(name) {
+  const txt = String(name || '?').replace(/<[^>]*>/g, '').trim();
+  let h = 0;
+  for (let i = 0; i < txt.length; i++) h = (h * 31 + txt.charCodeAt(i)) >>> 0;
+  const d = document.createElement('div');
+  d.className = 'w-full h-24 rounded-lg grid place-items-center text-lg font-bold px-2 text-center leading-tight ' +
+                THUMB_TINT[h % THUMB_TINT.length];
+  d.textContent = txt.slice(0, 14);
+  return d;
+}
+
+function renderParts() {
+  const q = S.filter.toLowerCase();
+  const list = S.parts.filter(p =>
+    (S.cat === 'ทั้งหมด' || p.category === S.cat) &&
+    (!q || p.name.toLowerCase().includes(q) || p.part.toLowerCase().includes(q) ||
+     String(p.location).toLowerCase().includes(q)));
+
+  $('part-grid').innerHTML = list.length ? `
+    <div class="grid gap-2" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">
+      ${list.map(p => {
+        const inCart = S.cart[p.part];
+        const out = p.usable <= 0;
+        return `
+        <button onclick="addLine('${esc(p.part)}')" ${out ? 'disabled' : ''}
+          class="card p-3 text-left relative flex flex-col ${out ? 'opacity-50' : 'hover:shadow-md'}
+                 ${inCart ? 'ring-2 ring-teal-500' : ''}">
+          ${inCart ? `<span class="absolute top-2 right-2 z-10 chip bg-teal-600 text-white">${inCart.qty}</span>` : ''}
+          ${partThumb(p)}
+          <div class="font-semibold text-sm leading-tight line-clamp-2 mt-2">${esc(p.name)}</div>
+          <div class="text-xs text-slate-500 mt-1 truncate">${esc(p.part)}</div>
+          <div class="text-xs text-slate-400">${p.location ? '📍 ' + esc(p.location) : '&nbsp;'}</div>
+          <div class="flex items-baseline justify-between mt-2">
+            <span class="num font-bold ${p.low ? 'text-red-600' : ''}">${p.usable} <span class="text-xs font-normal">${esc(p.unit)}</span></span>
+            ${out ? '<span class="chip bg-red-100 text-red-700">หมด</span>'
+                  : (p.low ? '<span class="chip bg-amber-100 text-amber-800">ใกล้หมด</span>' : '')}
+          </div>
+        </button>`;
+      }).join('')}
+    </div>` : '<p class="text-slate-400 p-4">ไม่พบอะไหล่ที่ค้นหา</p>';
+}
+
+/**
+ * เครื่องสแกนส่งรหัสมาแล้วกด Enter ให้ ถ้ารหัสตรงตัวก็ใส่ตะกร้าทันที
+ * ถ้าไม่ตรง ถือว่าเป็นคำค้น — ปล่อยให้ตัวกรองทำงานแล้วบอกว่าไม่เจอ
+ */
+function readScan(raw) {
+  const code = String(raw || '').trim();
+  if (!code) return false;
+  const hit = S.parts.find(p => p.part.toLowerCase() === code.toLowerCase());
+  if (hit) { S.filter = ''; addLine(hit.part); return true; }
+  S.filter = code;
+  renderParts();
+  toast('ไม่พบรหัส ' + code + ' — ค้นจากชื่อแทน');
+  return false;
+}
+
+function addLine(part) {
+  const p = byPart(part);
+  if (!p) return;
+  const line = S.cart[part] || (S.cart[part] = { part: part, name: p.name, unit: p.unit, qty: 0, note: '' });
+  if (line.qty + 1 > p.usable) { toast('คงเหลือ ' + p.usable + ' ' + p.unit + ' เท่านั้น'); return; }
+  line.qty++;
+  S.flash = part;
+  renderParts();
+  renderCart();
+  if (window.innerWidth < 1024) toast(p.name + ' × ' + line.qty, true);
+}
+
+function setQty(part, v) {
+  const line = S.cart[part];
+  const p = byPart(part);
+  if (!line || !p) return;
+  const qty = Math.max(0, Number(v) || 0);
+  if (qty > p.usable) { toast('คงเหลือ ' + p.usable + ' ' + p.unit + ' เท่านั้น'); line.qty = p.usable; }
+  else line.qty = qty;
+  if (!line.qty) delete S.cart[part];
+  renderParts();
+  renderCart();
+}
+
+function dropLine(part) { delete S.cart[part]; renderParts(); renderCart(); }
+
+function renderCart() {
+  const lines = cartLines();
+  const total = lines.reduce((s, l) => s + l.qty * (byPart(l.part) || { cost: 0 }).cost, 0);
+
+  $('cart-lines').innerHTML = lines.length ? lines.map(l => {
+    const p = byPart(l.part) || {};
+    return `
+    <div class="rounded-xl bg-slate-100 p-2 ${S.flash === l.part ? 'flash' : ''}">
+      <div class="flex items-start gap-2">
+        <div class="flex-1 min-w-0">
+          <div class="font-medium text-sm truncate">${esc(l.name)}</div>
+          <div class="text-xs text-slate-500">${esc(l.part)} · คงเหลือ ${p.usable || 0} ${esc(l.unit)}</div>
+        </div>
+        <button onclick="dropLine('${esc(l.part)}')" class="btn btn-ghost px-2" aria-label="ลบ">✕</button>
+      </div>
+      <div class="flex items-center gap-2 mt-2">
+        <button onclick="setQty('${esc(l.part)}',${l.qty - 1})" class="btn btn-soft tap px-0" style="width:44px">−</button>
+        <input value="${l.qty}" onchange="setQty('${esc(l.part)}',this.value)" inputmode="numeric"
+               class="field text-center num font-bold" style="width:72px">
+        <button onclick="setQty('${esc(l.part)}',${l.qty + 1})" class="btn btn-soft tap px-0" style="width:44px">+</button>
+        <span class="ml-auto text-sm text-slate-500 num">${cost(l.qty * (p.cost || 0))}</span>
+      </div>
+      <input value="${esc(l.note)}" oninput="S.cart['${esc(l.part)}'].note=this.value"
+             placeholder="หมายเหตุ (ไม่บังคับ)" class="field mt-2 text-xs" style="min-height:34px">
+    </div>`;
+  }).join('') : '<p class="text-slate-400 text-sm p-2">สแกนหรือแตะอะไหล่เพื่อใส่ตะกร้า</p>';
+
+  S.flash = null;
+  $('cart-count').textContent = lines.length + ' รายการ';
+  $('cart-total').textContent = cost(total);
+  $('issue-btn').disabled = !lines.length;
+  $('bar-count').textContent = '🧰 ' + lines.length + ' รายการ · ' + cartQty() + ' ชิ้น';
+}
+
+function doIssue(btn) {
+  run(btn, async () => {
+    const lines = cartLines().map(l => ({ part: l.part, qty: l.qty, note: l.note }));
+    if (!lines.length) return;
+    const r = await api('issue', {
+      machine: S.target.machine, jobNo: S.target.jobNo, dept: S.target.dept,
+      requester: can('LEAD') ? S.target.requester : '', note: S.target.note,
+      lines: lines, ref: S.ref
+    });
+    S.cart = {};
+    S.ref = newRef();                 // ตะกร้าใหม่ = ref ใหม่
+    S.target.jobNo = '';
+    toggleCart(false);
+    await refresh(false);
+    render();
+    // เคยกดไปแล้วแต่เน็ตหลุดตอนตอบกลับ — ไม่ตัดสต๊อกซ้ำ บอกเลขใบเดิมไป
+    if (r.duplicate) { toast('รายการนี้ถูกบันทึกไปแล้ว: ' + r.issueId + ' (ไม่ตัดสต๊อกซ้ำ)', true); return; }
+    slipDone(r);
+  });
+}
+
+/** เบิกเสร็จ: สรุปให้เห็น และให้พิมพ์ใบเบิกไปเซ็นชื่อได้ */
+function slipDone(r) {
+  openModal(
+    `<div class="text-center">
+       <div class="text-4xl">✅</div>
+       <h2 class="text-lg font-bold mt-1">เบิกสำเร็จ</h2>
+       <p class="text-sm text-slate-500">เลขที่ ${esc(r.issueId)}</p>
+     </div>
+     <table class="w-full text-sm mt-4">
+       <tr class="text-left text-slate-500"><th>อะไหล่</th><th class="text-right">จำนวน</th>
+           ${r.costHidden ? '' : '<th class="text-right">มูลค่า</th>'}</tr>
+       ${r.lines.map(l => `<tr class="border-t">
+         <td class="py-1">${esc(l.name)}<div class="text-xs text-slate-400">${esc(l.part)}</div></td>
+         <td class="text-right num">${l.qty} ${esc(l.unit)}</td>
+         ${r.costHidden ? '' : `<td class="text-right num">${money(l.value)}</td>`}
+       </tr>`).join('')}
+     </table>
+     <div class="text-sm text-slate-500 mt-3">
+       เครื่องจักร <b class="text-slate-800">${esc(r.machine)}</b>
+       ${r.jobNo ? ' · ใบแจ้งซ่อม <b class="text-slate-800">' + esc(r.jobNo) + '</b>' : ''}
+       <br>ผู้เบิก <b class="text-slate-800">${esc(r.requester)}</b>
+       ${r.costHidden ? '' : '<br>มูลค่ารวม <b class="text-slate-800">' + money(r.total) + '</b>'}
+     </div>`,
+    `<button onclick="printSlip()" class="btn btn-soft">🖨 พิมพ์ใบเบิก</button>
+     <button onclick="closeModal()" class="btn btn-primary ml-auto px-5">เบิกรายการต่อไป</button>`);
+  LAST_ISSUE = r;
+}
+
+let LAST_ISSUE = null;
+
+/** ใบเบิกกระดาษความร้อน 58/80 มม. สำหรับเซ็นรับของ */
+function printSlip() {
+  const r = LAST_ISSUE;
+  if (!r) return;
+  document.documentElement.style.setProperty('--slip-width', (CFG.SLIP_WIDTH || '80') + 'mm');
+  $('print-area').innerHTML = `
+    <div style="text-align:center">
+      <img src="${logoSrc()}" alt="" style="max-width:38mm;margin:0 auto 1.5mm;display:block"
+           onerror="this.remove()">
+      <div style="font-weight:700;font-size:13px">${esc(CFG.SITE_NAME || 'คลังอะไหล่')}</div>
+      ${CFG.SITE_ADDRESS ? `<div>${esc(CFG.SITE_ADDRESS)}</div>` : ''}
+      <div style="font-weight:700;margin-top:2px">ใบเบิกอะไหล่</div>
+    </div>
+    <hr>
+    <div>เลขที่: ${esc(r.issueId)}</div>
+    <div>วันเวลา: ${esc(r.ts)}</div>
+    <div>เครื่องจักร: ${esc(r.machine)}</div>
+    ${r.jobNo ? `<div>ใบแจ้งซ่อม: ${esc(r.jobNo)}</div>` : ''}
+    ${r.dept ? `<div>แผนก: ${esc(r.dept)}</div>` : ''}
+    <div>ผู้เบิก: ${esc(r.requester)}</div>
+    <hr>
+    <table>
+      <tr><th style="text-align:left">รายการ</th><th class="r">จำนวน</th></tr>
+      ${r.lines.map(l => `<tr>
+        <td>${esc(l.name)}<br><span style="font-size:10px">${esc(l.part)}</span></td>
+        <td class="r">${l.qty} ${esc(l.unit)}</td></tr>`).join('')}
+    </table>
+    <hr>
+    <div>รวม ${r.lines.length} รายการ${r.costHidden ? '' : ' · มูลค่า ' + money(r.total)}</div>
+    <hr>
+    <div style="margin-top:10px;white-space:pre-line">${esc(CFG.SLIP_FOOTER || '')}</div>`;
+  window.print();
+}
+
+/* ---- ถ่ายรูป / สแกนด้วยกล้องมือถือ ------------------------------------- *
+ * แอปรันอยู่ใน iframe ของ Apps Script ซึ่งอาจไม่ได้เปิดสิทธิ์กล้องให้ (Permissions-Policy)
+ * จึงลองกล้องสดก่อน ถ้าโดนปฏิเสธก็ตกไปโหมด "ถ่ายรูปทีละใบ" ที่ใช้ <input capture>
+ * ซึ่งเป็นตัวเลือกไฟล์ของ OS — ไม่ต้องขอสิทธิ์ผ่าน iframe จึงทำงานได้เสมอ
+ */
+const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+const PHOTO_MAX_PX = 1000;
+const PHOTO_QUALITY = 0.82;
+
+let zxingReady = null;
+/** โหลด ZXing ตอนกดใช้ครั้งแรกเท่านั้น (330 KB) ไม่ถ่วงตอนเปิดแอป */
+function loadZxing() {
+  if (zxingReady) return zxingReady;
+  zxingReady = new Promise((ok, fail) => {
+    if (window.ZXing) return ok(window.ZXing);
+    const s = document.createElement('script');
+    s.src = ZXING_URL;
+    s.onload = () => window.ZXing ? ok(window.ZXing) : fail(new Error('โหลดตัวอ่านบาร์โค้ดไม่สำเร็จ'));
+    s.onerror = () => fail(new Error('โหลดตัวอ่านบาร์โค้ดไม่ได้ — ตรวจอินเทอร์เน็ต'));
+    document.head.appendChild(s);
+  });
+  return zxingReady;
+}
+
+/** เปิดกล้องถ่ายภาพหนึ่งใบ คืนไฟล์ที่ได้ */
+function grabPhoto() {
+  return new Promise(ok => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';          // มือถือ = เปิดกล้องหลังเลย · คอม = เลือกไฟล์
+    input.onchange = () => ok(input.files && input.files[0]);
+    input.click();
+  });
+}
+
+/** อ่านไฟล์ → ย่อลง canvas → dataURL ที่เล็กพอจะส่งขึ้นเซิร์ฟเวอร์ */
+function shrinkImage(file, maxPx) {
+  return new Promise((ok, fail) => {
+    const fr = new FileReader();
+    fr.onerror = () => fail(new Error('อ่านไฟล์รูปไม่ได้'));
+    fr.onload = () => {
+      const img = new Image();
+      img.onerror = () => fail(new Error('ไฟล์นี้ไม่ใช่รูปภาพ'));
+      img.onload = () => {
+        const scale = Math.min(1, (maxPx || PHOTO_MAX_PX) / Math.max(img.width, img.height));
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(img.width * scale);
+        cv.height = Math.round(img.height * scale);
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        ok(cv.toDataURL('image/jpeg', PHOTO_QUALITY));
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+
+/* ---- รูปอะไหล่ ---- */
+
+function takePartPhoto(part) {
+  grabPhoto().then(f => { if (f) uploadPartPhoto(part, f); });
+}
+
+async function uploadPartPhoto(part, file) {
+  const p = S.parts.find(x => x.part === part);
+  toast('กำลังย่อรูป…', true);
+  let dataUrl;
+  try { dataUrl = await shrinkImage(file); }
+  catch (e) { toast(e.message); return; }
+
+  toast('กำลังอัปโหลด…', true);
+  try {
+    const r = await api('savePartImage', part, dataUrl);
+    if (p) p.image = r.url;        // อัปเดตในมือเลย ไม่ต้องดึงคลังใหม่ทั้งก้อน
+    toast('บันทึกรูปแล้ว', true);
+    render();
+  } catch (e) { toast(e.message || 'อัปโหลดไม่สำเร็จ'); }
+}
+
+/* ---- สแกนบาร์โค้ด / QR ---- */
+
+let scanStop = null;
+
+function closeScanner() {
+  if (scanStop) { try { scanStop(); } catch (e) { /* ปิดไปแล้ว */ } scanStop = null; }
+  closeModal();
+}
+
+async function openScanner() {
+  openModal(
+    `<h2 class="text-lg font-bold">📷 สแกนบาร์โค้ด / QR</h2>
+     <div class="mt-3 rounded-xl overflow-hidden bg-black relative" style="aspect-ratio:4/3">
+       <video id="scan-video" playsinline muted class="w-full h-full object-cover"></video>
+       <div class="absolute inset-x-6 top-1/2 -translate-y-1/2 border-2 border-teal-400/80 rounded-lg"
+            style="height:28%"></div>
+     </div>
+     <p id="scan-msg" class="text-sm text-slate-500 mt-2">กำลังเปิดกล้อง…</p>
+     <div id="scan-fallback" class="hidden mt-2"></div>`,
+    `<button onclick="closeScanner()" class="btn btn-ink ml-auto px-5">ปิด</button>`);
+
+  let ZX;
+  try { ZX = await loadZxing(); }
+  catch (e) { $('scan-msg').textContent = e.message; return; }
+
+  const reader = new ZX.BrowserMultiFormatReader();
+  try {
+    // กล้องสด: อ่านต่อเนื่องจนเจอ แล้วปิดเอง
+    const controls = await reader.decodeFromConstraints(
+      { video: { facingMode: { ideal: 'environment' } } }, 'scan-video',
+      (result) => { if (result) onScanned(result.getText()); });
+    scanStop = () => { controls && controls.stop ? controls.stop() : reader.reset(); };
+    $('scan-msg').textContent = 'เล็งบาร์โค้ดให้อยู่ในกรอบ';
+  } catch (e) {
+    // iframe ไม่ให้สิทธิ์กล้อง หรือเครื่องไม่มีกล้องสด → ถ่ายทีละใบแทน
+    offerPhotoScan(reader, e);
+  }
+}
+
+function offerPhotoScan(reader, err) {
+  const denied = err && /NotAllowed|Permission|denied/i.test(String(err.name || err.message || ''));
+  $('scan-video').parentElement.classList.add('hidden');
+  $('scan-msg').innerHTML = denied
+    ? 'เบราว์เซอร์ไม่อนุญาตให้เปิดกล้องสดในหน้านี้ — ใช้ถ่ายทีละใบแทนได้'
+    : 'เปิดกล้องสดไม่ได้ในเครื่องนี้ — ใช้ถ่ายทีละใบแทนได้';
+  const box = $('scan-fallback');
+  box.classList.remove('hidden');
+  box.innerHTML = `<button onclick="photoScan(this)" class="btn btn-ink w-full"
+                     style="min-height:52px">📷 ถ่ายรูปบาร์โค้ด</button>`;
+  box.__reader = reader;
+}
+
+async function photoScan(btn) {
+  const reader = $('scan-fallback').__reader;
+  const file = await grabPhoto();
+  if (!file) return;
+  btn.disabled = true; btn.textContent = 'กำลังอ่าน…';
+  try {
+    const dataUrl = await shrinkImage(file, 1600);   // บาร์โค้ดต้องการความละเอียดกว่ารูปอะไหล่
+    const result = await reader.decodeFromImageUrl(dataUrl);
+    onScanned(result.getText());
+  } catch (e) {
+    toast('อ่านบาร์โค้ดจากรูปไม่ได้ — ลองเข้าใกล้ขึ้นและให้แสงพอ');
+  } finally {
+    btn.disabled = false; btn.textContent = '📷 ถ่ายรูปบาร์โค้ด';
+  }
+}
+
+/* หน้าไหนกดสแกน ผลก็ต้องกลับไปที่ช่องนั้น ไม่ใช่เด้งกลับหน้าเบิกเสมอ
+   null = ไม่มีใครจอง ถือว่าเป็นการสแกนเพื่อเบิก */
+let SCAN_TARGET = null;
+
+/** เจอรหัสแล้ว: ปิดกล้อง แล้วส่งรหัสไปให้ช่องที่ขอมา */
+function onScanned(text) {
+  const code = String(text || '').trim();
+  if (!code) return;
+  closeScanner();
+  if (navigator.vibrate) navigator.vibrate(60);
+
+  const t = SCAN_TARGET;
+  SCAN_TARGET = null;
+  if (t) {
+    const el = $(t.id);
+    if (el) { el.value = code; el.dispatchEvent(new Event('input', { bubbles: true })); }
+    if (!byPart(code)) toast('ไม่พบรหัส ' + code + ' ในคลัง — ตรวจก่อนบันทึก');
+    else if (t.then) t.then(code);
+    return;
+  }
+
+  if (S.tab !== 'issue') go('issue');
+  const box = $('scan');
+  if (box) box.value = code;
+  if (!readScan(code)) toast('ไม่พบรหัส ' + code + ' ในคลัง');
+}
+</script>

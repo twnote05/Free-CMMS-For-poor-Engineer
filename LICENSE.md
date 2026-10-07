@@ -2,7 +2,7 @@
 
 <https://polyformproject.org/licenses/noncommercial/1.0.0>
 
-Required Notice: Copyright 2026 twnote05 (https://github.com/twnote05/Free-CMMS-For-poor-Engineer)
+Required Notice: Copyright 2026 IE จอมขี้เกียจ (https://github.com/twnote05/Free-CMMS-For-poor-Engineer)
 
 ## Acceptance
 
