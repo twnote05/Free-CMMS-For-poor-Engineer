@@ -43,6 +43,12 @@ What survives those constraints:
 - **Non-programmers must be able to change things.** SLA targets, KPI weights, the machine register and factory holidays all live in sheets.
 - **Hiding a button is not access control.** Roles are checked server-side on every call.
 
+## Handing this to an AI
+
+Claude Code, Codex, Cursor and Gemini CLI read [AGENTS.md](AGENTS.md) automatically — open the folder and say what you want.
+
+For a chat AI you paste into, use [PROMPT-FOR-AI.md](PROMPT-FOR-AI.md). Attach only the files it asks for; some source files are five thousand lines.
+
 ## Buy me a beer
 
 If this made your working life easier and you feel like it, scan to tip with PromptPay (Thailand).
