@@ -40,4 +40,4 @@ What survives those constraints:
 
 ## Licence
 
-MIT — use it, change it, sell it. No warranty.
+MIT — use it, change it. No warranty.
