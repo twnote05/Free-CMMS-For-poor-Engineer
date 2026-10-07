@@ -124,6 +124,8 @@ If this made your working life easier and you feel like it, scan to tip with Pro
 
 <img src="../assets/promptpay.svg" alt="PromptPay QR" width="180">
 
+Outside Thailand PromptPay will not work — [Buy Me a Coffee](https://buymeacoffee.com/n07e_tw) instead.
+
 Entirely optional. Using it is thanks enough.
 
 ## Licence

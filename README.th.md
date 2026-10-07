@@ -56,6 +56,8 @@ Claude Code, Codex, Cursor, Gemini CLI อ่าน [AGENTS.md](AGENTS.md) เ�
 
 <img src="assets/promptpay.svg" alt="พร้อมเพย์" width="180">
 
+อยู่ต่างประเทศโอนพร้อมเพย์ไม่ได้ กด [Buy Me a Coffee](https://buymeacoffee.com/n07e_tw) แทนได้ครับ
+
 ไม่โอนก็ใช้ได้เหมือนเดิมครับ ขอให้เอาไปใช้ได้จริงก็พอแล้ว
 
 ## สัญญาอนุญาต

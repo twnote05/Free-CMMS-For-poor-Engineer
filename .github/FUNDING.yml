@@ -1,4 +1,6 @@
 # ปุ่ม Sponsor บนหน้า repo
+buy_me_a_coffee: n07e_tw
+
 # GitHub ไม่มีช่อง PromptPay ใช้ custom ชี้กลับไปที่หัวข้อเลี้ยงเบียร์ใน README ซึ่งมี QR อยู่แล้ว
 custom:
   - "https://github.com/twnote05/Free-CMMS-For-poor-Engineer#buy-me-a-beer"
