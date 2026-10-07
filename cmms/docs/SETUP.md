@@ -8,7 +8,7 @@ About 30 minutes. You need a **company** Google account, not a personal one — 
 
 ```bash
 git clone https://github.com/twnote05/Free-CMMS-For-poor-Engineer.git
-cd Free-CMMS-For-poor-Engineer
+cd Free-CMMS-For-poor-Engineer/cmms
 ```
 
 You also need **Node.js 18+** (for `clasp` and for running the tests). Check with `node -v`.

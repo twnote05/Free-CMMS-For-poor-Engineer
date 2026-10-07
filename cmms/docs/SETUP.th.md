@@ -8,7 +8,7 @@
 
 ```bash
 git clone https://github.com/twnote05/Free-CMMS-For-poor-Engineer.git
-cd Free-CMMS-For-poor-Engineer
+cd Free-CMMS-For-poor-Engineer/cmms
 ```
 
 ต้องมี **Node.js 18 ขึ้นไป** ด้วย (ใช้กับ `clasp` และรันเทสต์) — เช็คด้วย `node -v`
