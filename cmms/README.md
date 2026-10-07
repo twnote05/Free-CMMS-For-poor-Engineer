@@ -90,7 +90,7 @@ node test.js
 
 ## Know this before you adopt it
 
-- **Pushing is not deploying.** `clasp push` updates the code; the URL your staff use still serves the pinned version until you `clasp deploy`. See the [runbook](docs/RUNBOOK.th.md).
+- **Pushing is not deploying.** `clasp push` updates the code; the URL your staff use still serves the pinned version until you `clasp deploy`. See the [runbook](docs/RUNBOOK.md).
 - **Run `clearCache()` after editing sheets**, or screens keep showing stale data for 5 minutes.
 - **`dataIssues()`** is a read-only data-quality report you can run any time: machines with no owner, unlabelled checklist fields, suspicious tolerances, weak passwords.
 - **Apps Script limits:** 6 minutes per execution · 10M cells per spreadsheet · `CacheService` TTL is not guaranteed.
@@ -107,7 +107,7 @@ You would have to build these yourself: spare-parts/stock integration · labour 
 | | |
 |---|---|
 | [docs/SETUP.md](docs/SETUP.md) | Step-by-step install |
-| [docs/RUNBOOK.th.md](docs/RUNBOOK.th.md) | Deploy, roll back, reset a PIN, common failures (Thai) |
+| [docs/RUNBOOK.md](docs/RUNBOOK.md) | Deploy, roll back, reset a PIN, common failures |
 | [docs/SHEETS.th.md](docs/SHEETS.th.md) | Every sheet and column (Thai) |
 
 ## Licence
