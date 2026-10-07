@@ -110,6 +110,12 @@ You would have to build these yourself: spare-parts/stock integration · labour 
 | [docs/RUNBOOK.md](docs/RUNBOOK.md) | Deploy, roll back, reset a PIN, common failures |
 | [docs/SHEETS.th.md](docs/SHEETS.th.md) | Every sheet and column (Thai) |
 
+## Buy me a beer
+
+If this made your working life easier and you feel like it, PromptPay **0971636590** (Thailand).
+
+Entirely optional. Using it is thanks enough.
+
 ## Licence
 
 **PolyForm Noncommercial License 1.0.0** — free for any noncommercial purpose: factories running it for themselves, schools, hospitals, government, hobby projects. You may copy it, change it and pass it on. **You may not sell it or use it in a commercial product or service.** No warranty. See [LICENSE.md](../LICENSE.md).

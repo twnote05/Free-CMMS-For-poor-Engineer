@@ -118,6 +118,12 @@ One external library: **ExcelJS**, loaded from a CDN only when you press Export 
 
 [RUNBOOK.md](RUNBOOK.md) — shipping a new version, rolling back, where the logo is stored, printing and offline use, and the failures you will hit.
 
+## Buy me a beer
+
+If this made your working life easier and you feel like it, PromptPay **0971636590** (Thailand).
+
+Entirely optional. Using it is thanks enough.
+
 ## Licence
 
 **PolyForm Noncommercial License 1.0.0** — free for any noncommercial purpose: factories running it for themselves, schools, hospitals, government, hobby projects. You may copy it, change it and pass it on. **You may not sell it or use it in a commercial product or service.** No warranty. See [LICENSE.md](../LICENSE.md).
