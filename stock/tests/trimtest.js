@@ -1,3 +1,7 @@
+/*! Free CMMS for poor engineers — https://github.com/twnote05/Free-CMMS-For-poor-Engineer
+ *  Required Notice: Copyright 2026 IE จอมขี้เกียจ
+ *  PolyForm Noncommercial 1.0.0 — ห้ามใช้เชิงพาณิชย์ · ดู LICENSE.md
+ */
 // backupAndTrim ลบข้อมูลจริง — ต้องพิสูจน์ว่าตัดถูกช่วง และไฟล์สำรองครบก่อนลบ
 const fs = require('fs'), vm = require('vm');
 const dir = require('path').join(require('path').dirname(__dirname), 'src');   // ไฟล์ที่เอาไปวางใน Apps Script อยู่ใน src/

@@ -1,3 +1,7 @@
+/*! Free CMMS for poor engineers — https://github.com/twnote05/Free-CMMS-For-poor-Engineer
+ *  Required Notice: Copyright 2026 IE จอมขี้เกียจ
+ *  PolyForm Noncommercial 1.0.0 — ห้ามใช้เชิงพาณิชย์ · ดู LICENSE.md
+ */
 /**
  * รันชุดทดสอบทั้งหมด:  node tests/run.js
  *

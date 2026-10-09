@@ -177,4 +177,4 @@ Then open the `/exec` link, log in as one `LEAD` account, and take a single work
 
 ## Next
 
-[RUNBOOK](RUNBOOK.th.md) — deploying the next version, rolling back a bad deploy, resetting a PIN, and the failure modes you will actually hit.
+[RUNBOOK](RUNBOOK.md) — deploying the next version, rolling back a bad deploy, resetting a PIN, and the failure modes you will actually hit.

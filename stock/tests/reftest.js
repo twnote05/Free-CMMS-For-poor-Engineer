@@ -1,3 +1,7 @@
+/*! Free CMMS for poor engineers — https://github.com/twnote05/Free-CMMS-For-poor-Engineer
+ *  Required Notice: Copyright 2026 IE จอมขี้เกียจ
+ *  PolyForm Noncommercial 1.0.0 — ห้ามใช้เชิงพาณิชย์ · ดู LICENSE.md
+ */
 // กันคีย์ซ้ำต้องทนการเขี่ย cache — ข้อนี้คือเหตุผลทั้งหมดที่มี Ref_Log
 // เคสจริง: ผู้ใช้กดยืนยัน → เน็ตหลุดตอนเซิร์ฟเวอร์ตอบ → ผู้ใช้กดใหม่
 // ถ้าระหว่างนั้น CacheService เขี่ยค่าทิ้ง (เกิดได้ ไม่การันตี TTL) ของเดิมต้องยังจำได้
