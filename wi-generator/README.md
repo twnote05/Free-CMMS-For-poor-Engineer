@@ -104,7 +104,15 @@ It compares every calculation against separately hand-computed values, including
 ```
 WI_Generator.html   the whole program (HTML + CSS + JS in one file)
 wi_test.js          formula checker
+RUNBOOK.md          what to do when something breaks
 ```
+
+The licence is [LICENSE.md](../LICENSE.md) at the root of this repository.
+
+**Want it on its own?** The same tool is published as a standalone repository you can
+clone without the rest of the CMMS, and it runs straight from the browser with nothing
+to download: <https://twnote05.github.io/WI-Generator/WI_Generator.html>
+([repository](https://github.com/twnote05/WI-Generator))
 
 One external library: **ExcelJS**, loaded from a CDN only when you press Export to Excel. Everything else — charts (hand-drawn SVG) and the pagination engine — is written from scratch.
 

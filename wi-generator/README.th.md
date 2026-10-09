@@ -109,7 +109,14 @@ node wi_test.js
 ```
 WI_Generator.html   โปรแกรมทั้งหมด (HTML + CSS + JS ในไฟล์เดียว)
 wi_test.js          ตัวตรวจสูตรคำนวณ
+RUNBOOK.md          คู่มือตอนมีปัญหา
 ```
+
+สัญญาอนุญาตอยู่ที่ [LICENSE.md](../LICENSE.md) ตรงรากของ repo นี้
+
+**อยากได้แยกตัวเดียว** — ตัวเดียวกันนี้แยกเป็นอีก repo ให้โคลนไปโดยไม่ต้องเอาระบบแจ้งซ่อมไปด้วย
+และเปิดใช้จากเบราว์เซอร์ได้เลยไม่ต้องโหลด: <https://twnote05.github.io/WI-Generator/WI_Generator.html>
+([repo](https://github.com/twnote05/WI-Generator))
 
 ใช้ไลบรารีภายนอกตัวเดียวคือ **ExcelJS** โหลดจาก CDN เฉพาะตอนกดปุ่ม Export Excel
 ส่วนที่เหลือเขียนเองทั้งหมด รวมถึงกราฟ (วาดด้วย SVG) และตัวแบ่งหน้า
