@@ -2164,6 +2164,31 @@ function apiGetPM() {
   return out;
 }
 
+/* จำนวนงาน PM ตามแผนและที่ทำเสร็จ แยกรายเดือน — คีย์รูปเดียวกับ apiGetPM
+   จะได้รวมทั้งปีด้วยวิธีเดียวกันที่หน้าจอ ไม่ต้องเขียนตัวรวมสองแบบ
+
+   มีไว้เพราะการ์ด "% การทำ PM" เคยอ่านจากตัวเลขที่คนพิมพ์เองในชีตตั้งค่า
+   ซึ่งเป็นตัวเลขชุดเดียวกับที่ตารางแผน PM รู้อยู่แล้ว ของจริงไม่มีใครมานั่งกรอกซ้ำ
+   การ์ดจึงขึ้นว่า "ยังไม่มีข้อมูล" ตลอด ทั้งที่แผนทั้งเดือนกางไว้ครบแล้ว
+
+   ไม่นับรายการที่ยกเลิก — มันไม่ใช่แผนที่ต้องทำ จะไปโผล่ทั้งตัวตั้งและตัวหารไม่ได้
+   (กฎเดียวกับ summary.total ของ apiPmCalendar ซึ่งนับเฉพาะ active)
+
+   ไม่บังคับล็อกอิน ระดับเดียวกับ apiGetPM ที่คืนตัวเลขชุดเดียวกันนี้อยู่แล้ว
+   เป็นยอดรวมรายเดือน ไม่มีชื่อเครื่อง ชื่อคน หรือรายละเอียดงานติดไปด้วย */
+function apiPmCounts() {
+  var pack = pmRows_(), i = pmIdx_(pack.head), out = {};
+  pack.rows.forEach(function (r) {
+    var o = pmObj_(r, i);
+    if (!o.planned || o.status === PM_SKIP) return;
+    var key = String(o.planned).slice(0, 7);
+    var c = out[key] || (out[key] = { pmPlan: 0, pmDone: 0 });
+    c.pmPlan++;
+    if (o.status === PM_DONE) c.pmDone++;
+  });
+  return out;
+}
+
 function apiSetPM(token, year, month, data) {
   var actor = requireAuth_(token, 'LEAD');
   var lock = LockService.getScriptLock();

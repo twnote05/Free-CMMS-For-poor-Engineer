@@ -344,20 +344,60 @@ function clearCache() {
 /* ─────────── PM รายเดือน ───────────
    เก็บในชีต "PM รายเดือน" ทุกคนเห็นตรงกัน ไม่ใช่ต่างคนต่างเก็บในเครื่อง        */
 let pmCache = {};
+/* นับจากตารางแผน PM จริง — คีย์รูปเดียวกับ pmCache จึงรวมทั้งปีด้วยตัวเดียวกันได้ */
+let pmPlanCache = {};
 
+/* ยิงพร้อมกัน ไม่ใช่รอให้ตัวแรกเสร็จก่อน — สองคำสั่งไม่ได้ขึ้นต่อกัน
+   แต่ละตัวล้มได้เอง ไม่ใช่ปล่อยให้ทั้งหน้าพัง — ตกกลับไปใช้ตัวเลขที่กรอกเองเหมือนเดิม
+   ซึ่งเป็นพฤติกรรมก่อนหน้านี้ทั้งหมด ไม่ได้แย่ลงกว่าเดิม
+
+   ponytail: อ่านชีตแผน PM ทั้งใบทุกครั้งที่เปิดหน้า — ย้ายไปรวมกับ apiGetPM
+   หรือใส่ CacheService เมื่อแถวในชีตนั้นเยอะจนหน้าเปิดช้า */
 async function loadPMFromSheet() {
-  try { pmCache = await gs("apiGetPM") || {}; } catch (_) { pmCache = {}; }
+  const [a, b] = await Promise.all([
+    gs("apiGetPM").catch(() => ({})),
+    gs("apiPmCounts").catch(() => ({})),
+  ]);
+  pmCache = a || {};
+  pmPlanCache = b || {};
 }
 
-function getPM(year, month) {
-  if (month) return pmCache[`${year}-${month}`] || {};
-  return Object.entries(pmCache).filter(([k]) => k.startsWith(year + "-"))
-    .reduce((a, [, v]) => ({
-      workHours: (a.workHours || 0) + (Number(v.workHours) || 0),
-      pmPlan:    (a.pmPlan    || 0) + (Number(v.pmPlan)    || 0),
-      pmDone:    (a.pmDone    || 0) + (Number(v.pmDone)    || 0),
-    }), {});
+/* ชั่วโมงทำงานของเครื่องต่อเดือนยังต้องกรอกเอง — ไม่มีที่ไหนในระบบรู้ว่าเดือนนี้
+   โรงงานเดินกี่กะ ส่วนแผน PM กับ PM ที่เสร็จ ตารางแผนรู้ดีกว่าคนที่มานั่งพิมพ์ทีหลัง
+   จึงให้ตารางชนะ แล้วเหลือตัวเลขที่พิมพ์เองไว้เป็นทางสำรองของเดือนก่อนเริ่มใช้โมดูล PM
+   (เดือนที่ตารางไม่มีแถวเลย = "ยังไม่ได้กางแผน" ไม่ใช่ "ทำไม่ได้สักงาน") */
+function pmMonth_(year, month) {
+  const manual = pmCache[`${year}-${month}`] || {};
+  const auto = pmPlanCache[`${year}-${month}`];
+  return auto && auto.pmPlan
+    ? { ...manual, pmPlan: auto.pmPlan, pmDone: auto.pmDone, pmFromPlan: true }
+    : { ...manual };
 }
+
+/** ทั้งปี = ตัดสินทีละเดือนแล้วค่อยบวก ไม่ใช่บวกสองกองแล้วเลือกกองที่ชนะ
+
+    ของจริงตอนนี้ปนกันอยู่: ก.ย. มีแต่ตัวเลขที่กรอกเองไว้ ส่วน ต.ค. กางแผนในตารางแล้ว
+    บวกก่อนแล้วเลือกทีหลัง จะได้ทั้งปีเท่ากับของ ต.ค. เดือนเดียว ก.ย. หายไปเงียบ ๆ */
+function pmYear_(year) {
+  const months = new Set(
+    [...Object.keys(pmCache), ...Object.keys(pmPlanCache)]
+      .filter((k) => k.startsWith(year + "-")).map((k) => k.slice(5)));
+  const out = {};
+  let fromPlan = false;
+  months.forEach((m) => {
+    const one = pmMonth_(year, m);
+    if (one.pmFromPlan) fromPlan = true;
+    ["workHours", "pmPlan", "pmDone"].forEach((f) => {
+      if (one[f] !== undefined) out[f] = (out[f] || 0) + (Number(one[f]) || 0);
+    });
+  });
+  /* ปนกันทั้งปีก็ยังนับว่ามาจากตาราง — หน้าจอจะได้ไม่ไปเขียนว่า "ตัวเลขที่กรอกเอง"
+     ทั้งก้อน ทั้งที่ครึ่งหนึ่งมาจากตารางแผน */
+  if (fromPlan) out.pmFromPlan = true;
+  return out;
+}
+
+const getPM = (year, month) => (month ? pmMonth_(year, month) : pmYear_(year));
 
 /** บันทึกลงชีต — หน่วง 800ms เพราะผูกกับ oninput ถ้ายิงทุกตัวอักษรจะกินโควตาและชนกันเอง */
 let pmSaveTimer = null;
@@ -4193,8 +4233,9 @@ function panelKpi(p) {
              : tt("ยังไม่มีใบไหนเลยกำหนดเสร็จ", "None are past due yet"),
            color: ok(!k.open), drill: k.open ? "open" : "", star: true }),
     card({ label: "% การทำ PM", value: k.pmRate === null ? "ยังไม่มีข้อมูล" : k.pmRate + "%",
-           note: k.pmRate === null ? 'ขาด "แผน PM (งาน)" ที่ช่องด้านล่าง'
-                 : `PM เสร็จ ${nf(p.pm.pmDone)} จากแผน ${nf(p.pm.pmPlan)} งาน`,
+           note: k.pmRate === null ? 'ยังไม่มีแผน PM ในช่วงนี้ — กางตารางที่หน้า "แผน PM" หรือกรอกเองที่ช่องด้านล่าง'
+                 : `PM เสร็จ ${nf(p.pm.pmDone)} จากแผน ${nf(p.pm.pmPlan)} งาน` +
+                   (p.pm.pmFromPlan ? " (นับจากตารางแผน PM ไม่รวมรายการที่ยกเลิก)" : " (ตัวเลขที่กรอกเอง)"),
            /* ไฟล์ KPI Report ตัดสินด้วย IF(x = 100, "Achieve") — 99% ก็ยัง Non-Achieve
               ถ้าหน้าจอขึ้นเขียวที่ 90 จะขัดกับเอกสารที่ผู้ตรวจถืออยู่ */
            goal: GOAL.pm,
@@ -4277,22 +4318,35 @@ function panelKpi(p) {
   const pmBox = $("#pmInputs");
   if (p.month) {
     const cur = getPM(p.year, p.month);
+    /* ค่าที่คนพิมพ์เองจริง ๆ ไม่ใช่ค่าที่ตารางแผนคำนวณมาทับ — ต้องแยกให้ออก
+       ไม่งั้นการบันทึกครั้งถัดไปจะเอาตัวเลขที่ระบบคำนวณให้ ไปเขียนลงชีตตั้งค่าเป็นของคนกรอก */
+    const typed = pmCache[`${p.year}-${p.month}`] || {};
     pmBox.innerHTML = `
       <div><label class="lbl" for="pmHours">ชั่วโมงทำงานของเครื่องต่อเดือน</label>
         <input id="pmHours" type="number" min="0" step="1" class="inp num" value="${Number(cur.workHours) || ""}" placeholder="เช่น 576">
         <p class="text-[11px] text-slate-400 mt-1">ชั่วโมงที่ <b>เครื่องหนึ่งตัว</b> ควรเดินทั้งเดือน
           — กะเดียว 8 ชม. × 24 วัน = 192 · สองกะ = 384 · เดินต่อเนื่อง 24 ชม. = 576<br>
           ระบบคูณจำนวนเครื่องในทะเบียนให้เอง จะได้ไม่ต้องกลับมาแก้ทุกครั้งที่เพิ่มหรือถอดเครื่อง</p></div>
-      <div><label class="lbl" for="pmPlan">แผน PM (งาน)</label>
+      ${cur.pmFromPlan ? `<div class="sm:col-span-2">
+        <span class="lbl block">แผน PM (งาน)</span>
+        <p class="text-sm mt-1"><b>${nf(cur.pmPlan)}</b> งาน · ทำเสร็จแล้ว <b>${nf(cur.pmDone)}</b> งาน</p>
+        <p class="text-[11px] text-slate-400 mt-1">
+          นับจากตารางแผน PM ของเดือนนี้โดยตรง ไม่รวมรายการที่ยกเลิก —
+          แก้ที่เมนู "แผน PM" แล้วตัวเลขนี้กับการ์ดด้านบนขยับตามเอง${typed.pmPlan
+            ? `<br>ตัวเลขที่เคยกรอกไว้เอง (แผน ${nf(typed.pmPlan)} · เสร็จ ${nf(typed.pmDone || 0)}) ยังอยู่ในชีต แต่ไม่ได้ถูกใช้แล้ว`
+            : ""}</p></div>`
+      : `<div><label class="lbl" for="pmPlan">แผน PM (งาน)</label>
         <input id="pmPlan" type="number" min="0" step="1" class="inp num" value="${Number(cur.pmPlan) || ""}" placeholder="เช่น 20"></div>
       <div><label class="lbl" for="pmDone">PM ที่ทำเสร็จ (งาน)</label>
-        <input id="pmDone" type="number" min="0" step="1" class="inp num" value="${Number(cur.pmDone) || ""}" placeholder="เช่น 19"></div>`;
+        <input id="pmDone" type="number" min="0" step="1" class="inp num" value="${Number(cur.pmDone) || ""}" placeholder="เช่น 19"></div>`}`;
     pmBox.oninput = () => {
       if (!isUnlocked()) return;
       setPM(p.year, p.month, {                    // setPM หน่วงให้แล้ว ไม่ยิงทุกตัวอักษร
         workHours: Number($("#pmHours").value) || 0,
-        pmPlan:    Number($("#pmPlan").value)  || 0,
-        pmDone:    Number($("#pmDone").value)  || 0,
+        /* ตารางแผนเป็นคนให้ตัวเลขอยู่ ช่องกรอกจึงไม่ได้ขึ้นมา — ต้องส่งค่าเดิมที่เคยพิมพ์ไว้
+           กลับไปตามเดิม ไม่ใช่ส่ง 0 ซึ่งจะไปล้างข้อมูลของเดือนนั้นทิ้งเพราะคนแค่มาแก้ชั่วโมงทำงาน */
+        pmPlan: $("#pmPlan") ? Number($("#pmPlan").value) || 0 : Number(typed.pmPlan) || 0,
+        pmDone: $("#pmDone") ? Number($("#pmDone").value) || 0 : Number(typed.pmDone) || 0,
       });
       clearTimeout(pmBox._t);
       pmBox._t = setTimeout(renderDashboard, 900);

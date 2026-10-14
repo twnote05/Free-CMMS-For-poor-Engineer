@@ -23,7 +23,7 @@ vm.runInNewContext(
   "              overlapHours, stopSpan, breakdownSpan, periodWindow," +
   "              techScore, TECH_MIN_N, waitedOutside, loggedWell, techDrill," +
   "              techTotal, TECH_WEIGHT_DEFAULT, TECH_INVERTED, KPI_PICK, ROLE_KPI, TS_COL," +
-  "              stationMachines, isMyMachine, myStation, ticketScope, dtLocal, openTicketsOf };" +
+  "              stationMachines, isMyMachine, myStation, ticketScope, dtLocal, openTicketsOf, getPM };\n  this.setPmCaches = (a, b) => { pmCache = a; pmPlanCache = b };" +
   "\nthis.setME = (v) => { ME = v };" +
   "\nthis.setPmCal = (v) => { pmCal = v };" +
   "\nthis.setMachines = (v) => { MACHINES = v };",
@@ -38,7 +38,7 @@ const { fmtDuration, hoursBetween, elapsedHours,
         techScore, TECH_MIN_N, waitedOutside, loggedWell, techDrill,
         techTotal, TECH_WEIGHT_DEFAULT, TECH_INVERTED, KPI_PICK,
         ROLE_KPI, TS_COL, stationMachines, isMyMachine, myStation,
-        ticketScope, dtLocal, openTicketsOf } = sandbox.fns;
+        ticketScope, dtLocal, openTicketsOf, getPM } = sandbox.fns;
 
 /* ═══ สมุดเครื่องจักร: คอลัมน์ "ใบค้าง" ═══
    นับเฉพาะใบที่ยังไม่จบจริง ๆ ถ้านับใบที่ปิดหรือยกเลิกไปแล้วด้วย
@@ -3431,4 +3431,39 @@ console.log("OK — ผ่านทั้งหมด");
         `ใบที่ระบบเปิดเองจุดที่ ${i + 1} ต้องระบุ machine_down มาด้วย`);
     }
   });
+}
+
+
+/* ═══ การ์ด "% การทำ PM" อ่านจากตารางแผนจริง ═══
+   เดิมอ่านจากตัวเลขที่คนพิมพ์เองในชีตตั้งค่า ซึ่งเป็นตัวเลขชุดเดียวกับที่ตารางแผนรู้อยู่แล้ว
+   ของจริงไม่มีใครมานั่งกรอกซ้ำ การ์ดจึงขึ้น "ยังไม่มีข้อมูล" ทั้งที่แผนกางไว้ครบทั้งเดือน */
+{
+  const typed = { "2026-10": { workHours: 576, pmPlan: 20, pmDone: 19 },
+                  "2026-09": { workHours: 576, pmPlan: 11, pmDone: 11 } };
+  const plan  = { "2026-10": { pmPlan: 7, pmDone: 0 } };
+  sandbox.setPmCaches(typed, plan);
+
+  const oct = getPM(2026, "10");
+  assert.strictEqual(oct.pmPlan, 7, "ตารางแผนต้องชนะตัวเลขที่พิมพ์เอง");
+  assert.strictEqual(oct.pmDone, 0);
+  assert.strictEqual(oct.pmFromPlan, true, "ต้องบอกได้ว่าเลขนี้มาจากไหน ไม่งั้นหน้าจออธิบายผิด");
+  assert.strictEqual(oct.workHours, 576,
+    "ชั่วโมงทำงานไม่มีใครในระบบรู้แทนคนได้ ต้องเหลือค่าที่กรอกเองไว้");
+
+  /* เดือนที่ยังไม่มีแผนในตาราง ต้องตกกลับไปใช้ตัวเลขที่กรอกเอง
+     ไม่ใช่กลายเป็น 0% ซึ่งอ่านว่า "ทำ PM ไม่ได้สักงาน" ทั้งที่แปลว่า "ยังไม่ได้กางแผน" */
+  const sep = getPM(2026, "09");
+  assert.strictEqual(sep.pmPlan, 11);
+  assert.strictEqual(sep.pmDone, 11);
+  assert.ok(!sep.pmFromPlan);
+
+  // ทั้งปี: รวมจากตารางแผนเหมือนกัน และชั่วโมงทำงานยังรวมจากที่กรอกเองทุกเดือน
+  const yr = getPM(2026, "");
+  assert.strictEqual(yr.pmPlan, 18, "ทั้งปี = ต.ค. 7 จากตาราง + ก.ย. 11 ที่กรอกเองไว้ ไม่ใช่ทิ้ง ก.ย. ไป");
+  assert.strictEqual(yr.pmDone, 11, "ก.ย. เสร็จ 11 · ต.ค. ยังไม่ได้ทำ");
+  assert.strictEqual(yr.workHours, 1152);
+
+  // ปีที่ไม่มีข้อมูลเลยต้องไม่พัง และต้องไม่แอบนับของปีอื่น
+  assert.strictEqual(getPM(2025, "01").pmPlan, undefined);
+  assert.strictEqual(Object.keys(getPM(2025, "")).length, 0);
 }
