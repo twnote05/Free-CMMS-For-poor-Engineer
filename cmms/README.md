@@ -26,10 +26,13 @@ Those constraints rule out almost everything. What survives:
 | | |
 |---|---|
 | **Work orders** | Production staff can report a fault without logging in · assign to several technicians · bulk actions · trash (cancel without deleting) · automatic escalation when overdue · external repair / warranty claim tracking · PDF export |
-| **Preventive maintenance** | Annual plan expanded into a schedule · calendar that skips factory holidays · PM work orders · monthly summary report |
+| **Spare parts used** | Several SKU codes and quantities per work order · technicians enter them while the job is open, supervisors can complete them retroactively after it closes · codes are normalised on write and offered from what has been used before, so one bearing does not become five spellings · printed into the FM-MT-04 form |
+| **Preventive maintenance** | Annual plan expanded into a schedule · calendar that skips factory holidays · PM work orders · monthly summary report · supervisors can delete a plan (clearing every round not yet done) or clear and regenerate one plan's schedule after changing its cycle |
 | **Daily checklists** | Reads Google Form responses directly · per-machine score · drill into failed items · open a work order straight from a failed check |
-| **Machine parameters** | Compares recorded readings against tolerances · engineer approval step · generates one Google Form per machine from the register |
+| **Machine parameters** | Compares recorded readings against tolerances · engineer approval step · generates one Google Form per machine from the register · reads the limits sheet in either shape, one row per reading point or one row per machine with a column per point |
 | **KPIs** | MTTR · %breakdown · repeat failures · weighted per-technician scoring (weights are editable in a sheet) |
+| **Machine board** | One card per machine: running / stopped-by-fault / stopped-for-PM, with the daily check and parameter buttons on the card · a technician assigned to a station sees only that station's machines by default |
+| **Excel export** | Whole year, one month, or a single Monday-to-Sunday week · raw rows plus a stock-deduction sheet with one row per SKU and a line key, so re-exporting an overlapping range cannot double-deduct |
 | **Also** | Dark mode · Thai/English · QR codes for machines · event timeline · in-app notifications · audit log |
 
 **Roles:** `TECH` → `ENG`/`LEAD` → `ADMIN`, enforced server-side on every call, not by hiding buttons.

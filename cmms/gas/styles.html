@@ -7,7 +7,7 @@
    Plain CSS (Tailwind Play CDN ไม่ประมวลผล @apply ในไฟล์ CSS ภายนอก)
    ═══════════════════════════════════════════════════════════════════ */
 
-/* สีแบรนด์ — เปลี่ยนเป็นสีของบริษัทคุณได้ — เขียว #01e26c
+/* สีแบรนด์ YOUR COMPANY — เขียว #01e26c
    ใช้เขียวสดเป็นสีเน้นบนพื้นเข้ม และเขียวเข้มกว่าสำหรับปุ่ม/ตัวอักษรบนพื้นขาว
    (เขียวสดบนขาวมี contrast แค่ ~1.7:1 อ่านไม่ออก จึงใช้เป็นสีตกแต่งเท่านั้น) */
 :root {
@@ -888,6 +888,29 @@ tr.param-out td { background: #fef2f2; }
 .bulk-col { display: none; }
 body.bulk-on .bulk-col { display: table-cell; }
 
+/* ค่าใช้จ่ายขึ้นเฉพาะคนที่ล็อกอิน — หน้าติดตามสถานะเปิดให้ฝ่ายผลิตดูโดยไม่ต้องล็อกอิน
+   และ server ก็ไม่ส่งฟิลด์นี้ให้คนนอกอยู่แล้ว (ไม่ได้อยู่ใน PUBLIC_FIELDS)
+   ถ้าโชว์หัวคอลัมน์ไว้เฉย ๆ จะได้ตารางที่มีช่องว่างทั้งแถบโดยไม่มีเหตุผล */
+/* สวิตช์ On/Off บนการ์ดเครื่องจักร
+   สามสถานะ ไม่ใช่สอง — "ยังไม่เคยระบุ" ต้องดูต่างจาก "หยุด" ให้ชัด
+   ไม่งั้นเครื่องที่ไม่มีใครเคยแตะ จะดูเหมือนเครื่องที่มีคนตั้งใจสั่งหยุด */
+.sw { width: 46px; height: 26px; border-radius: 999px; background: #cbd5e1;
+      position: relative; flex: 0 0 auto; transition: background .15s; }
+.sw::after { content: ""; position: absolute; top: 3px; left: 3px;
+             width: 20px; height: 20px; border-radius: 50%; background: #fff;
+             box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: left .15s; }
+.sw[data-state="on"]  { background: #16a34a; }
+.sw[data-state="on"]::after { left: 23px; }
+.sw[data-state="off"] { background: #dc2626; }
+.sw[data-state="unset"] { background: #e2e8f0; }
+.sw[data-state="unset"]::after { left: 13px; }     /* ค้างกลาง = ยังไม่มีใครบอก */
+.sw:disabled { opacity: .45; cursor: not-allowed; }
+.sw:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+[data-theme="dark"] .sw[data-state="unset"] { background: #475569; }
+
+.cost-col { display: none; }
+body.cost-on .cost-col { display: table-cell; }
+
 .bulk-bar {
   display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
   padding: .625rem .75rem; margin-bottom: .875rem;
@@ -1092,6 +1115,11 @@ body.bulk-on .bulk-col { display: table-cell; }
   /* ช่องติ๊กต้องพับเป็นการ์ดด้วย — กฎ body.bulk-on ข้างบนตั้ง table-cell ไว้
      ซึ่งชนะกฎการ์ดด้วย specificity แล้วทำให้แถวบนมือถือเพี้ยนไปช่องเดียว */
   body.bulk-on table.as-cards td.bulk-col { display: flex; }
+  body.cost-on table.as-cards td.cost-col { display: flex; }   /* เหตุผลเดียวกับช่องติ๊ก */
+  /* ต้องปิดกลับให้คนที่ยังไม่ล็อกอินด้วย — กฎ table.as-cards td{display:flex} ข้างบน
+     มี specificity สูงกว่า .cost-col{display:none} ของเดสก์ท็อป คนนอกบนมือถือจึงเห็น
+     การ์ดขึ้นบรรทัด "ค่าใช้จ่าย —" ทุกใบ ทั้งที่ server ไม่เคยส่งค่านี้มาให้เขา */
+  body:not(.cost-on) table.as-cards td.cost-col { display: none; }
   table.as-cards td.num { justify-content: flex-start; }
   /* แถวว่าง/แถวข้อความอย่างเดียว ไม่ต้องพับเป็นการ์ด */
   table.as-cards td[colspan] { display: block; }

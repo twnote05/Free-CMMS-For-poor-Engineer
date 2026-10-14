@@ -14,16 +14,19 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<!-- เลิกใช้ bootstrap-icons แล้ว (CSS 83 KB + ฟอนต์อีกก้อน) ทั้งเว็บใช้แค่ 2 ไอคอนในกล่องเลี้ยงเบียร์ ที่เหลือเป็น SVG ฝังในหน้าอยู่แล้ว -->
 
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-  // ต้องอยู่หลัง CDN — ไม่งั้น utility class อย่าง font-bold จะยังใช้ฟอนต์ระบบ
-  tailwind.config = {
-    theme: { extend: { fontFamily: { sans: ['Sarabun', 'system-ui', 'sans-serif'] } } }
-  };
-</script>
+<!-- Tailwind เป็นไฟล์ CSS นิ่งที่สร้างไว้ล่วงหน้าแล้ว ไม่ใช่ตัวคอมไพล์ที่รันในเบราว์เซอร์
+
+     ต้องอยู่ "หลัง" styles เสมอ — ตัว CDN เดิมฉีด <style> เข้ามาทีหลังเสมอ ลำดับนี้จึงเป็น
+     สิ่งที่โค้ดทั้งไฟล์เขียนขึ้นโดยตั้งอยู่บนมันมาตลอด (ดูคอมเมนต์ใน styles.html ที่ว่า
+     "ต้อง !important เพราะ CDN โหลดทีหลัง")
+
+     เอามาไว้ข้างหน้าแล้วพังทันที: .hidden กับ .tab-btn มี specificity เท่ากัน
+     ลำดับจึงเป็นตัวตัดสิน — .tab-btn{display:flex} ชนะ แล้วเมนูที่ต้องซ่อนตอนยังไม่ล็อกอิน
+     โผล่ทั้งหมด จุดแดงบนกระดิ่งค้างติด แถบเลือกหลายใบค้างโชว์ -->
 <?!= include("styles") ?>
+<?!= include("tw") ?>
 </head>
 
 <!-- prefillMachine มาจาก QR — server กรองให้ตรงทะเบียนแล้ว
@@ -61,11 +64,7 @@
     <button type="button" class="tab-btn" data-tab="create">
       <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4H7a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-7"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L13 13l-4 1 1-4z"/></svg><span class="grow text-left">แจ้งซ่อมใหม่</span>
     </button>
-    <button type="button" class="tab-btn needs-login" data-tab="check">
-      <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.2l2.4 2.4 4.6-4.9"/></svg><span class="grow text-left">เช็คชีตประจำวัน</span>
-      <span id="navCheck" class="nav-pill zero" style="background:#0284c7" title="เครื่องที่ยังไม่ตรวจวันนี้">0</span>
-    </button>
-
+    
     <!-- ขึ้นเฉพาะคนที่ล็อกอินแล้ว เพราะต้องรู้ว่า "ฉัน" คือใครถึงจะกรองงานได้ -->
     <button type="button" id="navPmBtn" class="tab-btn needs-login hidden" data-tab="pm">
       <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3.5v4M16 3.5v4"/><path d="M8 14h2M14 14h2M8 17.5h2"/></svg><span class="grow text-left">แผน PM</span>
@@ -77,14 +76,16 @@
       <span id="navMine" class="nav-pill zero" style="background:#7c3aed" title="งานที่มอบหมายให้ฉันและยังไม่เสร็จ">0</span>
     </button>
 
+    <button type="button" class="tab-btn needs-login" data-tab="mlog">
+      <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M8 9.5h8M8 13h5"/><circle cx="17.5" cy="13" r="1.2"/></svg><span class="grow text-left">งานเครื่องจักร</span>
+      <span id="navCheck" class="nav-pill zero" style="background:#0284c7" title="เครื่องที่ยังไม่ตรวจวันนี้">0</span>
+    </button>
+
     <button type="button" class="tab-btn" data-tab="feedback">
       <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 12.5c0 3.9-3.8 7-8.5 7-1 0-2-.1-2.9-.4L4 21l1.4-3.6A6.6 6.6 0 0 1 3.5 12.5c0-3.9 3.8-7 8.5-7s8.5 3.1 8.5 7z"/></svg><span class="grow text-left">แนะนำ / ติชม</span>
     </button>
 
-    <button type="button" id="navParamBtn" class="tab-btn needs-login hidden" data-tab="param">
-      <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 13.6V5.5a1.5 1.5 0 0 0-3 0v8.1a3.5 3.5 0 1 0 3 0z"/><circle cx="12" cy="17" r="1.3" fill="currentColor" stroke="none"/></svg><span class="grow text-left">พารามิเตอร์เครื่องจักร</span>
-    </button>
-
+    
     <p class="nav-head needs-login">รายงาน</p>
     <button type="button" class="tab-btn needs-login" data-tab="report">
       <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16"/><rect x="6" y="11" width="3.2" height="6"/><rect x="12" y="6" width="3.2" height="11"/><rect x="17.5" y="14" width="2.5" height="3"/></svg><span class="grow text-left">Dashboard Summary</span>
@@ -93,10 +94,7 @@
     <button type="button" class="tab-btn needs-login" data-tab="kpi">
       <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg><span class="grow text-left">KPI</span>
     </button>
-    <button type="button" class="tab-btn needs-login" data-tab="timeline">
-      <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span class="grow text-left">ไทม์ไลน์ย้อนเหตุการณ์</span>
-    </button>
-    <button type="button" class="tab-btn needs-login" data-tab="qr">
+        <button type="button" class="tab-btn needs-login" data-tab="qr">
       <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1"/><rect x="13.5" y="3.5" width="7" height="7" rx="1"/><rect x="3.5" y="13.5" width="7" height="7" rx="1"/><path d="M13.5 13.5h3v3h-3zM17.5 17.5h3v3h-3z"/></svg><span class="grow text-left">QR ติดเครื่องจักร</span>
     </button>
 
@@ -104,6 +102,11 @@
     <a id="navStock" href="#" target="_blank" rel="noopener"
        class="tab-btn needs-login hidden" title="เปิดระบบเบิก-รับ-นับอะไหล่ในแท็บใหม่">
       <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 8.2v7.6a1.5 1.5 0 0 1-.8 1.3l-7 3.6a1.5 1.5 0 0 1-1.4 0l-7-3.6a1.5 1.5 0 0 1-.8-1.3V8.2"/><path d="M3.9 7.4l7.4-3.6a1.5 1.5 0 0 1 1.4 0l7.4 3.6-8.1 4z"/><path d="M12 11.4V20"/></svg><span class="grow text-left">ระบบ Stock อะไหล่</span>
+      <span class="text-slate-500 text-xs" aria-hidden="true">↗</span>
+    </a>
+    <a id="navWI" href="#" target="_blank" rel="noopener"
+       class="tab-btn needs-login hidden" title="เปิดโปรแกรมสร้าง WI / OPL / FMEA ในแท็บใหม่">
+      <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3.5H7a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3.5V8h4.5"/><path d="M8.5 12.5h7M8.5 16h4.5"/></svg><span class="grow text-left">สร้างเอกสาร WI</span>
       <span class="text-slate-500 text-xs" aria-hidden="true">↗</span>
     </a>
   </nav>
@@ -179,8 +182,14 @@
     <p class="text-[11px] text-slate-400 -mt-2">การ์ดด้านบนคือสถานะปัจจุบันของทั้งระบบ ไม่ขึ้นกับช่วงเวลา ส่วนตัวเลขบนปุ่มกรองนับเฉพาะในช่วงที่เลือก</p>
 
     <div class="panel p-4">
-      <div class="flex flex-wrap items-center gap-2 mb-4">
-        <div id="filterBar" class="flex flex-wrap gap-2 grow"></div>
+      <!-- ช่องค้นหามาก่อน เพราะเป็นอันที่ถูกใช้บ่อยที่สุด เดิมอยู่ขวาสุดของแถวที่ยาวที่สุด
+           ช่วงเวลาและความสำคัญอยู่ติดกันเพราะเป็นตัวกรองเหมือนกัน -->
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <div class="relative grow min-w-0 basis-72">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" aria-hidden="true">🔍</span>
+          <input id="searchBox" type="search" aria-label="ค้นหาใบแจ้งซ่อม"
+                 class="inp !w-full !pl-9" placeholder="ค้นหา เลขที่ / เครื่องจักร / ผู้แจ้ง">
+        </div>
         <select id="datePreset" aria-label="ช่วงเวลา" class="inp !w-auto">
           <option value="">ทุกช่วงเวลา</option>
           <option value="today">วันนี้</option>
@@ -188,20 +197,27 @@
           <option value="30">30 วันล่าสุด</option>
           <option value="month">เดือนนี้</option>
           <option value="lastmonth">เดือนที่แล้ว</option>
+          <option value="custom">เลือกวันที่เอง…</option>
         </select>
-        <div class="flex items-center gap-1.5 grow min-w-0 basis-56">
-          <input id="dateFrom" type="date" aria-label="ตั้งแต่วันที่" class="inp !w-auto grow min-w-0">
-          <span class="text-slate-400 shrink-0" aria-hidden="true">–</span>
-          <input id="dateTo" type="date" aria-label="ถึงวันที่" class="inp !w-auto grow min-w-0">
-        </div>
         <select id="priorityFilter" aria-label="กรองตามความสำคัญ" class="inp !w-auto">
           <option value="">ทุกความสำคัญ</option>
         </select>
-        <div class="relative grow sm:grow-0">
-          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" aria-hidden="true">🔍</span>
-          <input id="searchBox" type="search" aria-label="ค้นหาใบแจ้งซ่อม"
-                 class="inp !w-full sm:!w-64 !pl-9" placeholder="ค้นหา เลขที่ / เครื่องจักร / ผู้แจ้ง">
-        </div>
+      </div>
+
+      <!-- ช่องวันที่ขึ้นเฉพาะตอนเลือก "เลือกวันที่เอง" — ส่วนใหญ่ใช้ช่วงสำเร็จรูปอยู่แล้ว
+           และ <input type="date"> แสดงรูปแบบตาม locale ของเบราว์เซอร์ บังคับจาก HTML ไม่ได้
+           เครื่องที่ตั้งเป็น en-US จึงขึ้น mm/dd/yyyy ซึ่งคนอ่านผิดเป็นวัน/เดือน -->
+      <div id="dateRange" class="hidden items-center gap-1.5 mb-3 max-w-sm">
+        <input id="dateFrom" type="date" aria-label="ตั้งแต่วันที่" class="inp !w-auto grow min-w-0">
+        <span class="text-slate-400 shrink-0" aria-hidden="true">–</span>
+        <input id="dateTo" type="date" aria-label="ถึงวันที่" class="inp !w-auto grow min-w-0">
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2 mb-4">
+        <div id="filterBar" class="flex flex-wrap gap-2 grow"></div>
+        <!-- บอกว่ากรองอะไรอยู่ + ปุ่มล้าง ขึ้นเฉพาะตอนมีตัวกรองทำงานจริง
+             เดิมถ้าเผลอค้างตัวกรองไว้ ตารางจะสั้นผิดปกติโดยไม่มีอะไรบอกว่าเพราะอะไร -->
+        <div id="filterNote" class="hidden items-center gap-2 text-xs text-slate-500"></div>
       </div>
 
       <!-- โผล่เมื่อเลือกอย่างน้อย 1 ใบ -->
@@ -227,6 +243,7 @@
               <th class="th">วันที่แจ้ง</th>
               <th class="th">กำหนดเสร็จ</th>
               <th class="th">สถานะ</th>
+              <th class="th cost-col">ค่าใช้จ่าย</th>
               <th class="th w-10"><span class="sr-only">เปิดรายละเอียด</span></th>
             </tr>
           </thead>
@@ -262,6 +279,7 @@
               <th class="th">วันที่แจ้ง</th>
               <th class="th">กำหนดเสร็จ</th>
               <th class="th">สถานะ</th>
+              <th class="th cost-col">ค่าใช้จ่าย</th>
               <th class="th w-10"><span class="sr-only">เปิดรายละเอียด</span></th>
             </tr>
           </thead>
@@ -310,6 +328,10 @@
         <select id="pmMachineFilter" aria-label="กรองตามเครื่องจักร" class="inp !w-auto">
           <option value="">ทุกเครื่องจักร</option>
         </select>
+        <!-- รายการที่ยกเลิกไปแล้วไม่ควรรกปฏิทิน แต่ต้องมีทางเรียกกลับมาดูเวลากดพลาด -->
+        <label class="flex items-center gap-2 text-sm text-slate-500 cursor-pointer">
+          <input id="pmShowSkip" type="checkbox" class="w-4 h-4 accent-[#05924a]"> แสดงที่ยกเลิก
+        </label>
         <button type="button" id="pmPlanBtn" class="btn hidden" style="background:#7c3aed">⚙️ แก้แผน PM</button>
         <button type="button" id="pmSheetBtn" class="btn" style="background:#475569"
                 title="พิมพ์ใบงาน PM ของทุกรายการที่แสดงอยู่ตอนนี้ รวมเป็นไฟล์เดียว">🖨 ใบงานทั้งเดือน</button>
@@ -413,6 +435,9 @@
   </div>
 
   <!-- ────────── หน้าต่างแก้แผน PM (หัวหน้างาน) ────────── -->
+  <!-- รหัสอะไหล่ที่เคยใช้แล้ว — ให้คนที่สองเลือกของคนแรก ไม่ใช่คิดสะกดเองใหม่ -->
+  <datalist id="partCodes"></datalist>
+
   <div id="pmPlanModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
     <form id="pmPlanForm" class="bg-white rounded-2xl w-full max-w-lg p-5 space-y-3 max-h-[90vh] overflow-y-auto" novalidate>
       <div class="flex items-center justify-between">
@@ -422,7 +447,15 @@
       <p class="text-xs text-slate-500">เครื่องจักร + ชื่องาน ที่ซ้ำกับของเดิม = แก้ของเดิม ไม่ใช่เพิ่มแถวใหม่
         · แก้แล้วกด "ออกตารางล่วงหน้า" เพื่อให้ปฏิทินอัปเดต</p>
       <div><label class="lbl" for="ppPick">เลือกแผนเดิมมาแก้</label>
-        <select id="ppPick" class="inp"><option value="">— เพิ่มแผนใหม่ —</option></select></div>
+        <select id="ppPick" class="inp"><option value="">— เพิ่มแผนใหม่ —</option></select>
+        <!-- ปุ่มลบขึ้นเฉพาะตอนเลือกแผนเดิม "เพิ่มแผนใหม่" ไม่มีอะไรให้ลบ -->
+        <div id="ppRowActions" class="hidden flex flex-wrap gap-2 mt-2">
+          <button type="button" id="ppRebuild" class="chip"
+                  style="background:#e0f2fe;color:#075985;font-weight:700"
+                  title="ใช้หลังแก้รอบ (วัน) — ล้างวันของรอบเก่าทิ้งแล้วกางใหม่">♻ ล้างตารางล่วงหน้าแล้วกางใหม่</button>
+          <button type="button" id="ppDelete" class="chip"
+                  style="background:#fee2e2;color:#b91c1c;font-weight:700">🗑 ลบแผนนี้</button>
+        </div></div>
       <div><label class="lbl" for="ppMachine">เครื่องจักร <b class="req">*</b></label>
         <select id="ppMachine" class="inp"></select></div>
       <div><label class="lbl" for="ppTask">งาน PM <b class="req">*</b></label>
@@ -634,27 +667,38 @@
   </section>
 
   <!-- ────────── ไทม์ไลน์ย้อนเหตุการณ์ ────────── -->
-  <section id="tab-timeline" class="tab-panel hidden space-y-4">
+  <section id="tab-mlog" class="tab-panel hidden space-y-4">
     <div class="panel p-4">
       <div class="flex flex-wrap items-end gap-3">
         <div class="grow min-w-0 basis-64">
-          <label class="lbl" for="tlMachine">เครื่องจักร <b class="req">*</b></label>
-          <select id="tlMachine" class="inp"></select>
+          <label class="lbl" for="mlSearch">ค้นหาเครื่องจักร</label>
+          <input id="mlSearch" class="inp" placeholder="ชื่อเครื่อง · รหัส · อาคาร" autocomplete="off">
         </div>
-        <div><label class="lbl" for="tlFrom">ตั้งแต่</label>
-          <input id="tlFrom" type="date" class="inp !w-auto"></div>
-        <div><label class="lbl" for="tlTo">ถึง</label>
-          <input id="tlTo" type="date" class="inp !w-auto"></div>
-        <button type="button" id="tlGo" class="btn" style="background:var(--brand)">🕘 ดูไทม์ไลน์</button>
+        <div><label class="lbl" for="mlStatus">สถานะ</label>
+          <select id="mlStatus" class="inp !w-auto">
+            <option value="">ทั้งหมด</option>
+            <option value="หยุดเสีย">🔴 หยุดเสีย</option>
+            <option value="หยุดตามแผน PM">🟠 หยุดตามแผน PM</option>
+            <option value="เดินปกติ">🟢 เดินปกติ</option>
+            <option value="—">⚪ ยังไม่เคยระบุ</option>
+          </select></div>
+        <!-- ขึ้นเฉพาะคนที่มีสถานีประจำ หัวหน้ากับวิศวกรไม่มีสถานี จึงไม่เห็นช่องนี้ -->
+        <label id="mlMineWrap" hidden class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer pb-2">
+          <input id="mlMineOnly" type="checkbox" class="w-4 h-4 accent-[#05924a]"> เฉพาะเครื่องที่ฉันดูแล
+        </label>
+        <button type="button" id="mlReload" class="btn" style="background:var(--brand)">↻ โหลดใหม่</button>
       </div>
       <p class="text-[11px] text-slate-400 mt-2">
-        รวมใบแจ้งซ่อม · งาน PM · เช็คชีตประจำวัน · บันทึกพารามิเตอร์ ของเครื่องนั้นไว้บนแกนเวลาเดียว
-        เรียงจากใหม่ไปเก่า</p>
+        สถานะเปลี่ยนด้วยการกดเท่านั้น ระบบไม่ขยับให้เองตามใบแจ้งซ่อม — เครื่องหยุดโดยไม่มีใบก็มี
+        และมีใบแต่เครื่องยังเดินอยู่ก็มี · กดชื่อเครื่องเพื่อดูไทม์ไลน์ย้อนเหตุการณ์ของเครื่องนั้นด้านล่าง</p>
     </div>
 
-    <div id="tlChips" class="flex flex-wrap gap-2"></div>
-    <div class="panel p-4"><div id="tlBody" class="tl"></div></div>
+    <div id="mlChips" class="flex flex-wrap gap-2"></div>
+    <!-- การ์ด ไม่ใช่ตาราง — บนมือถือหน้างานตารางหกคอลัมน์ต้องเลื่อนข้าง ซึ่งไม่มีใครเลื่อน
+         ช่องที่เป็นหัวใจคือ "หยุด/เดิน" กับ "หยุดมานานแค่ไหน" ต้องเห็นตั้งแต่ยังไม่แตะจอ -->
+    <div id="mlGrid" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div>
   </section>
+
 
   <!-- ────────── ฟอร์มแจ้งซ่อม ────────── -->
   <section id="tab-create" class="tab-panel hidden">
@@ -730,6 +774,26 @@
               เลือก "ซ่อมเอง" เมื่อหน้างานจัดการเองได้ ระบบจะได้แยกสถิติออกจากงานที่ต้องเรียกช่าง
             </p>
           </div>
+        </div>
+
+        <!-- ขึ้นเฉพาะตอนเลือกเครื่องจักรแล้ว งานอาคาร/งานสร้างไม่มีเครื่องให้พูดถึง
+             ค่านี้ไปอัปเดตสมุดเครื่องจักรให้เอง ผู้แจ้งยืนอยู่หน้าเครื่อง เขารู้ดีที่สุด -->
+        <div id="machineDownWrap" class="mt-4 hidden">
+          <span class="lbl block">ตอนนี้เครื่องจักรเป็นยังไง <b class="req">*</b></span>
+          <div class="flex flex-wrap gap-2">
+            <label class="chip cursor-pointer">
+              <input type="radio" name="machine_down" value="เดินต่อได้" class="mr-1.5" checked>
+              🟢 ยังเดินต่อได้
+            </label>
+            <label class="chip cursor-pointer">
+              <input type="radio" name="machine_down" value="หยุดเดิน" class="mr-1.5">
+              🔴 หยุดเดิน
+            </label>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1">
+            เลือก "หยุดเดิน" แล้วสมุดเครื่องจักรจะขึ้นว่าเครื่องนี้หยุดทันที ไม่ต้องรอใครมากดซ้ำ
+            และจะกลับมาเป็นเดินปกติเองตอนผู้ตรวจรับยืนยันว่าเครื่องใช้งานได้แล้ว
+          </p>
         </div>
       </fieldset>
 
@@ -849,6 +913,13 @@
       <select id="yearPicker" aria-label="เลือกปี" class="inp !w-auto"></select>
       <select id="monthPicker" aria-label="เลือกเดือน" class="inp !w-auto"></select>
       <span id="periodInfo" class="text-xs text-slate-500 ml-auto"></span>
+      <!-- ช่วงที่จะส่งออก แยกจากปี/เดือนของ Dashboard โดยตั้งใจ
+           รายงานสัปดาห์ส่งทุกวันจันทร์ แต่ Dashboard ยังต้องดูทั้งเดือนอยู่ -->
+      <select id="expRange" aria-label="ช่วงที่จะส่งออก" class="inp !w-auto">
+        <option value="">ส่งออกตามปี/เดือนที่เลือก</option>
+        <option value="w0">รายสัปดาห์ - สัปดาห์นี้</option>
+        <option value="w1">รายสัปดาห์ - สัปดาห์ที่แล้ว</option>
+      </select>
       <button type="button" id="exportBtn"
               class="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm shadow-green-600/30 transition">
         ⬇ Export Excel
@@ -1067,6 +1138,58 @@
       </div>
     </div>
 
+    <!-- วิเคราะห์เพื่อปรับปรุง — คนละเรื่องกับ Dashboard ที่ตอบว่า "เครื่องไหนแย่"
+         หน้านี้ตอบว่า "แย่เพราะอะไร" และ "เครื่องหยุดจริงกี่ชั่วโมง" -->
+    <div id="sub-improve" class="sub-panel hidden space-y-4">
+      <div class="panel p-4">
+        <div class="flex flex-wrap items-end gap-3">
+          <div><label class="lbl" for="impMachine">เครื่องจักร</label>
+            <select id="impMachine" class="inp !w-auto"><option value="">ทุกเครื่อง</option></select></div>
+          <button type="button" id="impReload" class="btn" style="background:var(--brand)">↻ คำนวณใหม่</button>
+        </div>
+        <p id="impNote" class="text-[11px] text-slate-400 mt-2"></p>
+      </div>
+
+      <div class="panel p-4">
+        <h3 class="panel-title">Pareto สาเหตุการเสีย — แก้อะไรก่อนถึงคุ้มแรงที่สุด</h3>
+        <div class="h-72"><canvas id="chartCause"></canvas></div>
+        <div class="overflow-x-auto mt-3"><table class="w-full text-sm as-cards">
+          <thead><tr class="text-left text-slate-500 border-b border-slate-100">
+            <th class="th">รหัสสาเหตุ</th><th class="th">จำนวนใบ</th><th class="th">สะสม</th>
+            <th class="th">ค่าใช้จ่าย</th><th class="th">เครื่องที่เจอบ่อยสุด</th>
+          </tr></thead><tbody id="impCauseBody"></tbody>
+        </table></div>
+      </div>
+
+      <!-- ไล่ติดรหัสให้ใบเก่า — ยิ่งเริ่มช้า ใบที่ไม่มีรหัสยิ่งพอกขึ้นทุกวัน
+           ระบบ "เสนอ" รหัสจากคำในอาการ/การซ่อม คนเป็นคนกดยืนยัน ไม่ได้เขียนให้เอง -->
+      <div class="panel p-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="panel-title !mb-0">ติดรหัสย้อนหลังให้ใบเก่า</h3>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" id="bcLoad" class="chip">📥 ดึงใบที่ยังไม่มีรหัส</button>
+            <button type="button" id="bcSave" class="btn hidden" style="background:#0f766e">บันทึกหน้านี้</button>
+          </div>
+        </div>
+        <p id="bcNote" class="text-[11px] text-slate-400 mt-2">
+          ระบบเสนอรหัสจากคำที่เจอในอาการและบันทึกการซ่อม — ตรวจก่อนบันทึกทุกใบ
+          ใบที่เลือกเป็น "ข้าม" จะไม่ถูกแตะ</p>
+        <div id="bcBody" class="space-y-2 mt-3"></div>
+      </div>
+
+      <div class="panel p-4">
+        <h3 class="panel-title">Availability จากเวลาหยุดจริง</h3>
+        <p id="impUpNote" class="text-[11px] text-slate-400 mb-2"></p>
+        <div class="overflow-x-auto"><table class="w-full text-sm as-cards">
+          <thead><tr class="text-left text-slate-500 border-b border-slate-100">
+            <th class="th">เครื่องจักร</th><th class="th">Availability</th>
+            <th class="th">หยุดเสีย (ชม.)</th><th class="th">หยุดตามแผน (ชม.)</th>
+            <th class="th">จำนวนครั้งที่เสีย</th><th class="th">MTBF (ชม.)</th><th class="th">MTTR (ชม.)</th>
+          </tr></thead><tbody id="impUpBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
     <div id="sub-feedback" class="sub-panel hidden space-y-4">
       <div id="fbStats" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
       <div class="panel p-4">
@@ -1239,11 +1362,11 @@
         <div id="beerQrWrap" class="hidden text-center">
           <!-- ข้างในเป็นได้ทั้ง QR ที่ระบบสร้างจากเบอร์ และรูปที่หัวหน้าแคปมาวาง -->
           <div id="beerQrBox"></div>
-          <p class="text-[11px] text-slate-400 mt-1"><i class="bi bi-cash-coin"></i> พร้อมเพย์</p>
+          <p class="text-[11px] text-slate-400 mt-1"><span aria-hidden="true">💸</span> พร้อมเพย์</p>
         </div>
         <div id="beerBtcWrap" class="hidden text-center">
           <div id="beerBtcQr" class="beer-qr-box"></div>
-          <p class="text-[11px] text-slate-400 mt-1"><i class="bi bi-currency-bitcoin"></i> Bitcoin</p>
+          <p class="text-[11px] text-slate-400 mt-1"><span aria-hidden="true">₿</span> Bitcoin</p>
           <input id="beerBtcAddr" class="beer-addr" readonly aria-label="ที่อยู่ Bitcoin">
           <p class="text-[11px] text-slate-400">แตะที่อยู่เพื่อเลือกทั้งหมด แล้วคัดลอก</p>
         </div>
@@ -1325,12 +1448,9 @@
 
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<!-- defer: ทำงานหลัง parse เสร็จแต่ก่อน DOMContentLoaded จึงยังทันที่ init() ใช้ -->
-<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<!-- ป้ายตัวเลขบนกราฟ — ต้องโหลดหลัง chart.js เพราะต้อง register เข้ากับตัวหลัก -->
-<script defer src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- chart.js · datalabels · qrcode · xlsx ไม่ได้โหลดตรงนี้แล้ว รวมกัน 1.09 MB
+     ที่ทุกคนเคยโหลดทุกครั้งแม้ไม่ได้ใช้ ตอนนี้ loadScript() ใน app.html ดึงให้ตอนจะใช้จริง
+     (ดูยามใน drawChart · renderQr · drawQr · exportExcel) -->
 
 <script>
   // อ่านจาก data attribute แทนการฝังค่าลงในสตริง JS ตรง ๆ

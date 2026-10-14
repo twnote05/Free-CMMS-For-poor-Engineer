@@ -43,7 +43,8 @@ var HEADERS = [
   'เริ่มซ่อม', 'เวลาซ่อมจบ', 'ผู้เข้าซ่อม', 'การซ่อม', 'ใช้เวลา',
   'ผู้ตรวจรับงาน', 'วันที่ตรวจรับ', 'ผลการตรวจรับ', 'สาเหตุที่ส่งกลับแก้ไข',
   'จำนวนครั้งที่ส่งกลับ', 'ประเภท', 'รูป',
-  'ผู้รับซ่อมภายนอก', 'กำหนดรับคืน', 'เหตุผลที่ยกเลิก'
+  'ผู้รับซ่อมภายนอก', 'กำหนดรับคืน', 'เหตุผลที่ยกเลิก',
+  'เครื่องหยุดเดิน', 'รหัสสาเหตุ', 'อะไหล่ที่ใช้'   // ต่อท้ายเสมอ — รัน upgradeSheet() เพื่อเติมให้ชีตที่มีอยู่แล้ว
 ];
 
 var AUDIT_HEADERS = ['เวลา', 'ผู้ใช้', 'การกระทำ', 'หมายเลขแจ้งซ่อม', 'ฟิลด์', 'ค่าเดิม', 'ค่าใหม่'];
@@ -93,6 +94,7 @@ var FIELD_MAP = {
   cause: 'สาเหตุ',
   action_needed: 'ระบุความต้องการ',
   cost: 'ค่าใช้จ่าย',
+  parts: 'อะไหล่ที่ใช้',
   pr_no: 'เลขที่ PR',
   status_legacy: 'สถานะ',
   status: 'สถานะ (ละเอียด)',
@@ -113,6 +115,8 @@ var FIELD_MAP = {
   image_url: 'รูป',
   vendor: 'ผู้รับซ่อมภายนอก',
   expect_back: 'กำหนดรับคืน',
+  machine_down: 'เครื่องหยุดเดิน',
+  cause_code: 'รหัสสาเหตุ',
   cancel_reason: 'เหตุผลที่ยกเลิก'
 };
 
@@ -125,7 +129,7 @@ var PUBLIC_FIELDS = [
   'status', 'status_legacy', 'priority', 'due_at', 'assignee',
   'created_at', 'started_at', 'completed_at', 'reporter',
   'department', 'verified_by', 'verified_at', 'verification_status', 'rejection_note',
-  'source', 'image_url', 'vendor', 'expect_back', 'cancel_reason'
+  'source', 'image_url', 'vendor', 'expect_back', 'cancel_reason', 'machine_down', 'cause_code'
 ];
 
 /* ฟิลด์ที่ Guest (ฝ่ายผลิต) เขียนได้ตอนตรวจรับงาน ISO เท่านั้น
@@ -164,6 +168,129 @@ var PRIORITY_DEFAULT = 'ปกติ';
    ทำเป็นตัวเลือกเพื่อให้นับสถิติได้ว่ามีงานกี่ใบที่หน้างานจัดการกันเองได้
    แก้รายการที่นี่ที่เดียว ฝั่งหน้าเว็บดึงไปสร้างดรอปดาวน์เอง */
 var ACTION_NEEDED = ['ซ่อมเอง', 'ต้องการเรียกช่างซ่อมบำรุง'];
+
+/* ผู้แจ้งเป็นคนบอกเองว่าเครื่องหยุดไหม ไม่ใช่ให้ระบบเดาจากสถานะใบ
+   เขายืนอยู่หน้าเครื่องตอนกรอก ไม่มีใครรู้ดีกว่านั้น — และ "มีใบแต่เครื่องยังเดินได้"
+   เป็นเรื่องปกติในโรงงาน การอนุมานจากสถานะใบจึงให้ตัวเลขที่ดูน่าเชื่อแต่ผิด */
+/* ═══ รหัสสาเหตุ ═══
+   ช่อง "สาเหตุ" เป็นข้อความอิสระ ซึ่งแปลว่าทำ Pareto ตาม failure mode ไม่ได้เลย
+   และ Pareto ตาม failure mode คือฐานของ RCA กับ FMEA ทั้งหมด
+   ระบบจึงตอบได้แค่ "เครื่องไหนเสียบ่อย" ไม่มีวันตอบว่า "เสียเพราะอะไรบ่อย"
+
+   คนเลือกรหัสคือ "ช่างตอนปิดงาน" ไม่ใช่ "ผู้แจ้งตอนเปิดใบ" — ผู้แจ้งเห็นแค่อาการ
+   ช่างคือคนเดียวที่รู้สาเหตุจริงหลังรื้อออกมาดูแล้ว
+
+   แก้รายการได้จากชีต "ตั้งค่า" ช่อง "รหัสสาเหตุ" คั่นด้วยจุลภาค ไม่ต้องรอคนแก้โค้ด
+   แต่ต้องระวัง — ลบรหัสที่เคยใช้ไปแล้ว ใบเก่าจะอ้างรหัสที่ไม่มีในรายการ
+   ระบบยังแสดงผลได้ปกติ แค่แก้ใบนั้นต่อไม่ได้จนกว่าจะเลือกรหัสใหม่ */
+var CAUSE_CODES_DEFAULT = [
+  'ลูกปืน/แบริ่ง', 'มอเตอร์/เกียร์', 'ระบบไฟฟ้า/คอนโทรล', 'PLC/โปรแกรม/จอ',
+  'เซนเซอร์/สวิตช์', 'ลม/ไฮดรอลิก/วาล์ว', 'สายพาน/โซ่/คัปปลิ้ง',
+  'ฮีตเตอร์/ระบบทำความร้อน', 'ระบบหล่อเย็น/น้ำ', 'ใบมีด/ชุดตัด', 'แม่พิมพ์/ดาย',
+  'โครงสร้าง/ท่อ/รั่วซึม', 'ชิ้นงานติด/อุดตัน', 'ตั้งค่า/ใช้งานผิดวิธี',
+  'สึกหรอตามอายุ', 'อื่น ๆ'
+];
+
+function causeCodes_() {
+  var raw = String(cfg_('รหัสสาเหตุ', '')).trim();
+  if (!raw) return CAUSE_CODES_DEFAULT;
+  var list = raw.split(',').map(function (x) { return x.trim(); }).filter(String);
+  return list.length ? list : CAUSE_CODES_DEFAULT;
+}
+
+/* คำค้น -> รหัสสาเหตุ สำหรับ "เสนอ" รหัสให้ใบเก่าที่ยังไม่มี
+   ย้ำว่าเสนอ ไม่ใช่เขียนให้ — คนต้องกดยืนยันทุกใบ
+   เขียนทับข้อมูลจริงด้วยการเดาจากคำค้น คือการสร้างข้อมูลปลอมที่ดูน่าเชื่อ
+   ซึ่งแย่กว่าช่องว่าง เพราะช่องว่างยังรู้ว่าไม่รู้
+
+   เรียงจากเฉพาะเจาะจงไปกว้าง ตัวแรกที่เจอชนะ — "ปั๊มลมรั่ว" ต้องได้ลม ไม่ใช่รั่วซึม */
+var CAUSE_HINTS = [
+  ['ลูกปืน/แบริ่ง',          ['ลูกปืน', 'แบริ่ง', 'bearing']],
+  ['ใบมีด/ชุดตัด',           ['ใบมีด', 'ใบเลื่อย', 'คมตัด', 'blade', 'ชุดตัด']],
+  ['แม่พิมพ์/ดาย',           ['แม่พิมพ์', 'ดาย', 'mold', 'die', 't-die']],
+  ['ฮีตเตอร์/ระบบทำความร้อน', ['ฮีตเตอร์', 'heater', 'ความร้อน', 'อุณหภูมิ', 'เทอร์โม']],
+  ['ระบบหล่อเย็น/น้ำ',        ['หล่อเย็น', 'ชิลเลอร์', 'chiller', 'คูลลิ่ง', 'น้ำหล่อ', 'ปั๊มน้ำ']],
+  ['ลม/ไฮดรอลิก/วาล์ว',      ['ลม', 'นิวเมติก', 'ไฮดรอลิก', 'วาล์ว', 'กระบอก', 'โซลินอยด์', 'คอมเพรสเซอร์']],
+  ['สายพาน/โซ่/คัปปลิ้ง',     ['สายพาน', 'โซ่', 'คัปปลิ้ง', 'พูเลย์', 'เฟือง']],
+  ['PLC/โปรแกรม/จอ',         ['plc', 'โปรแกรม', 'จอ', 'หน้าจอ', 'ทัชสกรีน', 'hmi', 'อินเวอร์เตอร์']],
+  ['เซนเซอร์/สวิตช์',         ['เซนเซอร์', 'sensor', 'สวิตช์', 'ลิมิต', 'พร็อกซ์']],
+  ['ระบบไฟฟ้า/คอนโทรล',      ['เบรกเกอร์', 'แมคเนติค', 'ไฟฟ้า', 'สายไฟ', 'ตู้คอนโทรล', 'ไฟดับ', 'ช็อต', 'ฟิวส์']],
+  ['มอเตอร์/เกียร์',          ['มอเตอร์', 'motor', 'เกียร์', 'ขดลวด', 'โบร์เวอร์', 'blower']],
+  ['ชิ้นงานติด/อุดตัน',       ['ติด', 'อุดตัน', 'ตัน', 'ค้าง', 'กรองตัน', 'ถุงกรอง']],
+  ['ตั้งค่า/ใช้งานผิดวิธี',    ['ตั้งค่า', 'อะลายเม้น', 'ตั้งศูนย์', 'ปรับตั้ง', 'เซ็ตค่า']],
+  ['โครงสร้าง/ท่อ/รั่วซึม',   ['รั่ว', 'ซึม', 'ท่อ', 'แตก', 'ร้าว', 'เชื่อม']],
+  ['สึกหรอตามอายุ',          ['สึก', 'หมดอายุ', 'เสื่อม', 'ครบอายุ']]
+];
+
+function suggestCause_(text) {
+  var s = String(text || '').toLowerCase();
+  if (!s) return null;
+  for (var i = 0; i < CAUSE_HINTS.length; i++) {
+    var code = CAUSE_HINTS[i][0], words = CAUSE_HINTS[i][1];
+    for (var j = 0; j < words.length; j++) {
+      if (s.indexOf(words[j]) > -1) return { code: code, word: words[j] };
+    }
+  }
+  return null;
+}
+
+/** ใบที่ยังไม่มีรหัสสาเหตุ พร้อมรหัสที่ระบบเดาให้ — คนเป็นคนตัดสิน */
+function apiCauseSuggest(token, offset, limit) {
+  requireAuth_(token, 'LEAD');
+  var codes = causeCodes_();
+  var all = rowsToObjects_().filter(function (t) {
+    /* เฉพาะใบที่ซ่อมจบแล้ว — ใบที่ยังค้างอยู่ ช่างจะเลือกรหัสเองตอนส่งตรวจรับ
+       ไม่ต้องมานั่งเดาแทนเขา */
+    return !t.cause_code && t.status === STATUS_DONE;
+  });
+
+  var off = Math.max(0, Number(offset) || 0);
+  var lim = Math.min(50, Math.max(1, Number(limit) || 25));
+  var page = all.slice(off, off + lim).map(function (t) {
+    var hit = suggestCause_([t.description, t.cause, t.repair_action].join(' '));
+    return {
+      ticket_id: t.ticket_id, machine_name: t.machine_name,
+      description: truncate_(t.description), cause: truncate_(t.cause),
+      repair_action: truncate_(t.repair_action), created_at: iso_(t.created_at),
+      suggest: hit && codes.indexOf(hit.code) > -1 ? hit.code : '',
+      word: hit ? hit.word : ''
+    };
+  });
+  return { items: page, total: all.length, offset: off, codes: codes };
+}
+
+/** บันทึกรหัสที่คนยืนยันแล้วทีเดียวหลายใบ */
+function apiCauseApply(token, items) {
+  var user = requireAuth_(token, 'LEAD');
+  items = items || [];
+  if (!items.length) return { ok: true, saved: 0 };
+  if (items.length > 50) throw new Error('บันทึกได้ครั้งละไม่เกิน 50 ใบ');
+
+  var codes = causeCodes_();
+  var saved = 0, failed = [];
+  items.forEach(function (it) {
+    if (!it) return;
+    var code = String(it.cause_code || '').trim();
+    if (!code || codes.indexOf(code) === -1) return;      // ข้ามใบที่ยังไม่เลือก
+    /* ห่อทีละใบ — เดิมใบเดียวพังแล้วโยนออกกลางคัน ใบที่บันทึกไปแล้วก่อนหน้าก็บันทึกไปจริง
+       แต่หน้าเว็บได้ error อย่างเดียว ไม่รู้ว่าสำเร็จไปแล้วกี่ใบ แล้วกดซ้ำทั้งชุด */
+    try {
+      updateTicketInternal_(String(it.ticket_id), { cause_code: code }, {
+        action: 'ติดรหัสสาเหตุย้อนหลัง',
+        who: user.name + ' (' + user.role + ')',
+        quiet: true                                        // งานจัดข้อมูล ไม่ต้องยิงเมลหาใคร
+      });
+      saved++;
+    } catch (e) {
+      failed.push(String(it.ticket_id) + ': ' + e.message);
+    }
+  });
+  return { ok: true, saved: saved, failed: failed };
+}
+
+var MACHINE_DOWN_YES = 'หยุดเดิน';
+var MACHINE_DOWN_NO  = 'เดินต่อได้';
+var MACHINE_DOWN     = [MACHINE_DOWN_YES, MACHINE_DOWN_NO];
 
 /** งานอาคาร ห้องน้ำ ประตู ไฟถนน ไม่มีเครื่องจักรให้เลือก — บังคับเฉพาะงานที่เป็นเครื่องจักรจริง
  *  (ของเดิมบังคับทุกใบ ทำให้งานกลุ่มนี้ซึ่งเป็น 23% ของทั้งหมด แจ้งเข้าระบบไม่ได้เลย) */
@@ -228,8 +355,8 @@ function prop_(key) {
    คนตั้งค่าไม่ได้ก๊อปรหัสเปล่ามาวาง เขากด "คัดลอกลิงก์" แล้ววางทั้งลิงก์
    ซึ่งได้ค่าหน้าตาแบบนี้ลงไปใน Script Properties
 
-     1AbCdEfGhIjKlMnOpQrStUvWxYz01234?usp=drive_link
-     https://drive.google.com/drive/folders/1AbC...?usp=sharing
+     1PxvE1q93ctPXjBNSDrWgnEY-EK2MZwXn?usp=drive_link
+     https://drive.google.com/drive/folders/1Pxv...?usp=sharing
 
    DriveApp.getFolderById() ปฏิเสธทั้งสองแบบ แล้วโยน "รหัสไฟล์หรือโฟลเดอร์ไม่ถูกต้อง"
    ซึ่งเป็นข้อความที่อ่านแล้วไม่มีทางเดาได้ว่าต้องไปแก้ตรงไหน
@@ -438,7 +565,24 @@ function writeAudit_(action, ticketId, diffs, who) {
 function truncate_(v) {
   if (Object.prototype.toString.call(v) === '[object Date]') return iso_(v);
   var s = String(v == null ? '' : v);
-  return s.length > 300 ? s.slice(0, 300) + '…' : s;
+  return deFormula_(s.length > 300 ? s.slice(0, 300) + '…' : s);
+}
+
+/* ═══ กันสูตรหลุดลงชีต ═══
+   หน้าแจ้งซ่อมกับหน้าตรวจรับเปิดให้ฝ่ายผลิตใช้โดยไม่ต้องล็อกอิน ซึ่งถูกแล้ว
+   แต่ setValues/appendRow ของ Apps Script ตีความสตริงที่ขึ้นต้นด้วย = + - @ เป็น "สูตร"
+   แล้วสูตรนั้นรันด้วยสิทธิ์เจ้าของไฟล์ ซึ่งอ่านชีต Users ที่มี PIN hash กับ salt ได้
+   พิมพ์ =IMPORTDATA("https://.../?x="&Users!E2&Users!F2) ลงช่องอาการ = ข้อมูลออกนอกทันที
+
+   เติม ' ข้างหน้าเฉพาะตัวที่ขึ้นต้นอันตราย — Sheets ใช้ ' เป็นเครื่องหมาย "อันนี้เป็นข้อความ"
+   และไม่แสดงมันออกมา ข้อความปกติไม่ถูกแตะเลยสักตัว
+
+   จงใจไม่ดัก "-" ทั้งที่ตำราบอกให้ดัก — ช่างขึ้นต้นบรรทัดด้วย - เป็นปกติเวลาไล่รายการ
+   ("-เปลี่ยนลูกปืน -ทำความสะอาด") ข้อมูลจริงในชีตตอนนี้ก็เก็บเป็นข้อความธรรมดาไม่ใช่สูตร
+   ดักเพิ่มจะได้ ' ไปเกาะหน้าบันทึกการซ่อมแทบทุกใบ แลกกับช่องที่ไม่ได้เปิดอยู่จริง */
+function deFormula_(v) {
+  if (typeof v !== 'string' || !v) return v;
+  return /^[=+@]/.test(v) ? "'" + v : v;
 }
 
 /* ─────────── ติดตั้ง ─────────── */
@@ -896,7 +1040,7 @@ var CACHE_SEC = 300;
 /* ⚠️ เพิ่ม/ลบช่องใน apiGetConfig() แล้วต้องขยับเลขท้ายคีย์นี้ทุกครั้ง
    ไม่งั้นเครื่องที่เคยเปิดจะได้ก้อนแคชโครงเก่าที่ไม่มีช่องใหม่ไปอีก 5 นาที
    แล้วคนตั้งค่าจะนั่งงงว่าใส่ค่าในชีตแล้วทำไมหน้าเว็บไม่ขึ้น (เจอมาแล้วกับปุ่มเลี้ยงเบียร์) */
-var CACHE_KEY_CONFIG = 'cfg_v4';
+var CACHE_KEY_CONFIG = 'cfg_v8';   // v6 = เพิ่ม machineDown — ขยับเลขทุกครั้งที่เพิ่ม/ลบฟิลด์ใน apiGetConfig
 var CACHE_SEC_FORM = 21600;   // ลิงก์ฟอร์มแทบไม่เปลี่ยน เก็บยาวกว่าแคชตั้งค่า
 /* เพดานของ CacheService คือ 100KB ต่อคีย์ และนับเป็น "ไบต์" ไม่ใช่จำนวนตัวอักษร
    ภาษาไทยกินตัวละ 3 ไบต์ใน UTF-8 ถ้าเช็คด้วย .length จะประเมินต่ำไป 3 เท่า
@@ -1027,6 +1171,9 @@ function apiGetConfig(token) {
     }),
     priorityDefault: PRIORITY_DEFAULT,
     actionNeeded: ACTION_NEEDED,
+    machineDown: MACHINE_DOWN,
+    machineStatuses: MSTATUS_ALL,
+    causeCodes: causeCodes_(),
     statuses: [STATUS_OPEN, STATUS_DOING, STATUS_OUT, STATUS_WAIT, STATUS_DONE, STATUS_CANCEL],
     webAppUrl: ScriptApp.getService().getUrl(),
     slaHours: slaHoursFor_(PRIORITY_DEFAULT),   // ใช้เป็นค่าอ้างอิงบนหน้า KPI เท่านั้น
@@ -1037,8 +1184,11 @@ function apiGetConfig(token) {
     beerBtc: String(cfg_('ที่อยู่ Bitcoin เลี้ยงเบียร์', '')).trim(),
     /* URL ของ Apps Script เปลี่ยนทุกครั้งที่กด New deployment
        เก็บไว้ในชีต "ตั้งค่า" จะได้แก้เองได้โดยไม่ต้องรอคนแก้โค้ด */
-    /* เว้นว่าง = ไม่มีปุ่มไประบบสต็อก — ใส่ได้ทีหลังในชีต "ตั้งค่า" โดยไม่ต้องแก้โค้ด */
     stockUrl: String(cfg_('ลิงก์ระบบ Stock อะไหล่', '')),
+    /* โปรแกรมสร้างเอกสาร WI/OPL/FMEA — เป็นหน้าเว็บนิ่ง ๆ ไม่ได้ฝังเข้ามาในนี้
+       เพราะมันพิมพ์ A4/A3 กับโหลด Excel ออก ซึ่งทำใน iframe ของ Apps Script ไม่ได้ดี */
+    wiUrl: String(cfg_('ลิงก์โปรแกรมสร้างเอกสาร WI',
+      'https://twnote05.github.io/WI-Generator/WI_Generator.html')),
     maxImageBytes: MAX_IMAGE_BYTES,
     /* น้ำหนักคะแนนผลงานช่าง — อยู่ในชีตเพราะเป็น "นโยบาย" ไม่ใช่ "ตรรกะ"
        ปีไหนอยากเน้นวินัยการบันทึกก็ขยับเลขในชีต ไม่ต้องรอคนแก้โค้ดแล้ว deploy ใหม่ */
@@ -1206,7 +1356,7 @@ function appendTicket_(t, sh, head) {
     if (h === 'ลำดับ') return seqNo;
     if (h === 'วันที่แจ้ง') return t.created_at;
     var k = keyOf[h];
-    return k && t[k] !== undefined ? t[k] : '';
+    return k && t[k] !== undefined ? deFormula_(t[k]) : '';
   }));
 }
 
@@ -1229,6 +1379,15 @@ function apiCreateTicket(payload) {
 
     var machine = payload.machine_name ? assertKnownMachine_(payload.machine_name) : '';
 
+    /* ไม่บังคับกรอก — ใบงานสร้าง/งานอาคารไม่มีเครื่องจักรให้พูดถึง เว้นว่างได้
+       แต่ถ้ากรอกมา ต้องเป็นค่าใดค่าหนึ่งในสองค่านี้เท่านั้น ไม่งั้นคอลัมน์จะแตกเป็นข้อความอิสระ
+       แบบเดียวกับที่ชื่อเครื่องจักรเคยแตกเป็น 117 แบบ */
+    var down = String(payload.machine_down || '').trim();
+    if (down && MACHINE_DOWN.indexOf(down) === -1) {
+      throw new Error('สถานะเครื่องต้องเป็น: ' + MACHINE_DOWN.join(' หรือ '));
+    }
+    if (down && !machine) down = '';          // ไม่มีเครื่อง ก็ไม่มีอะไรให้หยุด
+
     var priority = PRIORITIES.filter(function (p) { return p.key === payload.priority; }).length
       ? payload.priority : PRIORITY_DEFAULT;
 
@@ -1246,7 +1405,7 @@ function apiCreateTicket(payload) {
       started_at: '', completed_at: '', technician: '', repair_action: '', repair_minutes: '',
       verified_by: '', verified_at: '', verification_status: '', rejection_note: '',
       reject_count: 0, source: String(payload.source || 'แจ้งซ่อม'),
-      image_url: ''
+      image_url: '', machine_down: down
     };
 
     /* รูปแนบพังต้องไม่ทำให้ใบแจ้งซ่อมหายไปทั้งใบ
@@ -1268,6 +1427,19 @@ function apiCreateTicket(payload) {
       { field: 'เครื่องจักร', oldValue: '', newValue: machine },
       { field: 'ผู้แจ้ง', oldValue: '', newValue: t.reporter }
     ], t.reporter || 'ผู้แจ้ง');
+
+    /* แจ้งว่าเครื่องหยุด = Machine log ขึ้นว่าหยุดทันที ไม่ต้องรอหัวหน้ามากดซ้ำ
+       ห่อ try ไว้ เพราะใบแจ้งซ่อมเข้าระบบแล้ว ถ้าเขียนสถานะพลาดต้องไม่ลากใบหายไปด้วย
+       เหตุผลเดียวกับที่แนบรูปไม่ผ่านแล้วใบยังอยู่ */
+    if (down === MACHINE_DOWN_YES) {
+      try {
+        logMachineStatus_(machine, MSTATUS_STOP,
+          id + ' — ' + String(payload.description).trim(),
+          t.reporter || 'ผู้แจ้ง', now, true);     // true = อยู่ใน lock ของ apiCreateTicket แล้ว
+      } catch (e) {
+        Logger.log('อัปเดตสถานะเครื่องจาก ' + id + ' ไม่สำเร็จ: ' + e.message);
+      }
+    }
 
     notifyNewTicket_(t);
     return { ok: true, ticket_id: id, image_url: t.image_url, due_at: iso_(t.due_at),
@@ -1316,10 +1488,33 @@ function updateTicketInternal_(ticketId, changes, ctx) {
       return c === -1 ? '' : rowVals[c];
     };
 
+    /* บางเส้นทางเรียกได้โดยไม่ต้องล็อกอิน จึงต้องบังคับว่าใบต้องอยู่สถานะที่ถูกต้องก่อน
+       เช็คตรงนี้เพราะแถวถูกอ่านแล้วและยังอยู่ในล็อก ถ้าไปเช็คข้างนอกจะมีช่องให้สถานะ
+       เปลี่ยนระหว่างที่เช็คเสร็จกับตอนเขียนจริง */
+    if (ctx.requireStatus && String(getVal('status') || '').trim() !== ctx.requireStatus) {
+      throw new Error('ใบนี้อยู่สถานะ "' + (getVal('status') || '—') + '" จึงทำรายการนี้ไม่ได้');
+    }
+
+    /* อะไหล่ของใบที่ซ่อมจบไปแล้ว = เติมข้อมูลย้อนหลัง เป็นสิทธิ์ของหัวหน้างานขึ้นไป
+       เดิมกันด้วยการซ่อนปุ่มอย่างเดียว ซึ่งไม่ใช่การกันสิทธิ์ — ใบที่ปิดและส่งให้คลัง
+       ตัดสต๊อกไปแล้วเมื่อสัปดาห์ก่อน ถ้าใครแก้รหัสทีหลังได้ ยอดที่ไม่ตรงจะหาสาเหตุไม่เจอ
+       ctx.rank ไม่ถูกส่ง = เส้นทางภายใน (ตรวจรับ · จ่ายงานหลายใบ) ซึ่งไม่แตะช่องนี้อยู่แล้ว */
+    if (changes && ctx.rank !== undefined && ctx.rank < RANK.LEAD && getVal('completed_at') &&
+        (changes.parts !== undefined || changes.cost !== undefined)) {
+      throw new Error('ใบนี้ซ่อมจบแล้ว การแก้อะไหล่หรือค่าใช้จ่ายย้อนหลังต้องให้หัวหน้างานขึ้นไปเป็นคนแก้');
+    }
+
     var work = {};
     Object.keys(changes || {}).forEach(function (k) {
       if (FIELD_MAP[k]) work[k] = changes[k];
     });
+
+    /* "คนเป็นคนกรอกเวลามาเอง" ต้องจำไว้ตรงนี้ ก่อนที่ระบบจะประทับเวลาให้เองข้างล่าง
+       ไม่งั้นตัวตรวจเวลาจะไปเล่นงานเวลาที่ระบบประทับเอง แล้วใบที่มีเวลาเสร็จแต่ไม่มีเวลาเริ่ม
+       (เปิดใบแล้วข้ามไปรอตรวจเลย) จะกดเริ่มซ่อมไม่ได้อีกเลย เพราะ started_at ที่เพิ่งประทับ
+       เป็นเวลาปัจจุบัน ซึ่งอยู่หลังเวลาเสร็จเดิมเสมอ */
+    var userStart = work.started_at !== undefined;
+    var userEnd   = work.completed_at !== undefined;
 
     // เปลี่ยนระดับความสำคัญแล้วไม่ได้กำหนดวันเองมาด้วย → เลื่อนกำหนดเสร็จตามระดับใหม่
     if (work.priority && !work.due_at) {
@@ -1339,8 +1534,23 @@ function updateTicketInternal_(ticketId, changes, ctx) {
     // นาทีที่ใช้ซ่อมต้องคิดที่ server เท่านั้น ไม่งั้น MTTR ปลอมได้จากหน้าเว็บ
     var startEff = toDate_(work.started_at !== undefined ? work.started_at : getVal('started_at'));
     var endEff   = toDate_(work.completed_at !== undefined ? work.completed_at : getVal('completed_at'));
+
+    /* ตรวจเฉพาะเวลาที่คนกรอกมาเอง ไม่ตรวจเวลาที่ระบบประทับให้
+       ใบเก่าที่เวลาเพี้ยนอยู่แล้วต้องยังแก้ฟิลด์อื่นและยังปิดงานได้ ไม่งั้นใบที่ข้อมูลเสีย
+       จะกลายเป็นใบที่แตะอะไรไม่ได้เลย ซึ่งแย่กว่าปล่อยให้ตัวเลขเพี้ยน */
+    var ceiling = new Date(Date.now() + 5 * 60000);     // เผื่อนาฬิกาเครื่องที่กรอกเดินเร็ว
+    if (userStart && startEff && startEff > ceiling) throw new Error('เวลาเริ่มซ่อมเป็นเวลาในอนาคต');
+    if (userEnd && endEff && endEff > ceiling) throw new Error('เวลาซ่อมเสร็จเป็นเวลาในอนาคต');
+    if ((userStart || userEnd) && startEff && endEff && endEff < startEff) {
+      throw new Error('เวลาซ่อมเสร็จต้องไม่ก่อนเวลาเริ่มซ่อม');
+    }
+
     if (startEff && endEff && endEff >= startEff) {
       work.repair_minutes = Math.round((endEff - startEff) / 60000);
+    } else if ((userStart || userEnd) && (!startEff || !endEff)) {
+      /* ลบเวลาข้างใดข้างหนึ่งทิ้งแล้วนาทีเดิมค้างอยู่ = MTTR อ้างอิงเวลาที่ไม่มีแล้ว
+         ล้างทิ้งไปเลย ให้เห็นว่า "ยังไม่รู้" ดีกว่าโชว์ตัวเลขที่พิสูจน์ไม่ได้ */
+      work.repair_minutes = '';
     }
 
     // ส่งกลับแก้ไข = นับจำนวนครั้งเพิ่มเองที่ server
@@ -1370,6 +1580,7 @@ function updateTicketInternal_(ticketId, changes, ctx) {
       if (c === -1) return;
       var v = work[key];
       if (DATE_FIELDS.indexOf(key) > -1 && v) v = new Date(v);
+      else v = deFormula_(v);                 // ข้อความที่แก้ทีหลังต้องกันสูตรเหมือนตอนเปิดใบ
       var before = rowVals[c];
       if (String(iso_(before)) === String(iso_(v))) return;    // ไม่เปลี่ยนจริง ไม่ต้องเขียน
       rowVals[c] = v;
@@ -1413,6 +1624,74 @@ function updateTicketInternal_(ticketId, changes, ctx) {
    pr_no = เลขใบขอซื้อจาก ERP หัวหน้าซ่อมบำรุง/หัวหน้าช่างเทคนิคเป็นคนกรอก ใช้ส่งต่อให้ฝ่ายบัญชี */
 var LEAD_ONLY_FIELDS = ['priority', 'due_at', 'assignee', 'pr_no', 'cancel_reason'];
 
+/* ═══ อะไหล่ที่ใช้ในใบนี้ ═══
+   หนึ่งใบใส่ได้หลายรหัส เก็บเป็นข้อความหลายบรรทัดในคอลัมน์เดียว ไม่ได้แยกเป็นชีตใหม่
+   เพราะทุกรายงานในระบบนี้อ่าน "หนึ่งแถว = หนึ่งใบ" แยกชีตเมื่อไหร่แปลว่าต้อง join
+   ทุกครั้งที่อ่านใบ ซึ่งแพงกว่าประโยชน์ที่ได้ตอนนี้มาก
+
+   รูปแบบคงที่ "รหัส x จำนวน" จึง parse กลับเป็นรายการได้ ทั้งตอนเติมลงฟอร์ม FM-MT-04
+   และตอนที่ระบบ Stock เริ่มใช้งานจริงแล้วต้องมาคิดต้นทุนอะไหล่รายเครื่อง
+   ponytail: คอลัมน์ข้อความ — แยกเป็นชีต Parts_Used เมื่อต้องรายงานรายอะไหล่ข้ามใบ
+
+   ไม่ตรวจว่ารหัสมีอยู่จริงในชีต Parts ของระบบ Stock โดยตั้งใจ — คนละสเปรดชีตกัน
+   และของจริงยังไม่ได้เริ่มใช้ ถ้าบังคับตอนนี้คือกรอกอะไรไม่ได้เลยสักรายการ
+
+   ไม่อยู่ใน LEAD_ONLY_FIELDS เพราะช่างคือคนเดียวที่รู้ว่าถอดตัวไหนออกใส่ตัวไหนเข้า
+   ถ้าช่างกรอกไม่ได้ ก็ไม่มีรหัสให้คลังตัดสต๊อกมาตั้งแต่ต้นทาง — หน้าจอเป็นคนกำหนดว่า
+   ใบที่ปิดแล้วเหลือเฉพาะหัวหน้าที่แก้ได้ ระดับเดียวกับช่อง "การซ่อม" และ "ค่าใช้จ่าย" */
+var PARTS_MAX = 30;                       // หนึ่งงานซ่อมใช้เกินนี้ แปลว่ากรอกผิดช่อง
+
+function parseParts_(text) {
+  var out = [], seen = {};
+  String(text == null ? '' : text).split(/[\r\n]+/).forEach(function (ln) {
+    var s = ln.trim();
+    if (!s) return;
+    /* ต้องมี "ช่องว่าง" คั่นหน้าตัว x เสมอ และกินให้ยาวที่สุด (ไม่ใช่ lazy)
+       ของเดิมใช้ \s* กับ .*? — "Oil seal TC 35x52x7" ซึ่งเป็นการเขียนขนาดซีลตามปกติ
+       และไม่มีจำนวนต่อท้ายเลย ถูกอ่านเป็นรหัส "Oil seal TC 35x52" จำนวน 7
+       ซีลหนึ่งตัวกลายเป็นเจ็ดตัวในแผ่นที่คลังเอาไปตัดสต๊อก พิสูจน์แล้วด้วยสคริปต์
+       ตอนนี้บรรทัดแบบนั้นจะไม่ผ่าน ซึ่งถูกแล้ว เพราะมันไม่ได้บอกจำนวนมาจริง ๆ
+       "สายพาน 2x4 x 10" ยังอ่านได้ถูกเพราะตัวคั่นจริงมีช่องว่างนำหน้า */
+    var m = s.match(/^(.*\S)\s+[x\u00d7*]\s*([0-9]+(?:\.[0-9]+)?)$/i);
+    if (!m) throw new Error('บรรทัด "' + s + '" ผิดรูปแบบ — ต้องเป็น "รหัสอะไหล่ x จำนวน" ' +
+                            '(ต้องเว้นวรรคหน้าตัว x)');
+    /* บีบให้เป็นรูปแบบเดียวตั้งแต่ตอนเก็บ ไม่ใช่แค่ตอนเทียบว่าซ้ำ
+       บนมือถือแป้นไทย ลูกปืนตัวเดียวกลายเป็น "6204-2RS" / "6204  2RS" / "6204-2rs"
+       ได้ภายในเดือนเดียว — เรื่องเดิมกับชื่อเครื่องจักรที่เคยแตกเป็น 117 แบบ
+       พอแตกแล้วคำถาม "ปีนี้ใช้อะไหล่ตัวนี้ไปเท่าไร" ตอบไม่ได้ ซึ่งคือเหตุผลเดียว
+       ที่เก็บข้อมูลชุดนี้ตั้งแต่ต้น · ตัวอักษรไทยไม่มีตัวใหญ่ toUpperCase จึงไม่กระทบ */
+    var code = m[1].trim().replace(/\s+/g, ' ').toUpperCase(), qty = Number(m[2]);
+    if (!code) throw new Error('มีบรรทัดที่ไม่ได้ใส่รหัสอะไหล่');
+    if (!(qty > 0)) throw new Error('จำนวนของ "' + code + '" ต้องมากกว่า 0');
+    /* กันเลขที่พิมพ์พลาดจนกลายเป็น exponent — Number(1e21) เขียนกลับเป็น "1e+21"
+       ซึ่ง regex ข้างบนอ่านไม่ออก แปลว่า server เขียนข้อความที่ตัวเองอ่านไม่ได้ลงชีต
+       แล้วการแก้ใบนั้นครั้งถัดไปจะ error ใส่ข้อความที่ server เขียนเอง
+       งานซ่อมหนึ่งงานไม่มีทางใช้อะไหล่ถึงหลักล้านชิ้น ตีกรอบไว้เลยจบกว่า */
+    if (qty >= 1e6 || qty < 1e-3) {
+      throw new Error('จำนวนของ "' + code + '" ไม่สมเหตุสมผล (' + m[2] + ')');
+    }
+    /* รหัสซ้ำแล้วบวกให้เงียบ ๆ = คนกรอกไม่รู้ว่าระบบแก้ตัวเลขให้ ทักไปเลยตรงกว่า */
+    var key = code;                           // บีบรูปแบบไปแล้วตั้งแต่ข้างบน
+    if (seen[key]) throw new Error('รหัส "' + code + '" ซ้ำกัน — รวมเป็นบรรทัดเดียวแล้วใส่จำนวนรวม');
+    seen[key] = 1;
+    out.push({ code: code, qty: qty });
+  });
+  if (out.length > PARTS_MAX) throw new Error('ใส่อะไหล่ได้ไม่เกิน ' + PARTS_MAX + ' รายการต่อใบ');
+  return out;
+}
+
+/** เขียนกลับเป็นรูปแบบเดียวเสมอ — ตรวจค่าหนึ่งแล้วเก็บอีกค่าหนึ่งคือที่มาของข้อมูลแตกรูปแบบ */
+function partsText_(items) {
+  return items.map(function (p) { return p.code + ' x ' + p.qty; }).join('\n');
+}
+
+/* ลงเวลาย้อนหลัง — งานที่ซ่อมจริงไปแล้วแต่มาเปิด/ปิดใบทีหลัง เวลาที่ server ประทับให้จึงไม่ตรง
+   ปล่อยไว้ MTTR กับ %Breakdown เพี้ยนทั้งเดือน แต่แก้ได้ทุกคนก็คือแต่งตัวเลขได้ทุกคน
+
+   ISO ไม่ได้ห้ามแก้ย้อนหลัง ห้ามแก้แบบไม่มีร่องรอย — Audit เก็บ "ใคร · จากอะไรเป็นอะไร"
+   อยู่แล้ว ขาดข้อเดียวคือ "เพราะอะไร" จึงบังคับกรอกเหตุผลแล้วเขียนลงคอลัมน์การกระทำของ Audit */
+var BACKDATE_FIELDS = ['started_at', 'completed_at'];
+
 function apiUpdateTicket(token, ticketId, changes) {
   var user = requireAuth_(token);
   if (!ticketId) throw new Error('ต้องระบุหมายเลขใบแจ้งซ่อม');
@@ -1422,6 +1701,55 @@ function apiUpdateTicket(token, ticketId, changes) {
   });
   if (planning.length) requireAuth_(token, 'LEAD');
 
+  /* รหัสสาเหตุต้องอยู่ในรายการเท่านั้น ปล่อยให้พิมพ์เองเมื่อไหร่ก็กลับไปเป็นข้อความอิสระ
+     แล้ว Pareto ก็พังอีกรอบ — บทเรียนเดียวกับชื่อเครื่องจักรที่เคยแตกเป็น 117 แบบ
+     ค่าว่างผ่านได้ เพราะใบเก่า 347 ใบยังไม่มีรหัส และยังต้องแก้ฟิลด์อื่นของมันได้ */
+  if (changes && changes.cause_code) {
+    var cc = String(changes.cause_code).trim();
+    if (causeCodes_().indexOf(cc) === -1) {
+      throw new Error('รหัสสาเหตุ "' + cc + '" ไม่อยู่ในรายการ — เลือกจากที่ระบบมีให้เท่านั้น');
+    }
+    changes.cause_code = cc;          // เขียนค่าที่ตัดช่องว่างแล้วกลับไป ไม่ใช่ตรวจค่าหนึ่งเก็บอีกค่าหนึ่ง
+  }
+
+  /* ตอนเปิดใบตรวจไว้แล้ว แต่ตอนแก้ใบไม่ได้ตรวจ — ช่างจึงยัดข้อความอะไรก็ได้ลงช่องนี้
+     ค่าที่ไม่ใช่ "หยุดเดิน" เป๊ะ ๆ ทำให้ isDownTicket_ มองไม่เห็นใบนั้น
+     กฎกันปลดเครื่องก่อนเวลาเลยถูกปิดไปเงียบ ๆ และคอลัมน์กลับไปเป็นข้อความอิสระ */
+  if (changes && changes.machine_down) {
+    var md = String(changes.machine_down).trim();
+    if (MACHINE_DOWN.indexOf(md) === -1) {
+      throw new Error('สถานะเครื่องต้องเป็น: ' + MACHINE_DOWN.join(' หรือ '));
+    }
+    changes.machine_down = md;
+  }
+
+  /* ตรวจที่ server ไม่ใช่แค่ที่หน้าจอ — หน้าจอไม่ใช่ขอบเขตความเชื่อถือ
+     ค่าว่างผ่านได้ เพราะต้องลบรายการที่ใส่ผิดออกทั้งหมดได้ */
+  if (changes && changes.parts !== undefined) {
+    changes.parts = partsText_(parseParts_(changes.parts));
+  }
+
+  var backdating = Object.keys(changes || {}).some(function (k) {
+    return BACKDATE_FIELDS.indexOf(k) > -1;
+  });
+  var why = '';
+  if (backdating) {
+    requireAuth_(token, 'LEAD');
+    why = String(changes.backdate_reason || '').trim();
+    if (!why) throw new Error('ต้องระบุเหตุผลที่ลงเวลาย้อนหลัง');
+  }
+
+  /* "ซ่อมเสร็จสมบูรณ์" ตั้งเองจากทางนี้ไม่ได้ ต้องผ่าน apiVerifyTicket ทางเดียว
+     เพราะที่นั่นคือจุดที่ฝ่ายผลิตเซ็นรับงาน แล้ว server เป็นคนตั้งสถานะให้เอง (ไม่รับจาก client)
+     ไม่งั้นช่างที่ล็อกอินแล้วยิง apiUpdateTicket ตรง ๆ จะปิดงานตัวเองได้โดยไม่มีคนตรวจรับ
+     บันทึกการตรวจรับทั้งชุดกลายเป็นของปลอม ซึ่งเป็นเรื่องเดียวกับที่ apiBulkUpdate
+     กันไว้แล้วตั้งแต่แรก ("ปิดงานหลายใบพร้อมกันไม่ได้") แต่ทางใบเดี่ยวยังเปิดอยู่
+
+     ปล่อยให้ตั้งสถานะอื่นได้ตามเดิม — เริ่มซ่อม ส่งซ่อมนอก ส่งตรวจรับ คืองานประจำวันของช่าง */
+  if (changes && changes.status === STATUS_DONE) {
+    throw new Error('ปิดงานเองไม่ได้ — ต้องให้ฝ่ายผลิตกดตรวจรับงานตามขั้นตอน ISO');
+  }
+
   /* ยกเลิกใบเป็นสิทธิ์ของหัวหน้างานเท่านั้น และต้องมีเหตุผลเสมอ
      ใบที่หายไปจากสถิติโดยไม่มีคำอธิบาย คือช่องโหว่ที่ทำให้ตัวเลขถูกแต่งได้ */
   if (changes && changes.status === STATUS_CANCEL) {
@@ -1429,8 +1757,11 @@ function apiUpdateTicket(token, ticketId, changes) {
     if (!String(changes.cancel_reason || '').trim()) throw new Error('ต้องระบุเหตุผลที่ยกเลิก');
   }
   return updateTicketInternal_(ticketId, changes, {
-    action: 'แก้ไขใบแจ้งซ่อม',
-    who: user.name + ' (' + user.role + ')'     // Audit ต้องรู้ว่าใครเป็นคนแก้
+    action: why ? 'ลงเวลาย้อนหลัง — ' + why : 'แก้ไขใบแจ้งซ่อม',
+    who: user.name + ' (' + user.role + ')',    // Audit ต้องรู้ว่าใครเป็นคนแก้
+    /* ส่งระดับสิทธิ์ลงไปตรวจตอนอ่านแถวแล้ว — ตรงนั้นที่เดียวที่รู้ว่าใบปิดไปหรือยัง
+       โดยไม่ต้องอ่านชีตซ้ำ และยังอยู่ในล็อก สถานะจึงเปลี่ยนแทรกกลางทางไม่ได้ */
+    rank: RANK[user.role] || 0
   });
 }
 
@@ -1518,10 +1849,50 @@ function apiVerifyTicket(ticketId, payload) {
   if (!pass && !safe.rejection_note) throw new Error('ส่งกลับแก้ไขต้องระบุสาเหตุ');
   if (pass) safe.status = STATUS_DONE;        // ตั้งให้เองฝั่ง server ไม่รับจาก client
 
+  /* เส้นทางนี้ไม่ต้องใช้ token โดยตั้งใจ ฝ่ายผลิตจะได้ตรวจรับโดยไม่ต้องมีบัญชี
+     แต่เลขใบเรียงกันจึงเดาได้ ถ้าไม่บังคับสถานะ ใครก็กดปิดใบที่ยังซ่อมไม่เสร็จ
+     ปลุกใบที่ยกเลิกไปแล้ว หรือกด "ส่งกลับ" ใส่ใบที่ปิดแล้วเพื่อล้างเวลาซ่อมทิ้งได้
+     หน้าจอก็เปิดปุ่มนี้เฉพาะสถานะนี้อยู่แล้ว ไม่ได้ตัดทางที่ใช้งานจริง */
   var res = updateTicketInternal_(ticketId, safe, {
     action: pass ? 'ตรวจรับงานผ่าน' : 'ส่งกลับแก้ไข',
-    who: safe.verified_by
+    who: safe.verified_by,
+    requireStatus: STATUS_WAIT
   });
+
+  /* ผู้ตรวจรับยืนยันว่าเครื่องกลับมาเดินแล้ว — คนเดียวกับที่เพิ่งไปดูของจริงที่หน้าเครื่อง
+     ปลดให้เฉพาะตอนตรวจรับผ่าน ส่งกลับแก้ไขแปลว่างานยังไม่จบ เครื่องยังไม่ควรขึ้นว่าเดิน */
+  if (pass && payload.machine_back) {
+    try {
+      var t = rowsToObjects_().filter(function (x) { return x.ticket_id === ticketId; })[0];
+      var mc = t && t.machine_name;
+      /* ต้องเป็นใบที่ "ผู้แจ้งบอกว่าเครื่องหยุด" เท่านั้น
+         เดิมเชื่อ machine_back จากหน้าเว็บอย่างเดียว ซึ่งเส้นทางนี้ไม่ต้องล็อกอิน
+         ใครรู้เลขใบก็ส่งมาได้ แล้วไปลบสถานะหยุดที่หัวหน้าตั้งไว้เองโดยไม่มีใบเกี่ยวข้อง */
+      if (mc && t.machine_down !== MACHINE_DOWN_YES) {
+        Logger.log('ข้ามการปลด ' + mc + ' — ใบ ' + ticketId + ' ไม่ได้แจ้งว่าเครื่องหยุด');
+        mc = '';
+      }
+      if (mc) {
+        /* เครื่องถูกสั่งหยุดตามแผน PM อยู่ ปิดใบซ่อมไม่ได้แปลว่างาน PM จบไปด้วย
+           ปลดให้ตรงนี้คือไปลบสถานะที่คนอื่นตั้งใจตั้งไว้ */
+        var cur = machineStatus_()[mc];
+        var still = otherDownTickets_(mc, ticketId);
+        if (cur && cur.status === MSTATUS_PLAN) {
+          Logger.log('ไม่ปลด ' + mc + ' เพราะกำลังหยุดตามแผน PM อยู่');
+        } else if (still.length) {
+          /* ยังมีใบอื่นที่บอกว่าเครื่องนี้หยุดอยู่ ปิดใบนี้ใบเดียวไม่ได้แปลว่าเครื่องเดินได้แล้ว
+             ปล่อยให้ขึ้นว่าเดินทั้งที่ยังซ่อมไม่เสร็จ คือตัวเลข Availability ที่โกหก */
+          Logger.log('ไม่ปลด ' + mc + ' เพราะยังมีใบค้าง: ' +
+            still.map(function (x) { return x.ticket_id; }).join(', '));
+        } else {
+          logMachineStatus_(mc, MSTATUS_RUN, ticketId + ' — ตรวจรับงานผ่าน เครื่องกลับมาเดินปกติ',
+                            safe.verified_by, new Date());
+        }
+      }
+    } catch (e) {
+      Logger.log('ปลดสถานะเครื่องจาก ' + ticketId + ' ไม่สำเร็จ: ' + e.message);
+    }
+  }
 
   /* ให้คะแนนได้เฉพาะตอนอนุมัติ — งานที่ส่งกลับยังไม่จบ ให้คะแนนตอนนี้ก็ยังไม่รู้ผล
      และเหตุผลที่ส่งกลับถูกเก็บไว้ที่ใบแจ้งซ่อมอยู่แล้ว ไม่ต้องเก็บซ้ำ */
@@ -2053,9 +2424,35 @@ function pmBuildSchedule_(months, who) {
   });
 
   if (out.length) {
-    pack.sheet.getRange(pack.sheet.getLastRow() + 1, 1, out.length, PMCAL_HEAD.length).setValues(out);
-    SpreadsheetApp.flush();
-    writeAudit_('ออกตาราง PM ล่วงหน้า', out.length + ' ครั้ง / ' + months + ' เดือน', [], who || 'ระบบ');
+    /* ต้องถือล็อกตอนเขียน — ของเดิมไม่ถือเลยสักทางในสามทางที่เรียก (ทริกเกอร์รายวัน ·
+       ปุ่มออกตารางล่วงหน้า · ปุ่มล้างแล้วกางใหม่) สองคนกดพร้อมกันจะอ่าน getLastRow()
+       ได้เลขเดียวกันแล้วเขียนทับบล็อกของกันและกัน ได้รหัส PM- ซ้ำและครั้งที่หายไปเงียบ ๆ
+       "กางตารางเป็น idempotent" จริงเฉพาะตอนรันทีละคน ไม่ใช่ตอนรันพร้อมกัน
+
+       อ่านใหม่ในล็อกด้วย ไม่ใช้ seen จากตอนต้นฟังก์ชัน เพราะระหว่างที่คิดอยู่
+       อีกคนอาจเพิ่งเขียนวันเดียวกันลงไปแล้ว */
+    var lk = LockService.getScriptLock();
+    lk.waitLock(20000);
+    try {
+      var p2 = pmRows_(), i2 = pmIdx_(p2.head), has = {};
+      p2.rows.forEach(function (r2) {
+        var o2 = pmObj_(r2, i2);
+        has[o2.machine + '|' + o2.task + '|' + o2.planned] = true;
+      });
+      out = out.filter(function (row) {
+        // row เรียงตาม PMCAL_HEAD: 1=เครื่องจักร 2=งาน PM 3=วันที่วางแผน
+        return !has[canonical_(row[1]) + '|' + String(row[2]) + '|' + dayKey_(row[3])];
+      });
+      if (out.length) {
+        p2.sheet.getRange(p2.sheet.getLastRow() + 1, 1, out.length, PMCAL_HEAD.length).setValues(out);
+        SpreadsheetApp.flush();
+      }
+    } finally {
+      lk.releaseLock();
+    }
+    if (out.length) {
+      writeAudit_('ออกตาราง PM ล่วงหน้า', out.length + ' ครั้ง / ' + months + ' เดือน', [], who || 'ระบบ');
+    }
   }
   return { created: out.length, skipped: skipped };
 }
@@ -2266,6 +2663,159 @@ function apiPmSavePlan(token, row) {
   return { ok: true, updated: false };
 }
 
+/* ลบแผน PM — เครื่องถูกขาย งานถูกยุบรวม หรือรอบที่วางไว้ไม่ตรงกับหน้างานแล้ว
+   แผนนั้นก็ไม่ควรกางลงปฏิทินต่อ
+
+   ชีต "แผน PM" เป็นทะเบียนแม่ ไม่ใช่บันทึกเหตุการณ์ จึงลบแถวได้โดยไม่ขัดข้อกำหนด append-only
+   ส่วนปฏิทินลบเฉพาะครั้งที่ยัง "วางแผนไว้" และวันยังไม่ถึง — ครั้งที่ทำไปแล้วคือประวัติ
+   ห้ามแตะเด็ดขาด ไม่งั้น %PM Compliance ของเดือนที่ปิดไปแล้วจะขยับเองโดยไม่มีใครรู้ตัว */
+/* ลบครั้งที่ "วางแผนไว้" และวันยังไม่ถึง ของแผนเดียว — คืนจำนวนที่ลบไป
+   ครั้งที่ทำไปแล้วหรือเลยวันมาแล้วไม่แตะ นั่นคือประวัติที่ %PM Compliance ย้อนหลังใช้อยู่
+   ไล่จากล่างขึ้นบน ลบจากบนลงล่างแล้วแถวที่เหลือจะเลื่อนขึ้น ตัวนับจะข้ามแถวถัดไปทุกครั้ง
+   ผู้เรียกต้องถือล็อกมาแล้ว — ฟังก์ชันนี้ลบแถวรัว ๆ ไม่ควรมีใครเขียนชีตแทรกกลางทาง */
+function pmDropFuture_(m, t, onlyFuture) {
+  var today = dayKey_(new Date());
+  var pack = pmRows_(), i = pmIdx_(pack.head), dropped = 0;
+  for (var k = pack.rows.length - 1; k >= 0; k--) {
+    var o = pmObj_(pack.rows[k], i);
+    /* เทียบชื่องานแบบตัดช่องว่างหัวท้าย — ฝั่งชีตแผนเทียบแบบ trim อยู่แล้ว
+       แถวที่คีย์ลงชีตตรง ๆ แล้วติดเว้นวรรคท้ายจะหลุดทุกครั้งถ้าสองฝั่งเทียบไม่เหมือนกัน
+       ผลคือแผนถูกลบ แต่ครั้งในปฏิทินค้างตลอดกาลโดยไม่มีแผนอยู่ข้างหลัง
+
+       ครั้งที่มีใบแจ้งซ่อมผูกแล้วห้ามลบ — ช่างไปตรวจรอบหน้าก่อนกำหนด เจอของเสีย
+       แล้วเปิดใบจากรอบนั้น แถวนั้นยังเป็น "วางแผนไว้" อยู่ ลบไปคือใบซ่อมนั้น
+       อ้างที่มาไม่ได้อีก — ท่าเดียวกับที่ removePlannedPm ระวังไว้แล้ว */
+    if (o.machine === m && String(o.task).trim() === t && o.status === PM_PLANNED &&
+        !o.actual && !o.ticketId && o.planned &&
+        (!onlyFuture || o.planned >= today)) {
+      pack.sheet.deleteRow(k + 2);            // +1 แถวหัวตาราง +1 เพราะแถวชีตเริ่มนับที่ 1
+      dropped++;
+    }
+  }
+  return dropped;
+}
+
+/* ปฏิทินตอนนี้กางไปถึงกี่เดือนข้างหน้า — ใช้รักษาระยะเดิมไว้ตอนกางใหม่
+   อย่างน้อย 12 เดือนเท่าทริกเกอร์รายวัน ไม่เกิน 24 เท่าเพดานของ apiPmBuildSchedule */
+function pmHorizonMonths_() {
+  var pack = pmRows_(), i = pmIdx_(pack.head), max = '';
+  pack.rows.forEach(function (r) {
+    var o = pmObj_(r, i);
+    if (o.planned && o.planned > max) max = o.planned;
+  });
+  if (!max) return 12;
+  var months = Math.ceil((new Date(max).getTime() - Date.now()) / (30 * 864e5));
+  return Math.min(Math.max(months, 12), 24);
+}
+
+/* ล้างตารางล่วงหน้าของแผนเดียวแล้วกางใหม่ — ท่าที่ต้องใช้ทุกครั้งหลังแก้ "รอบ (วัน)"
+
+   แก้รอบจาก 90 เป็น 30 วันแล้วกด "ออกตารางล่วงหน้า" เฉย ๆ จะได้วันของรอบเก่าค้างปนกับรอบใหม่
+   เพราะตัวกางตารางข้ามเฉพาะคู่ เครื่อง|งาน|วันที่ ที่ซ้ำกันเป๊ะ มันไม่มีทางรู้ว่าวันเดิม
+   มาจากรอบที่เลิกใช้แล้ว
+
+   กางใหม่ให้เลยในคำสั่งเดียว — ล้างแล้วลืมกดกาง คือปฏิทินของแผนนั้นว่างเปล่า ซึ่งแย่กว่าเดิม */
+function apiPmClearSchedule(token, machine, task) {
+  var user = requireAuth_(token, 'LEAD');
+  var m = canonical_(machine);
+  var t = String(task || '').trim();
+  if (!m || !t) throw new Error('ต้องระบุเครื่องจักรและชื่องาน PM');
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  var dropped, horizon;
+  try {
+    /* จำระยะที่ปฏิทินกางไว้เดิมก่อนลบ — ของเดิมลบอนาคตทิ้งแบบไม่มีเพดาน แล้วกางกลับ
+       แค่ 12 เดือนตายตัว โรงงานที่เคยกดกาง 24 เดือนจะเสียเดือนที่ 13-24 ของแผนนั้น
+       ไปเงียบ ๆ ทั้งที่ข้อความแจ้งผลขึ้นว่าสำเร็จ */
+    horizon = pmHorizonMonths_();
+    /* ปุ่มนี้คือ "เปลี่ยนรอบแล้วกางใหม่" จึงแตะเฉพาะอนาคต — ครั้งที่เลยกำหนดแล้วยังไม่ได้ทำ
+       คือหนี้ค้างจริงที่ต้องเห็นต่อไป ต่างจากปุ่มลบแผนที่ตั้งใจเคลียร์ทั้งกระดาน */
+    dropped = pmDropFuture_(m, t, true);
+    SpreadsheetApp.flush();
+    /* เขียน Audit ตรงนี้ ก่อนออกจากล็อกและก่อนกางใหม่ — ของเดิมเขียนหลังกางเสร็จ
+       ถ้ากางตารางชนเพดาน 6 นาทีของ GAS แถวที่ลบไป commit เรียบร้อยแล้ว
+       แต่ไม่มี Audit สักแถว ไม่มีใครรู้ว่าวันไหนหายไปและใครเป็นคนสั่ง */
+    writeAudit_('ล้างตารางล่วงหน้า', m + ' · ' + t,
+                [{ field: 'ตาราง PM ล่วงหน้า', oldValue: dropped + ' ครั้ง',
+                   newValue: 'ลบแล้ว รอกางใหม่ ' + horizon + ' เดือน' }], user.name);
+  } finally {
+    lock.releaseLock();
+  }
+
+  /* กางนอกล็อก — ท่อนนี้ยาวกว่ามาก ถือล็อกคร่อมไว้ด้วยแปลว่าคนอื่นบันทึกอะไรไม่ได้เลยทั้งช่วง
+     กางตารางเป็น idempotent อยู่แล้ว (ข้ามคู่ที่มีอยู่) ใครมากดพร้อมกันก็ไม่เกิดแถวซ้ำ */
+  var r = pmBuildSchedule_(horizon, user.name);
+
+  /* นับของแผนนี้เองหลังกางเสร็จ — r.created เป็นยอดรวมทั้งโรงงาน ซึ่งถูกกลบด้วยแผนอื่น
+     จนอ่านไม่ออกว่าแผนที่เพิ่งแก้ได้ตารางกลับมาจริงไหม ถ้าชื่อเครื่องไม่ตรงทะเบียน
+     แผนนี้จะถูกข้ามเงียบ ๆ ได้ 0 ครั้ง ทั้งที่ยอดรวมขึ้นเป็นร้อย */
+  var today2 = dayKey_(new Date());
+  var p3 = pmRows_(), i3 = pmIdx_(p3.head), mine = 0;
+  p3.rows.forEach(function (row) {
+    var o = pmObj_(row, i3);
+    if (o.machine === m && String(o.task).trim() === t && o.status === PM_PLANNED &&
+        o.planned && o.planned >= today2) mine++;
+  });
+  clearCache();
+  writeAudit_('กางตาราง PM ใหม่หลังล้าง', m + ' · ' + t,
+              [{ field: 'ตาราง PM ล่วงหน้า', oldValue: 'ลบไป ' + dropped + ' ครั้ง',
+                 newValue: 'แผนนี้ได้ ' + mine + ' ครั้ง (ทั้งระบบ ' + r.created + ')' }],
+              user.name);
+  return { ok: true, dropped: dropped, mine: mine, created: r.created, skipped: r.skipped };
+}
+
+function apiPmDeletePlan(token, machine, task) {
+  var user = requireAuth_(token, 'LEAD');
+  var m = canonical_(machine);
+  var t = String(task || '').trim();
+  if (!m || !t) throw new Error('ต้องระบุเครื่องจักรและชื่องาน PM ที่จะลบ');
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sh = sheet_(SHEET_PMPLAN);
+    var vals = sh.getDataRange().getValues();
+    var head = vals[0];
+    var iM = head.indexOf('เครื่องจักร'), iT = head.indexOf('งาน PM');
+    var hit = 0, saved = [];
+    /* ไล่จากล่างขึ้นบน — ลบจากบนลงล่างแล้วแถวที่เหลือจะเลื่อนขึ้น ตัวนับจะข้ามแถวถัดไปทุกครั้ง */
+    for (var r = vals.length - 1; r >= 1; r--) {
+      if (canonical_(vals[r][iM]) === m && String(vals[r][iT]).trim() === t) {
+        /* เก็บค่าทุกช่องลง Audit ก่อนลบ — รอบ · ผู้รับผิดชอบ · ทำครั้งล่าสุด · หัวข้อตรวจ
+           อยู่ในแถวนี้ที่เดียว ชีตตาราง PM ไม่มีคอลัมน์หัวข้อตรวจ และ pmChecklistOf_
+           ไปอ่านจากชีตแผนสด ๆ ตอนสั่งพิมพ์ ลบแผนทิ้งแล้วใบงาน PM ของรอบที่ทำไปแล้ว
+           จะพิมพ์ออกมาเป็นบรรทัดว่าง — เก็บไว้ใน Audit อย่างน้อยยังกู้กลับมาคีย์ใหม่ได้ */
+        head.forEach(function (h, c) {
+          if (String(vals[r][c] || '') !== '') {
+            saved.push({ field: String(h), oldValue: String(vals[r][c]), newValue: '(ลบ)' });
+          }
+        });
+        sh.deleteRow(r + 1);
+        hit++;
+      }
+    }
+    if (!hit) throw new Error('ไม่พบแผน "' + m + ' · ' + t + '" ในชีตแผน PM');
+
+    /* เคลียร์ออกจากกระดานทั้งหมด ทั้งที่เลยกำหนดและที่วางไว้ล่วงหน้า — ลบแผนแล้ว
+       วิศวกรจะใส่แผนชุดใหม่เข้าไปแทน ถ้าเหลือของเก่าคาไว้ ปฏิทินจะปนกันสองชุด
+       ครั้งที่ทำไปแล้วและครั้งที่มีใบแจ้งซ่อมผูกอยู่ยังอยู่ครบ นั่นคือประวัติ ไม่ใช่แผน */
+    var dropped = pmDropFuture_(m, t, false);
+    SpreadsheetApp.flush();
+    clearCache();
+    /* ไม่เก็บรายวันที่ที่เคลียร์ออก — รอบที่ไม่มีบันทึกว่าช่างผู้รับผิดชอบทำแล้ว
+       ไม่ใช่ข้อมูลที่ต้องเก็บ เก็บแค่จำนวนไว้ให้รู้ว่ากระทบปฏิทินแค่ไหนก็พอ
+       ส่วนตัวนิยามแผน (รอบ · ผู้รับผิดชอบ · หัวข้อตรวจ) ลง Audit ไปแล้วข้างบน
+       เพราะอันนั้นคือของที่ต้องใช้ตอนคีย์แผนชุดใหม่เข้าไปแทน */
+    saved.push({ field: 'ตาราง PM ที่ยังไม่ได้ทำ', oldValue: dropped + ' ครั้ง',
+                 newValue: 'เคลียร์ออกจากปฏิทินแล้ว' });
+    writeAudit_('ลบแผน PM', m + ' · ' + t, saved, user.name);
+    return { ok: true, dropped: dropped };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 /* ═══════════ ความคิดเห็นต่อฝ่ายซ่อมบำรุง ═══════════
    เก็บสองทาง เพราะคนสองกลุ่มพูดคนละจังหวะกัน
 
@@ -2313,7 +2863,7 @@ function writeFeedback_(row) {
     row.type,
     row.rating || '',
     truncate_(row.subject || ''),
-    String(row.detail || '').slice(0, FEEDBACK_MAX),
+    deFormula_(String(row.detail || '').slice(0, FEEDBACK_MAX)),
     truncate_(row.by || ''),
     truncate_(row.dept || ''),
     String(row.ticketId || '')
@@ -2663,23 +3213,121 @@ function kvCheck_(values, std, tol) {
 
    หัวคอลัมน์อ่านจากหัวตาราง ไม่นับตำแหน่ง เพราะชีตนี้คนของโรงงานแก้เอง สลับคอลัมน์เมื่อไรก็ได้
    ยังคงอ่านอย่างเดียว ไม่มีคำสั่งเขียนกลับไปที่ไฟล์ต้นทางแม้แต่บรรทัดเดียว */
-function paramStdSheet_() {
+/* เว็บแอป "EXTRUSION MONITOR & CONTROL" ที่ช่างใช้ลงค่าจริง
+   วางเป็นค่าตั้งต้นแบบเดียวกับลิงก์ระบบ Stock อะไหล่ — ชีต "ตั้งค่า" ยังทับได้เสมอ
+   เพราะ URL ของ Apps Script เปลี่ยนทุกครั้งที่กด New deployment
+   ก่อนหน้านี้ค่าตั้งต้นเป็นค่าว่าง ปุ่ม "ลงค่า" จึงซ่อนตัวเองทุกที่จนไม่มีใครเห็น */
+/* ใส่ URL เว็บแอปบันทึกพารามิเตอร์ของคุณตรงนี้ หรือกรอกที่ชีต "ตั้งค่า" ก็ได้
+   ว่างไว้ = ปุ่ม "ลงค่า" ซ่อนตัวเอง ดีกว่าปุ่มที่กดแล้วไปหน้า 404 */
+var PARAM_FORM_URL = '';
+
+/* ไฟล์ของโรงงานมีชีตพิกัดสองใบที่คนละทรงกัน และจะมีใบที่สามได้อีกเรื่อย ๆ
+     Std.parameter — ทรงกว้าง ของ Extrusion ขึ้นทะเบียนไว้ตั้งแต่แรก
+     Std.fields    — ทรงยาว ของเครื่องที่เหลือ วิศวกรแก้เองได้จากหน้าเว็บ
+   ของเดิมคืนใบแรกที่เจอแล้วหยุด เครื่องที่พิกัดอยู่ในใบหลังจึงไม่มีพิกัดเลย
+   ทั้งที่กรอกไว้เรียบร้อย — คืนทุกใบแล้วเอามารวมกันแทน */
+function paramStdSheets_() {
   var all;
-  try { all = paramSS_().getSheets(); } catch (e) { return null; }
-  for (var i = 0; i < all.length; i++) {
-    var n = all[i].getName().toLowerCase();
-    if ((n.indexOf('std') > -1 || n.indexOf('พิกัด') > -1 || n.indexOf('spec') > -1) &&
-        all[i].getLastRow() > 1) return all[i];
-  }
-  return null;
+  try { all = paramSS_().getSheets(); } catch (e) { return []; }
+  return all.filter(function (sh) {
+    var n = sh.getName().toLowerCase();
+    return (n.indexOf('std') > -1 || n.indexOf('พิกัด') > -1 || n.indexOf('spec') > -1) &&
+           sh.getLastRow() > 1;
+  });
+}
+
+/** ใบแรก — เหลือไว้ให้โค้ดเดิมที่ยังอ่านทีละใบเรียกใช้ */
+function paramStdSheet_() {
+  var all = paramStdSheets_();
+  return all.length ? all[0] : null;
+}
+
+/* ═══ ชีตพิกัดทรงกว้าง ═══
+   ไฟล์จริงของโรงงาน (ชีต "Std.parameter") เก็บแถวละหนึ่งเครื่อง แล้วแตกคอลัมน์ตามจุดวัด
+     Machine | STD Z1 … STD Z7 | STD T-Die Z1 … STD T-Die Z7 | หมายเหตุ
+   ตัวอ่านทรงยาวข้างล่างมองไม่เห็นเลย เพราะไม่มีคอลัมน์ "ชื่อพารามิเตอร์" ให้จับ
+   แล้วมันคืนค่าว่างทั้งก้อน — ผลคือหน้าพารามิเตอร์ดูค่าได้ แต่ตัดสินผ่าน/ไม่ผ่าน
+   ไม่ได้สักเครื่อง ทั้งที่โรงงานขึ้นทะเบียนพิกัดไว้กับผู้ตรวจเรียบร้อยแล้ว
+
+   ชื่อจุดวัดในชีตพิกัดกับในชีตบันทึกคนละคนตั้ง ต้องแปลงให้ตรงกันตรงนี้
+     STD Z<n>        ->  ZONE <n>    บาร์เรล Extruder
+     STD T-Die Z<n>  ->  MOLD <n>    หัว T-Die
+   ชื่ออื่นแค่ตัดคำว่า STD ออกแล้วใช้ตามเดิม ไฟล์ของสายงานอื่นจะได้ไม่ต้องมาแก้โค้ด */
+function paramStdName_(h) {
+  var s = String(h || '').trim().replace(/^std\s*/i, '').trim();
+  var m = /^t[\s-]*die\s*z\s*(\d+)$/i.exec(s);
+  if (m) return 'MOLD ' + m[1];
+  m = /^z\s*(\d+)$/i.exec(s);
+  if (m) return 'ZONE ' + m[1];
+  return s;
+}
+
+function paramStdWide_(vals, raw, cM) {
+  var out = {}, cols = [], cNote = -1;
+  raw.forEach(function (h, i) {
+    if (i === cM) return;
+    if (/^\s*std\b/i.test(String(h || ''))) { cols.push({ i: i, key: paramStdName_(h) }); return; }
+    var n = String(h || '').trim().toLowerCase();
+    if (cNote < 0 && (n === 'หมายเหตุ' || n === 'note' || n === 'remark' || n.indexOf('tol') === 0)) {
+      cNote = i;
+    }
+  });
+  if (!cols.length) return out;
+
+  vals.forEach(function (r) {
+    var id = String(r[cM] || '').trim();
+    if (!id) return;
+    /* "บวก - ลบ ไม่เกิน 10องศา" -> 10 · ไม่มีตัวเลขก็ปล่อย 0 ซึ่ง kvCheck_ แปลว่า
+       ต้องตรงเป๊ะ แล้วจะฟ้องรัวทุกแถว — ตั้งใจให้เป็นแบบนั้น เพราะพิกัดที่ไม่มีเกณฑ์
+       คือพิกัดที่ยังกรอกไม่เสร็จ ควรเห็นว่าผิดดีกว่าเงียบ */
+    var raw2 = cNote > -1 ? String(r[cNote] || '') : '';
+    var tol = Number((raw2.replace(/[^0-9.]/g, ' ').trim().split(/\s+/)[0]) || NaN);
+    var d = out[id] || (out[id] = { std: {}, tol: { all: isFinite(tol) ? tol : 0, by: {} } });
+    cols.forEach(function (c) {
+      var v = r[c.i];
+      if (v === '' || v === null || v === undefined) return;
+      var n = Number(v);
+      /* 0 = เครื่องรุ่นนี้ไม่มีจุดวัดนั้น (EXT1 ไม่มี Z6 Z7 · EXT2 ไม่มี Z7)
+         ไม่ใช่พิกัดศูนย์องศา อ่านตรง ๆ จะกลายเป็น 0±10 แล้วฟ้องว่าหลุดสเปกทุกแถว
+         ซึ่งแย่กว่าไม่ฟ้องเลย เพราะพอฟ้องมั่วแล้วคนจะเลิกเชื่อทั้งหน้า */
+      if (!isFinite(n) || n === 0) return;
+      d.std[c.key] = n;
+    });
+  });
+  return out;
+}
+
+/* "EXT3-110" ในชีตบันทึก กับ "EXT3" ในชีตพิกัด คือเครื่องเดียวกัน
+   ชีตพิกัดเขียนแค่รุ่น ชีตบันทึกเขียนรุ่นต่อด้วยขนาดสกรู ตัดตั้งแต่ตัวคั่นแรกแล้วเทียบ
+   ใช้เป็นทางสุดท้ายหลังเทียบตรงตัวและเทียบแบบไม่สนตัวพิมพ์ไม่เจอแล้วเท่านั้น */
+function paramBase_(s) {
+  return String(s || '').trim().toLowerCase().split(/[-–—\s]/)[0];
 }
 
 /** { เครื่อง: { std: {พารามิเตอร์: ค่า}, tol: {all, by} } } — ไม่มีชีตก็คืนว่าง */
 function paramStd_() {
-  var sh = paramStdSheet_(), out = {};
+  /* รวมทุกใบ ใบหลังทับใบหน้าเป็นรายช่อง ไม่ใช่ทับทั้งเครื่อง
+     Std.fields ถูกแก้ทีหลังและเป็นของที่วิศวกรตั้งเอง จึงควรชนะค่าตั้งต้นจากฟอร์ม
+     แต่ชนะเฉพาะช่องที่กรอกไว้จริง ช่องที่เว้นว่างต้องไม่ไปล้างของเดิมทิ้ง */
+  var out = {};
+  paramStdSheets_().forEach(function (sh) {
+    var one = paramStdOne_(sh);
+    Object.keys(one).forEach(function (id) {
+      var d = out[id] || (out[id] = { std: {}, tol: { all: 0, by: {} } });
+      Object.keys(one[id].std).forEach(function (k) { d.std[k] = one[id].std[k]; });
+      Object.keys(one[id].tol.by).forEach(function (k) { d.tol.by[k] = one[id].tol.by[k]; });
+      if (one[id].tol.all) d.tol.all = one[id].tol.all;
+    });
+  });
+  return out;
+}
+
+function paramStdOne_(sh) {
+  var out = {};
   if (!sh) return out;
   var vals = sh.getDataRange().getValues();
-  var head = vals.shift().map(function (h) { return String(h || '').trim().toLowerCase(); });
+  var raw = vals.shift().map(function (h) { return String(h || '').trim(); });
+  var head = raw.map(function (h) { return h.toLowerCase(); });
   var col = function (names) {
     for (var j = 0; j < names.length; j++)
       for (var i = 0; i < head.length; i++)
@@ -2692,7 +3340,8 @@ function paramStd_() {
   var cT = col(['tol', 'เกณฑ์', 'พิกัด']);
   var cLo = col(['min', 'ต่ำสุด']);
   var cHi = col(['max', 'สูงสุด']);
-  if (cM < 0 || cP < 0) return out;
+  if (cM < 0) return out;
+  if (cP < 0) return paramStdWide_(vals, raw, cM);   // ไม่มีคอลัมน์ชื่อจุดวัด = ทรงกว้าง
 
   vals.forEach(function (r) {
     var id = String(r[cM] || '').trim(), p = String(r[cP] || '').trim();
@@ -2724,11 +3373,15 @@ function paramApplyStd_(defs) {
   try { std = paramStd_(); } catch (e) { return defs; }
   var ids = Object.keys(std);
   if (!ids.length) return defs;
-  var byLow = {};
-  ids.forEach(function (k) { byLow[k.toLowerCase()] = std[k]; });
+  var byLow = {}, byBase = {};
+  ids.forEach(function (k) {
+    byLow[k.toLowerCase()] = std[k];
+    var b = paramBase_(k);
+    if (b && !byBase[b]) byBase[b] = std[k];   // ชนกันให้ตัวแรกชนะ อย่าเดามั่ว
+  });
 
   Object.keys(defs).forEach(function (id) {
-    var src = std[id] || byLow[String(id).toLowerCase()];
+    var src = std[id] || byLow[String(id).toLowerCase()] || byBase[paramBase_(id)];
     if (!src) return;
     var d = defs[id], low = {};
     (d.groups || []).forEach(function (grp) {
@@ -3252,7 +3905,7 @@ function apiParamStatus(token) {
     machines: out,
     round: newest ? newest.round : '',
     asOf: newest ? newest.date : '',
-    formUrl: String(cfg_('ลิงก์ฟอร์มพารามิเตอร์', '')),
+    formUrl: String(cfg_('ลิงก์ฟอร์มพารามิเตอร์', PARAM_FORM_URL)),
     external: !!prop_('PARAM_SHEET_ID'),
     /* ยังไม่มีพิกัดมาตรฐานให้เทียบสักเครื่อง = หน้าจอดูค่าได้ แต่ยังตัดสินผ่าน/ไม่ผ่านไม่ได้
        ต้องบอกไว้ ไม่งั้นทุกเครื่องขึ้นเขียวแล้วคนเข้าใจว่าระบบตรวจให้แล้ว */
@@ -3435,7 +4088,7 @@ function apiParamMachine(token, id, history) {
     approval: log ? (oks[paramRoundKey_(id, log.date, log.round)] || null) : null,
     canApprove: paramCanApprove_(requireAuth_(token)),
     approveSelf: !!(log && log.operator && log.operator === requireAuth_(token).name),
-    formUrl: String(cfg_('ลิงก์ฟอร์มพารามิเตอร์', ''))
+    formUrl: String(cfg_('ลิงก์ฟอร์มพารามิเตอร์', PARAM_FORM_URL))
   };
 }
 
@@ -3492,6 +4145,307 @@ function apiParamMakeTicket(token, id, payload) {
   return { ok: true, ticket_id: res.ticket_id };
 }
 
+
+/* ═══════════ สถานะเครื่องจักร เดิน / หยุด ═══════════
+   ทะเบียนเครื่องจักรบอกได้แค่ว่าเครื่องยังอยู่ในระบบไหม ไม่ได้บอกว่าตอนนี้เดินอยู่หรือหยุดอยู่
+   คำถามที่ผู้จัดการถามทุกเช้า — "ตอนนี้มีเครื่องไหนหยุดอยู่บ้าง" — ระบบจึงตอบไม่ได้เลย
+
+   เก็บเป็นชีตแยกแบบ append-only ไม่ได้เติมคอลัมน์ลงทะเบียนเครื่องจักร เพราะสองข้อ
+     1. ทะเบียนเป็นชีตที่คนแก้มือ ให้โปรแกรมเขียนทับทุกครั้งที่กดหยุดเครื่องคือคนละหน้าที่กัน
+        และทะเบียนยังถูกใช้ร่วมกับโปรเจคอื่น การขยับคอลัมน์มีราคาสูงกว่าที่เห็น
+     2. ถ้าเก็บเป็นคอลัมน์จะเหลือแค่ "สถานะล่าสุด" — หยุดกี่ครั้ง ครั้งละนานเท่าไหร่ หายหมด
+        ซึ่งเป็นตัวเลขที่ใช้คิด Availability ทีหลัง
+
+   แถวหลังทับแถวก่อน รูปแบบเดียวกับชีตรับรองพารามิเตอร์ แถวเก่ายังอยู่ให้ตรวจย้อนได้ */
+var SHEET_MSTATUS = 'บันทึกสถานะเครื่อง';
+var MSTATUS_HEAD  = ['เวลาบันทึก', 'เครื่องจักร', 'สถานะ', 'เวลาที่เกิดจริง', 'สาเหตุ/อาการ', 'ผู้บันทึก'];
+var MSTATUS_RUN   = 'เดินปกติ';
+var MSTATUS_STOP  = 'หยุดเสีย';
+var MSTATUS_PLAN  = 'หยุดตามแผน PM';
+var MSTATUS_ALL   = [MSTATUS_RUN, MSTATUS_STOP, MSTATUS_PLAN];
+
+/* แถวเก่าเขียนไว้แค่ว่า "หยุด" ตอนที่ยังมีสองสถานะ แปลงตอนอ่านไม่ใช่ไปไล่แก้ของเดิม
+   ชีตนี้เป็น append-only ตามข้อกำหนด ISO การย้อนไปแก้ถ้อยคำในแถวที่บันทึกไปแล้ว
+   คือการแก้ประวัติ ซึ่งแย่กว่าการแปลตอนอ่านทุกครั้ง */
+var MSTATUS_LEGACY = { 'หยุด': MSTATUS_STOP };
+
+function mstatusSheet_(create) {
+  var ss = ss_();
+  var sh = ss.getSheetByName(SHEET_MSTATUS);
+  if (!sh && create) {
+    sh = ss.insertSheet(SHEET_MSTATUS);
+    sh.getRange(1, 1, 1, MSTATUS_HEAD.length).setValues([MSTATUS_HEAD])
+      .setFontWeight('bold').setBackground('#e8eefb');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+/** { 'ชื่อเครื่อง': {status, since, note, by, at} } — แถวหลังทับแถวก่อน
+    เครื่องที่ไม่เคยถูกบันทึกจะไม่มีคีย์ ฝั่งจอถือว่า "ยังไม่เคยระบุ" ไม่ใช่ "เดินปกติ"
+    เดาว่าเดินปกติให้คือการโกหกว่าระบบรู้ ทั้งที่ยังไม่มีใครบอกมันสักครั้ง */
+function machineStatus_() {
+  var sh;
+  try { sh = mstatusSheet_(false); } catch (e) { return {}; }
+  if (!sh || sh.getLastRow() < 2) return {};
+
+  var vals = sh.getDataRange().getValues();
+  var head = vals.shift().map(function (h) { return String(h || '').trim(); });
+  var ix = {};
+  head.forEach(function (h, i) { ix[h] = i; });
+  var g = function (r, n) {
+    var i = ix[n];
+    return i === undefined ? '' : r[i];
+  };
+
+  var out = {}, when = {};
+  vals.forEach(function (r) {
+    var name = String(g(r, 'เครื่องจักร') || '').trim();
+    if (!name) return;
+    var st = String(g(r, 'สถานะ') || '').trim();
+
+    /* ตัดสิน "ล่าสุด" ด้วยเวลาที่เกิดจริง ไม่ใช่ลำดับแถว — ต้องใช้เกณฑ์เดียวกับ apiMachineUptime
+       ไม่งั้นลงย้อนหลังทีเดียว การ์ดจะบอกอย่าง รายงาน Availability บอกอีกอย่าง
+       แถวที่เวลาเท่ากันให้แถวหลังชนะ เพราะเป็นการแก้ของแถวก่อน */
+    var at = toDate_(g(r, 'เวลาที่เกิดจริง')) || toDate_(g(r, 'เวลาบันทึก'));
+    if (when[name] && at && when[name] > at) return;
+    if (at) when[name] = at;
+
+    out[name] = {
+      status: MSTATUS_LEGACY[st] || st,
+      since:  iso_(g(r, 'เวลาที่เกิดจริง')),
+      note:   String(g(r, 'สาเหตุ/อาการ') || '').trim(),
+      by:     String(g(r, 'ผู้บันทึก') || '').trim(),
+      at:     iso_(g(r, 'เวลาบันทึก'))
+    };
+  });
+  return out;
+}
+
+/* ═══ Availability จากเวลาหยุดจริง ═══
+   %Breakdown ที่มีอยู่คิดจากเวลาในใบแจ้งซ่อม ซึ่งเป็น "ตัวแทน" ของเวลาหยุด ไม่ใช่เวลาหยุด
+   ใบเปิดค้างสามวันทั้งที่เครื่องเดินอยู่ก็มี เครื่องหยุดโดยไม่มีใบก็มี
+
+   ชีตบันทึกสถานะเก็บคู่ หยุด→เดิน ของจริง จึงคิดเวลาหยุดได้ตรง ๆ
+   และแยก "หยุดเสีย" ออกจาก "หยุดตามแผน PM" ได้ ซึ่งเป็นคนละเรื่องกันในทางวิศวกรรม —
+   การหยุดที่วางแผนไว้ไม่ใช่ความล้มเหลว แต่เป็นการลงทุน
+
+   คืนจำนวนวันที่มีข้อมูลจริงมาด้วยเสมอ ตัวเลข Availability ที่คิดจากข้อมูล 3 วัน
+   ไม่ได้แปลว่าเครื่องดี มันแปลว่ายังไม่รู้ — ต้องบอกให้คนอ่านรู้ด้วย ไม่ใช่โชว์แต่ % */
+function apiMachineUptime(token, year, month) {
+  requireAuth_(token, 'LEAD');
+
+  /* server เป็นคนประกอบช่วงเวลาเอง ไม่รับวันที่สำเร็จรูปจากหน้าเว็บ
+     เบราว์เซอร์สร้างขอบเดือนด้วยโซนเวลาของเครื่องตัวเอง เครื่องที่ตั้งเป็น UTC
+     จะทำให้ "1 ต.ค." เริ่มที่ 07:00 ตามเวลาไทย แล้วเหตุการณ์ตอนตีสามถูกนับเป็นเดือนก่อน
+     ให้ที่เดียวที่รู้โซนเวลาจริงเป็นคนคิด — appsscript.json ตั้ง Asia/Bangkok ไว้แล้ว */
+  var now = new Date();
+  var y  = Number(year) || now.getFullYear();
+  var mo = Number(month) || 0;                       // 0 = ทั้งปี
+  var from = mo ? new Date(y, mo - 1, 1) : new Date(y, 0, 1);
+  var edge = mo ? new Date(y, mo, 0, 23, 59, 59, 999)
+                : new Date(y, 11, 31, 23, 59, 59, 999);
+  var to = edge > now ? now : edge;
+
+  /* เลือกเดือนที่ยังมาไม่ถึง — เดิมส่ง from > to แล้วโดนสลับกันที่ server
+     กลายเป็นหน้าต่างที่ยื่นไปในอนาคต เครื่องที่หยุดอยู่ตอนนี้เลยถูกนับว่าหยุดยาวไปถึงสิ้นเดือนหน้า
+     ตอบไปตรง ๆ ว่ายังไม่มีข้อมูล ดีกว่าสลับให้เงียบ ๆ แล้วได้ตัวเลขที่อ่านแล้วเชื่อ */
+  if (from >= to) {
+    return { machines: [], days: 0, from: iso_(from), to: iso_(to), future: true };
+  }
+
+  var sh;
+  try { sh = mstatusSheet_(false); } catch (e) { sh = null; }
+  if (!sh || sh.getLastRow() < 2) {
+    return { machines: [], days: 0, from: iso_(from), to: iso_(to) };
+  }
+
+  var vals = sh.getDataRange().getValues();
+  var head = vals.shift().map(function (h) { return String(h || '').trim(); });
+  var ix = {};
+  head.forEach(function (h, i) { ix[h] = i; });
+
+  /* เรียงตามเวลาที่เกิดจริง ไม่ใช่ลำดับแถว — แถวที่ลงย้อนหลังอยู่ท้ายชีต
+     แต่ช่วงเวลาที่มันพูดถึงอยู่ก่อนหน้า เรียงผิดแล้วช่วงหยุดคำนวณกลับหัว
+
+     ทิ้งแถวที่สถานะไม่ใช่สามค่าที่รู้จัก — เดิมปล่อยผ่านแล้ว cur กลายเป็นค่าว่าง
+     ซึ่งมีผลเท่ากับ "ปิดช่วงหยุดเงียบ ๆ" แล้วเวลานั้นถูกนับเป็นเดินโดยไม่มีใครรู้ */
+  var evs = vals.map(function (r) {
+    var st = String(r[ix['สถานะ']] || '').trim();
+    st = MSTATUS_LEGACY[st] || st;
+    return {
+      machine: String(r[ix['เครื่องจักร']] || '').trim(),
+      status: st,
+      at: toDate_(r[ix['เวลาที่เกิดจริง']]) || toDate_(r[ix['เวลาบันทึก']])
+    };
+  }).filter(function (e) {
+    return e.machine && e.at && MSTATUS_ALL.indexOf(e.status) > -1;
+  }).sort(function (a, b) { return a.at - b.at; });
+
+  if (!evs.length) return { machines: [], days: 0, from: iso_(from), to: iso_(to) };
+
+  var byMachine = {};
+  evs.forEach(function (e) { (byMachine[e.machine] = byMachine[e.machine] || []).push(e); });
+
+  var out = [];
+  Object.keys(byMachine).forEach(function (name) {
+    var list = byMachine[name];
+
+    /* จุดเริ่มนับเป็นของ "แต่ละเครื่อง" ไม่ใช่ของทั้งโรงงาน
+       เดิมใช้เหตุการณ์แรกของทั้งชีต เครื่องที่เพิ่งเริ่มบันทึกเดือนมิถุนายน
+       จึงถูกนับว่าเดินปกติมาตั้งแต่มกราคม แล้วได้ Availability 99% ที่ไม่มีอะไรรองรับ */
+    var mStart = list[0].at > from ? list[0].at : from;
+    if (mStart >= to) return;                        // ไม่มีข้อมูลของเครื่องนี้ในหน้าต่างที่ขอ
+
+    var stopMs = 0, planMs = 0, breakdowns = 0, cur = null, curAt = null;
+
+    list.forEach(function (e) {
+      if (cur && curAt && e.at > curAt) {
+        var a = curAt < mStart ? mStart : curAt;
+        var b = e.at > to ? to : e.at;
+        if (b > a) {
+          if (cur === MSTATUS_STOP) stopMs += b - a;
+          else if (cur === MSTATUS_PLAN) planMs += b - a;
+        }
+      }
+      /* นับเฉพาะการเสียที่เกิดในหน้าต่างนี้ — เดิมนับทุกเหตุการณ์ในชีต
+         ดูเดือนเมษายนแล้วเครื่องที่เสียเดือนมีนาคมถูกนับด้วย ได้ MTTR = 0 ชม.
+         ทั้งที่ในเดือนเมษายนเครื่องไม่ได้เสียเลยสักครั้ง */
+      if (e.status === MSTATUS_STOP && cur !== MSTATUS_STOP &&
+          e.at >= mStart && e.at <= to) breakdowns++;
+      cur = e.status;
+      curAt = e.at;
+    });
+
+    // ช่วงสุดท้ายยังค้างอยู่จนถึงปลายหน้าต่าง
+    if (cur && curAt && to > curAt) {
+      var a2 = curAt < mStart ? mStart : curAt;
+      if (to > a2) {
+        if (cur === MSTATUS_STOP) stopMs += to - a2;
+        else if (cur === MSTATUS_PLAN) planMs += to - a2;
+      }
+    }
+
+    var spanMs = Math.max(0, to - mStart);
+    var upMs = Math.max(0, spanMs - stopMs - planMs);
+    var h = function (ms) { return Math.round(ms / 36e5 * 10) / 10; };
+
+    out.push({
+      machine: name,
+      days: Math.round(spanMs / 864e5 * 10) / 10,     // จำนวนวันของเครื่องนี้ ไม่ใช่ของทั้งโรงงาน
+      hoursSpan: h(spanMs), hoursDown: h(stopMs),
+      hoursPlanned: h(planMs), hoursUp: h(upMs),
+      breakdowns: breakdowns,
+      /* Availability นับเฉพาะการหยุดที่ไม่ได้วางแผน ตามนิยามที่ใช้กันทั่วไป
+         รวมการหยุดตามแผนเข้าไปด้วยจะได้ตัวเลขที่ลงโทษการทำ PM ซึ่งผิดวัตถุประสงค์ */
+      availability: spanMs ? Math.round((spanMs - stopMs) / spanMs * 1000) / 10 : null,
+      // MTBF จริง = ชั่วโมงที่เครื่องเดินได้ หารด้วยจำนวนครั้งที่เสียในหน้าต่างนี้
+      mtbf: breakdowns ? Math.round(upMs / 36e5 / breakdowns * 10) / 10 : null,
+      mttr: breakdowns ? Math.round(stopMs / 36e5 / breakdowns * 10) / 10 : null
+    });
+  });
+
+  out.sort(function (a, b) { return b.hoursDown - a.hoursDown; });
+  return {
+    machines: out,
+    days: out.reduce(function (mx, m) { return m.days > mx ? m.days : mx; }, 0),
+    from: iso_(from), to: iso_(to)
+  };
+}
+
+/** สถานะล่าสุดของทุกเครื่อง — ฝั่งจอเอาไปต่อกับทะเบียนและใบแจ้งซ่อมที่โหลดไว้แล้วเอง */
+function apiMachineLog(token) {
+  var user = requireAuth_(token);
+  /* ส่งสถานีกลับไปด้วย ฝั่งจอจะได้รู้ว่าเครื่องไหนกดได้โดยไม่ต้องเดาจากชีต Users
+     (เป็นแค่การซ่อนปุ่มให้ถูก ตัวกันจริงคือ canTouchMachine_ ที่ server) */
+  return { statuses: machineStatus_(), options: MSTATUS_ALL, station: user.station || '' };
+}
+
+/* เขียนแถวสถานะหนึ่งแถว — ไม่ตรวจสิทธิ์ ผู้เรียกเป็นคนตัดสินว่าใครเรียกได้
+   มีสามทางที่เรียกเข้ามา: สวิตช์บนการ์ด (หัวหน้า) · เปิดใบแจ้งซ่อม · ตรวจรับงาน
+   สองทางหลังไม่ต้องล็อกอินโดยตั้งใจ เพราะคนที่ยืนอยู่หน้าเครื่องคือคนที่รู้จริง
+   ทุกแถวจึงบังคับมี "ผู้บันทึก" และใบที่อ้างถึง เพื่อให้ตามย้อนได้ว่าใครสั่งหยุด */
+function logMachineStatus_(name, status, note, by, since, heldLock) {
+  /* heldLock = ผู้เรียกถือ script lock อยู่แล้ว (apiCreateTicket ถืออยู่ตอนเปิดใบ)
+     เอกสารของ Apps Script ไม่ได้รับประกันว่า Lock เป็น reentrant
+     ถ้าไม่ใช่ จะได้อย่างใดอย่างหนึ่ง: รอจนหมดเวลา 20 วินาทีแล้วเขียนไม่สำเร็จ
+     หรือ releaseLock ข้างในไปปลดล็อกของข้างนอกก่อนเวลา ซึ่งอันหลังอันตรายกว่ามาก
+     เพราะเปิดช่องให้สองคนได้เลขใบแจ้งซ่อมเดียวกัน — เลี่ยงทั้งสองทางด้วยการไม่ล็อกซ้อน */
+  var lock = heldLock ? null : LockService.getScriptLock();
+  if (lock) lock.waitLock(20000);
+  try {
+    var sh = mstatusSheet_(true);
+    sh.appendRow([new Date(), deFormula_(name), status, since || new Date(),
+                  deFormula_(truncate_(note || '')), deFormula_(truncate_(by || 'ระบบ'))]);
+    SpreadsheetApp.flush();
+  } finally {
+    if (lock) lock.releaseLock();
+  }
+  writeAudit_('เปลี่ยนสถานะเครื่องจักร', name, [{
+    field: 'สถานะเครื่อง', oldValue: '', newValue: status + (note ? ' — ' + note : '')
+  }], by || 'ระบบ');
+}
+
+/** ยังมีใบอื่นที่ยังไม่จบ และระบุว่าเครื่องนี้หยุดเดิน อยู่อีกไหม (ไม่นับใบที่ส่งมา)
+    ถ้ามี ห้ามปลดให้กลับมาเดิน — ปิดใบหนึ่งไม่ได้แปลว่าเรื่องที่ทำให้เครื่องหยุดจบทุกเรื่อง */
+function isDownTicket_(t, machine, exceptId) {
+  return t.machine_name === machine &&
+         t.ticket_id !== exceptId &&
+         t.machine_down === MACHINE_DOWN_YES &&
+         t.status !== STATUS_DONE && t.status !== STATUS_CANCEL;
+}
+
+function otherDownTickets_(machine, exceptId) {
+  return rowsToObjects_().filter(function (t) { return isDownTicket_(t, machine, exceptId); });
+}
+
+/** เครื่องนี้อยู่ในความดูแลของคนคนนี้ไหม
+    ทะเบียนเครื่องจักรเก็บ "ชื่อสถานี" ไว้ในคอลัมน์ผู้ดูแล ฝั่งคนเก็บที่คอลัมน์สถานีประจำในชีต Users
+    หัวหน้าขึ้นไปแตะได้ทุกเครื่อง ช่างแตะได้เฉพาะสถานีตัวเอง — เช็คที่ server ไม่ใช่แค่ซ่อนปุ่ม */
+function canTouchMachine_(user, machine) {
+  if ((RANK[user.role] || 0) >= RANK.LEAD) return true;
+  var st = String(user.station || '').trim();
+  if (!st) return false;
+  if (st.toUpperCase() === 'ALL') return true;        // คำที่ใช้จริงในชีต แปลว่าดูแลทั้งโรงงาน
+  var list = machines_();
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].name === machine) return String(list[i].owner || '').trim() === st;
+  }
+  return false;
+}
+
+/** บันทึกว่าเครื่องหยุดหรือกลับมาเดิน — ช่างทำได้เฉพาะเครื่องในสถานีตัวเอง */
+function apiSetMachineStatus(token, machine, payload) {
+  var user = requireAuth_(token);
+  payload = payload || {};
+
+  var name = assertKnownMachine_(machine);        // กันชื่อแตก ใช้ตัวเดียวกับใบแจ้งซ่อม
+  if (!canTouchMachine_(user, name)) {
+    throw new Error('เครื่อง "' + name + '" ไม่ได้อยู่ในสถานีที่คุณดูแล — แจ้งหัวหน้างานแทน');
+  }
+
+  var status = String(payload.status || '').trim();
+  if (MSTATUS_ALL.indexOf(status) === -1) {
+    throw new Error('สถานะต้องเป็น: ' + MSTATUS_ALL.join(' · '));
+  }
+
+  /* หยุดเครื่องโดยไม่บอกว่าทำไม = แถวที่อ่านย้อนแล้วไม่ได้อะไร
+     หยุดตามแผนก็ต้องบอก ว่าเป็น PM หัวข้อไหน ไม่งั้นแยกไม่ออกว่าหยุดคุ้มหรือเปล่า
+     ตอนกลับมาเดินไม่บังคับ เพราะเหตุผลคือ "เสร็จแล้ว" ซึ่งรู้กันอยู่ */
+  var note = String(payload.note || '').trim();
+  if (status !== MSTATUS_RUN && !note) throw new Error('ระบุสาเหตุที่เครื่องหยุดด้วย');
+
+  var since = toDate_(payload.since) || new Date();
+  if (since > new Date(Date.now() + 5 * 60000)) throw new Error('เวลาที่เกิดจริงเป็นเวลาในอนาคต');
+  /* ย้อนหลังได้ แต่ไม่ใช่ย้อนไปปี 2000 — ของจริงคือ "ลืมบันทึกเมื่อวาน" ไม่ใช่เมื่อปีที่แล้ว
+     ไม่มีเพดาน แถวที่ใส่วันเก่ามาก ๆ จะไปยืดช่วงเวลาที่ใช้คิด Availability ของเครื่องนั้นทั้งก้อน */
+  if (since < new Date(Date.now() - 60 * 864e5)) {
+    throw new Error('ย้อนหลังได้ไม่เกิน 60 วัน — ถ้าต้องแก้ของเก่ากว่านั้น แก้ที่ชีตโดยตรง');
+  }
+
+  logMachineStatus_(name, status, note, user.name + ' (' + user.role + ')', since);
+  return { ok: true, statuses: machineStatus_() };
+}
 
 /* ═══════════ ไทม์ไลน์ย้อนเหตุการณ์ ═══════════
    คำถามที่ระบบยังตอบไม่ได้คือ "เครื่องพังตอนบ่ายสามวันศุกร์ ก่อนหน้านั้นเกิดอะไรบ้าง"
@@ -3758,6 +4712,63 @@ function sourceAudit() {
 
    ตัวนี้ไม่แก้ข้อมูล แค่รายงาน เพราะการชี้ว่า "ชล" คือคนเดียวกับ "ช่างชล" เป็นเรื่องที่หัวหน้าช่างรู้
    ระบบเดาแทนแล้วเดาผิด = เครดิตงานไปอยู่ผิดคน ซึ่งแก้ยากกว่าปล่อยให้คนตัดสินตั้งแต่แรก */
+/* ═══ เติมผู้ดูแลให้เครื่องที่ยังว่าง ═══
+   งานครั้งเดียว รันจบแล้วลบฟังก์ชันนี้ทิ้งได้
+
+   ค่าในตารางมาจากหัวหน้า ไม่ใช่ระบบเดา — ผูกผิดสถานีแปลว่าช่างผิดคนไปตรวจ
+   อ้างด้วยชื่อเครื่อง ไม่ใช่เลขแถว — แทรกแถวทีหนึ่งแล้วเลขแถวเลื่อนหมด
+   และเติมเฉพาะช่องที่ยังว่าง — ของที่มีคนกรอกไว้แล้วห้ามทับ */
+var OWNER_FILL = {
+  'Powder mill': 'EXT',
+  'Wpc crusher': 'EXT',
+  'Arm saw': 'MT',
+  'Drill press': 'MT',
+  'Hot and cold mixer 1': 'EXT',
+  'Exhaust fan-EX1': 'EXT',
+  'Exhaust fan-EX2': 'EXT',
+  'Exhaust fan-UV1': 'UV',
+  'Exhaust fan-UV2': 'UV',
+  'Blower 1': 'EXT',
+  'Blower 2': 'EXT',
+  'พัดลมอัดอากาศ Ext': 'EXT'
+};
+
+function fillMachineOwners() {
+  var NL = String.fromCharCode(10);
+  var sh = sheet_(SHEET_MACHINES);
+  var vals = sh.getDataRange().getValues();
+  var head = vals[0].map(function (h) { return String(h || '').trim(); });
+  var cName = head.indexOf('ชื่อเครื่องจักร');
+  var cOwn = head.indexOf('ผู้ดูแล');
+  if (cName < 0 || cOwn < 0) {
+    throw new Error('หาคอลัมน์ "ชื่อเครื่องจักร" หรือ "ผู้ดูแล" ไม่เจอ');
+  }
+
+  var done = [], skip = [], miss = {};
+  Object.keys(OWNER_FILL).forEach(function (k) { miss[k] = 1; });
+
+  for (var i = 1; i < vals.length; i++) {
+    var name = String(vals[i][cName] || '').trim();
+    var want = OWNER_FILL[name];
+    if (!want) continue;
+    delete miss[name];
+    var cur = String(vals[i][cOwn] || '').trim();
+    if (cur) { skip.push(name + ' — มีค่าอยู่แล้ว: ' + cur); continue; }
+    sh.getRange(i + 1, cOwn + 1).setValue(want);
+    done.push('แถว ' + (i + 1) + ' ' + name + ' → ' + want);
+  }
+
+  if (done.length) clearCache();   // ไม่ล้าง หน้าจอจะยังใช้ทะเบียนชุดเก่าไปอีก 5 นาที
+
+  var left = Object.keys(miss);
+  var msg = 'เติมแล้ว ' + done.length + ' · ข้าม ' + skip.length +
+    ' · ไม่เจอชื่อนี้ในทะเบียน ' + left.length + NL +
+    done.concat(skip).map(function (x) { return '  ' + x; }).join(NL) +
+    (left.length ? NL + '  ✗ ' + left.join(NL + '  ✗ ') : '');
+  Logger.log(msg);
+  return msg;
+}
+
 function techAudit() {
   var map = techAlias_(), count = {}, rows = rowsToObjects_();
   rows.forEach(function (t) {
@@ -4636,6 +5647,50 @@ function cbox_(on) {
   return '<span class="cb">' + (on ? '&#10004;' : '&nbsp;') + '</span>';
 }
 
+/* โลโก้บริษัทบนหัวฟอร์ม FM-MT-04 — ฝังเป็น data URI ไม่ใช่ลิงก์
+   ตัวแปลง HTML เป็น PDF ของ Apps Script ดึงรูปจาก URL ภายนอกไม่ได้ทุกครั้ง
+   ได้ฟอร์มที่โลโก้หายเป็นช่วง ๆ ซึ่งเอาไปให้ผู้ตรวจไม่ได้
+   เปลี่ยนโลโก้ = แปลงไฟล์เป็น base64 แล้วทับบรรทัดล่าง (ต้นฉบับอยู่ assets/logo.jpg) */
+/* ใส่โลโก้ของบริษัทคุณตรงนี้ — แปลงไฟล์รูปเป็น base64 แล้ววางทับทั้งบรรทัด
+   เช่น  var FORM_LOGO = 'data:image/png;base64,iVBORw0KGgo...';
+   ค่าตั้งต้นเป็นรูปโปร่งใส 1x1 จุด ฟอร์มจึงออกได้ตามปกติแม้ยังไม่ได้ใส่โลโก้
+   (ของเดิมในเทมเพลตลบบรรทัดนี้ทิ้งไปเลย ฟอร์ม FM-MT-04 เลยพังด้วย
+    FORM_LOGO is not defined ทุกครั้งที่กดออกเอกสาร) */
+var FORM_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+/* รหัสแบบฟอร์มที่พิมพ์ไว้มุมล่างของ FM-MT-04 — ผู้ตรวจ ISO ตามจากบรรทัดนี้กลับไปหาต้นฉบับ
+   FM-MT-05/06 ฝังสตริงนี้ไว้กลางก้อน HTML ของตัวเอง ที่นี่แยกเป็นค่าคงที่เพราะเลขแก้ไข
+   ขยับทุกครั้งที่ฟอร์มถูกทบทวน จะได้แก้ที่เดียวไม่ต้องไล่หาในสตริงยาว ๆ */
+var FORM_CODE = 'FM-MT-04/Rev.02, Effective date : 15 Aug 2024';
+
+/* กล่อง "อุปกรณ์และอะไหล่" บน FM-MT-04 เคยพิมพ์เลข 1-10 เปล่าไว้ให้เขียนมือทุกใบ
+   ใบไหนบันทึกรหัสไว้แล้วก็พิมพ์ลงไปเลย บรรทัดที่เหลือยังว่างให้เขียนเพิ่มได้เหมือนเดิม
+   ใบเก่าที่ข้อความไม่ตรงรูปแบบต้องยังออกเอกสารได้ — ฟอร์มพังเพราะข้อมูลเก่าคือกับดัก */
+function fmParts_(text) {
+  var lines;
+  try {
+    lines = parseParts_(text).map(function (p) { return p.code + ' x ' + p.qty; });
+  } catch (e) {
+    /* เดิม catch แล้วตั้ง items = [] — บรรทัดเสียบรรทัดเดียวทำให้กล่องว่างทั้งกล่อง
+       รวมบรรทัดที่ดีด้วย ซึ่งตรงข้ามกับเจตนาที่เขียนไว้ว่า "ใบเก่าต้องยังออกเอกสารได้"
+       พิมพ์ข้อความดิบไปเลยดีกว่า คนอ่านฟอร์มยังเห็นว่าเปลี่ยนอะไรไป */
+    lines = String(text == null ? '' : text).split(/[\r\n]+/)
+      .map(function (s) { return s.trim(); })
+      .filter(function (s) { return !!s; });
+  }
+  var out = '';
+  for (var i = 0; i < 10; i++) {
+    out += '<div class="dt">' + (i + 1) + '. ' + (lines[i] ? esc_(lines[i]) : '') + '</div>';
+  }
+  /* เกินสิบรายการต้องบอก ไม่ใช่ตัดทิ้งเงียบ ๆ — ฟอร์มที่ส่งให้ผู้ตรวจ ISO
+     ต้องไม่ขัดกับข้อมูลในชีตและในไฟล์ Excel */
+  if (lines.length > 10) {
+    out += '<div class="dt" style="font-weight:bold">และอีก ' + (lines.length - 10) +
+           ' รายการ — ดูในระบบ</div>';
+  }
+  return out;
+}
+
 function apiTicketPdf(token, ticketId) {
   var actor = requireAuth_(token);
 
@@ -4663,7 +5718,9 @@ function apiTicketPdf(token, ticketId) {
   var days = mins ? Math.floor(mins / 1440) : '';
   var hrs  = mins ? Math.round((mins % 1440) / 60 * 100) / 100 : '';
 
-  var techs = String(t.technician || '').split(/[,และ\/]+/)
+  /* เคยเป็น [,และ/] ซึ่งเป็น character class — มันแยกทีละตัวอักษร ชื่อที่มี แ ล หรือ ะ
+     จึงถูกหั่นกลางคำ "ช่างชล" ออกมาเป็น "ช่างช" บนฟอร์ม FM-MT-04 ที่ส่งให้ผู้ตรวจ */
+  var techs = String(t.technician || '').split(/\s*(?:,|\/|และ)\s*/)
                 .map(function (x) { return x.trim(); }).filter(String);
   var tech = function (n) { return techs[n] ? esc_(techs[n]) : ''; };
 
@@ -4775,10 +5832,7 @@ function apiTicketPdf(token, ticketId) {
   '<td colspan="12" class="c nb" style="padding-top:3px"><span class="tg">อุปกรณ์และอะไหล่</span></td></tr>' +
   '<tr><td colspan="31" class="nt" style="padding:3px 5px">' +
   fmLines_(rootCause, 68, 3, 'สาเหตุ&#8230; ') + fmLines_(t.repair_action, 68, 4, 'การแก้ไข&#8230; ') +
-  '</td><td colspan="12" class="nt" style="padding:3px 5px">' +
-  '<div class="dt">1. </div><div class="dt">2. </div><div class="dt">3. </div><div class="dt">4. </div>' +
-  '<div class="dt">5. </div><div class="dt">6. </div><div class="dt">7. </div><div class="dt">8. </div>' +
-  '<div class="dt">9. </div><div class="dt">10. </div></td></tr>' +
+  '</td><td colspan="12" class="nt" style="padding:3px 5px">' + fmParts_(t.parts) + '</td></tr>' +
 
   '<tr><td colspan="9" class="g">การทดสอบ</td><td colspan="18" class="ll">วิธีทดสอบ</td>' +
   '<td colspan="7" class="l">ผู้ควบคุมงาน/ส่งมอบ</td><td colspan="5" class="l">วันที่ส่งมอบ</td>' +

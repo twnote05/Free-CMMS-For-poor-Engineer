@@ -47,6 +47,7 @@ async function gsAuth(fn, ...args) {
 let MACHINES = [];          // [{code, name, group, location, owner}]
 let TEAM     = [];          // [{name, role}] จากชีต Users (server ไม่ส่งอีเมลออกมาแล้ว)
 let ACTION_NEEDED = ["ซ่อมเอง", "ต้องการเรียกช่างซ่อมบำรุง"];   // ทับด้วยค่าจาก server ตอนโหลด
+let CAUSE_CODES = [];       // รายการรหัสสาเหตุ มาจาก server (แก้ได้ที่ชีต "ตั้งค่า")
 let PRIORITIES = [];        // [{key, hours, note}] — SLA แยกตามระดับ ตั้งค่าที่ชีต "ตั้งค่า"
 let PRIORITY_DEFAULT = "ปกติ";
 
@@ -105,6 +106,14 @@ const STATUS = {
 const LIVE_STATUSES = [STATUS.WAIT, STATUS.REPAIR, STATUS.OUT, STATUS.VERIFY, STATUS.DONE];
 const isDead = (t) => t.status === STATUS.CANCEL;
 const live = (list) => list.filter((t) => !isDead(t));
+
+/* ค่าสำหรับ <input type="datetime-local"> — ช่องนี้อ่านเวลาท้องถิ่น แต่ toISOString() คืน UTC
+   ถ้าโยน ISO เข้าไปตรง ๆ เวลาจะเพี้ยนไป 7 ชั่วโมงทุกครั้ง จึงต้องหักออฟเซ็ตก่อนเสมอ */
+const dtLocal = (v) => {
+  const d = v ? new Date(v) : null;
+  return d && !isNaN(d)
+    ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
+};
 const BADGE = {
   [STATUS.WAIT]:   "badge-wait",
   [STATUS.REPAIR]: "badge-repair",
@@ -158,6 +167,59 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 const nf    = (n) => Number(n || 0).toLocaleString("th-TH");
+/* ═══════════ โหลดไลบรารีตอนที่จะใช้จริง ═══════════
+   เดิมแปะ <script defer> ไว้ 4 ตัวบนหัวเว็บ ทุกคนจึงโหลดครบทุกครั้งที่เปิด
+   รวม 1.09 MB (xlsx 861 · chart 200 · qrcode 19 · datalabels 12) ทั้งที่ช่างที่เปิดดู
+   แค่รายการแจ้งซ่อมไม่ได้ใช้สักตัว — บนเน็ตโรงงานนี่คือเวลารอเปล่า ๆ ก้อนใหญ่ที่สุด
+
+   เก็บ Promise ไว้ในแคช เรียกซ้ำระหว่างที่ยังโหลดไม่เสร็จจะได้ไม่ยิงซ้อน
+   โหลดพลาดให้ลบออกจากแคช คนกดใหม่จะได้มีโอกาสลองอีกครั้ง ไม่ใช่ค้างพังถาวร */
+const scriptCache = {};
+/* globalName = ชื่อตัวแปรที่ไลบรารีต้องสร้างขึ้นมาจริง ๆ
+   จำเป็นเพราะ onload ยิงเมื่อ "ดาวน์โหลดและรันจบ" ไม่ได้แปลว่าได้ของที่ต้องการ
+   เน็ตโรงงานที่มีหน้า captive portal ตอบ HTML มาพร้อมสถานะ 200 ก็เข้าทาง onload เหมือนกัน
+   ปล่อยไว้ ตัวที่เรียกซ้ำเมื่อโหลดเสร็จ (renderQr/drawQr) จะวนเรียกตัวเองไม่จบจนแท็บค้าง */
+function loadScript(url, globalName) {
+  if (scriptCache[url]) return scriptCache[url];
+  scriptCache[url] = new Promise((ok, fail) => {
+    const s = document.createElement("script");
+    s.src = url;
+    s.async = true;
+    s.onload = () => {
+      if (globalName && typeof window[globalName] === "undefined") {
+        delete scriptCache[url];
+        fail(new Error("ไฟล์โหลดมาแล้วแต่ไม่ใช่ไลบรารีที่ต้องการ — น่าจะติดหน้าล็อกอินของเน็ต"));
+        return;
+      }
+      ok();
+    };
+    s.onerror = () => { delete scriptCache[url]; fail(new Error("โหลดไลบรารีไม่สำเร็จ — ตรวจอินเทอร์เน็ต")); };
+    document.head.appendChild(s);
+  });
+  return scriptCache[url];
+}
+
+const CDN_CHART  = "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js";
+const CDN_LABELS = "https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js";
+const CDN_QR     = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+const CDN_XLSX   = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+
+/* datalabels ต้องมาหลัง chart.js เพราะมันไปลงทะเบียนกับ Chart ที่โหลดไว้แล้ว โหลดพร้อมกันไม่ได้
+   ค่า default ของฟอนต์กับสีเคยถูกตั้งตอน init ซึ่งตอนนั้น Chart ยังไม่มี จึงต้องตั้งซ้ำตรงนี้ */
+/* chartsReady ไม่ใช่ window.Chart — ระหว่างที่ chart.js มาแล้วแต่ datalabels ยังไม่มา
+   ถ้าเช็คแค่ window.Chart กราฟจะถูกวาดโดยไม่มีป้ายตัวเลข ไม่มีฟอนต์ไทย และสีแกนไม่ตรงธีม
+   แล้วไม่มีอะไรวาดซ้ำให้อีกจนกว่าจะรีเฟรชหน้า */
+let chartsReady = false;
+const ensureCharts = () => loadScript(CDN_CHART, "Chart")
+  .then(() => loadScript(CDN_LABELS, "ChartDataLabels"))
+  .then(() => {
+    Chart.defaults.font.family = "'Sarabun', system-ui, sans-serif";
+    applyTheme();                    // ตั้งสีแกนให้ตรงกับธีมที่ใช้อยู่
+    chartsReady = true;
+  });
+const ensureQr   = () => loadScript(CDN_QR, "QRCode");
+const ensureXlsx = () => loadScript(CDN_XLSX, "XLSX");
+
 const money = (n) => Number(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 0 });
 const pct   = (n, d) => (d ? Math.round((n / d) * 100) : 0);
 
@@ -467,7 +529,7 @@ const isMyMachine = (name) => {
 
    ค่าเริ่มต้นเปิดเฉพาะช่างที่มีสถานี — หัวหน้ากับวิศวกรต้องเห็นครบทั้งโรงงานเสมอ
    เก็บค่าไว้ในตัวแปรไม่ใช่ใน DOM เพราะหน้าถูกวาดใหม่ทุกครั้งที่เปลี่ยนวันที่ */
-const mineOnly = { param: null, check: null };
+const mineOnly = { param: null, check: null, mlog: null };
 function mineOnlyOn(page) {
   if (mineOnly[page] === null) mineOnly[page] = !!myStation() && !isLead();
   return !!myStation() && mineOnly[page];
@@ -853,6 +915,10 @@ function applyLock() {
      คนนอกที่เข้ามาแจ้งซ่อมจะเหลือแค่ 2 เมนูที่เขาใช้จริง — ติดตามสถานะ กับ แจ้งซ่อมใหม่ */
   $$(".needs-login").forEach((el) => el.classList.toggle("hidden", !on));
 
+  /* คอลัมน์ค่าใช้จ่ายในตารางใบแจ้งซ่อม — server ไม่ส่ง cost ให้คนที่ไม่ได้ล็อกอินอยู่แล้ว
+     (ไม่อยู่ใน PUBLIC_FIELDS) ตรงนี้แค่ไม่ต้องโชว์หัวคอลัมน์เปล่า ๆ ให้เขา */
+  document.body.classList.toggle("cost-on", on);
+
   // token หมดอายุระหว่างใช้งาน แล้วค้างอยู่บนหน้าที่เพิ่งถูกซ่อน = กดอะไรไม่ได้เลย
   if (!on && NEED_LOGIN.includes(currentTab)) showTab("list");
 
@@ -862,7 +928,18 @@ function applyLock() {
   const hasStock = on && !!CONFIG.stockUrl;
   stock.href = CONFIG.stockUrl || "#";
   stock.classList.toggle("hidden", !hasStock);
-  $("#navExtHead").classList.toggle("hidden", !hasStock);
+
+  /* โปรแกรมสร้างเอกสาร WI — งานออกแบบวิธีทำงาน เป็นเรื่องของหัวหน้าขึ้นไป ช่างไม่ต้องเห็น
+     ไม่ได้กันสิทธิ์อะไร เพราะหน้านั้นเป็นฟอร์มเปล่า ไม่มีข้อมูลโรงงานวิ่งผ่าน */
+  const wi = $("#navWI");
+  /* ต้องมี on ด้วย ไม่ใช่แค่ lead — forceRelogin() ทิ้ง token แต่ไม่ล้าง ME
+     ตอนเซสชันหมดอายุ isLead() จึงยังจริงอยู่ แล้วลิงก์นี้จะโผล่ให้คนที่หลุดล็อกอินไปแล้ว
+     (คลาส needs-login ซ่อนไว้ให้แล้วด้านบน แต่บรรทัดล่างนี้ไปเปิดกลับ) */
+  const hasWI = on && lead && !!CONFIG.wiUrl;
+  wi.href = CONFIG.wiUrl || "#";
+  wi.classList.toggle("hidden", !hasWI);
+
+  $("#navExtHead").classList.toggle("hidden", !hasStock && !hasWI);
 
   const who = $("#whoami");
   who.classList.toggle("hidden", !on);
@@ -898,6 +975,7 @@ function syncMachineRequired() {
   $("#machineHint").textContent = need
     ? "ไม่พบเครื่องที่ต้องการ? แจ้งผู้ดูแลเพิ่มในทะเบียนเครื่องจักรก่อน"
     : "ลักษณะงานนี้ไม่ต้องระบุเครื่องจักร";
+  $("#machineDownWrap").classList.toggle("hidden", !need);
 
   // อธิบายว่าประเภทที่เพิ่งเลือกหมายถึงงานแบบไหน — เลือกผิดแล้วสถิติรายประเภทเพี้ยนทั้งปี
   const hint = $("#workTypeHint");
@@ -948,6 +1026,8 @@ async function handleSubmit(e) {
     work_type:      fd.get("work_type") || "",
     priority:       fd.get("priority") || PRIORITY_DEFAULT,
     image_base64:   image ? image.full : "",
+    // ส่งเฉพาะตอนที่ช่องนี้โผล่จริง ไม่งั้นใบงานอาคารจะพกค่า "เดินต่อได้" ติดไปด้วยทั้งที่ไม่มีเครื่อง
+    machine_down:   machine ? String(fd.get("machine_down") || "") : "",
   };
 
   try {
@@ -1013,6 +1093,9 @@ function techAction(id, next) {
 
   if (tech) changes.technician = tech;
   if (act)  changes.repair_action = act;
+  /* ส่งค่าว่างไปด้วยโดยตั้งใจ — เลือกผิดแล้วต้องแก้กลับเป็น "ยังไม่ทราบ" ได้
+     เช็คว่ามีช่องอยู่บนจอไหม ไม่ใช่เช็คว่ามีค่าไหม แบบเดียวกับช่องผู้รับซ่อมภายนอก */
+  if ($("#mCause")) changes.cause_code = $("#mCause").value;
   if (cost !== undefined && cost !== "") changes.cost = Number(cost) || 0;
   if (min && Number(min) > 0) changes.repair_minutes = Number(min);   // กรอกเองถือว่าทับค่าคำนวณ
 
@@ -1031,6 +1114,12 @@ function techAction(id, next) {
   if (next === STATUS.VERIFY) {
     if (!changes.repair_action && !t.repair_action) {
       toast("กรุณากรอก \"การซ่อม\" ก่อนส่งตรวจรับ (ISO ต้องมีบันทึกการแก้ไข)", false);
+      return;
+    }
+    /* บังคับตอนส่งตรวจรับ ไม่ใช่ตอนเริ่มซ่อม — ตอนเริ่มช่างยังไม่รู้สาเหตุ
+       ถ้าบังคับตั้งแต่ต้นจะได้ "อื่น ๆ" เต็มไปหมด ซึ่งแย่กว่าไม่มีรหัสเลย */
+    if (!changes.cause_code && !t.cause_code) {
+      toast("กรุณาเลือกรหัสสาเหตุก่อนส่งตรวจรับ — ใช้ทำ Pareto หาสาเหตุหลักของโรงงาน", false);
       return;
     }
     changes.verification_status = "รอตรวจรับ";
@@ -1053,6 +1142,8 @@ function approve(id) {
     verified_at: new Date().toISOString(),
     rating: starValue($("#mStarsWrap [data-stars]")),
     comment: $("#mComment")?.value.trim() || "",
+    // ไม่มีช่องนี้บนจอ = ใบที่เครื่องไม่ได้หยุด ส่ง false ไปไม่ให้ server ไปปลดอะไรเกินจำเป็น
+    machine_back: !!$("#mBackOn")?.checked,
   }, `ตรวจรับงาน ${id} เรียบร้อย`, { verify: true });
 }
 
@@ -1092,7 +1183,46 @@ function applyDatePreset() {
   else if (v === "month")     set(new Date(now.getFullYear(), now.getMonth(), 1), now);
   else if (v === "lastmonth") set(new Date(now.getFullYear(), now.getMonth() - 1, 1),
                                   new Date(now.getFullYear(), now.getMonth(), 0));
-  else set("", "");
+  else if (v !== "custom")    set("", "");
+  /* "custom" ไม่ยุ่งกับค่าที่กรอกไว้ — คนเพิ่งเลือกช่วงสำเร็จรูปแล้วอยากขยับปลายทางนิดเดียว
+     ถ้าล้างทิ้งก่อนจะต้องกรอกใหม่ทั้งคู่ */
+  render();
+}
+
+/** ป้ายบอกว่ากำลังกรองอะไรอยู่ + ปุ่มล้าง และซ่อน/โชว์ช่องวันที่ตามช่วงที่เลือก */
+function syncFilterUI() {
+  const preset = $("#datePreset");
+  const custom = preset.value === "custom";
+  $("#dateRange").classList.toggle("hidden", !custom);
+  $("#dateRange").classList.toggle("flex", custom);
+
+  const from = $("#dateFrom").value, to = $("#dateTo").value;
+  const pri = $("#priorityFilter").value, q = $("#searchBox").value.trim();
+
+  const bits = [];
+  if (preset.value && !custom) bits.push(preset.selectedOptions[0].textContent);
+  else if (from || to) bits.push(`${from ? fmtD(from) : "เริ่มต้น"} – ${to ? fmtD(to) : "ล่าสุด"}`);
+  if (pri) bits.push(pri);
+  if (q) bits.push(`"${q}"`);
+
+  const note = $("#filterNote");
+  note.classList.toggle("hidden", !bits.length);
+  note.classList.toggle("flex", !!bits.length);
+  if (bits.length) {
+    note.innerHTML = `<span>กรองอยู่: <b>${esc(bits.join(" · "))}</b></span>
+      <button type="button" id="filterClear" class="chip">✕ ล้างตัวกรอง</button>`;
+  }
+}
+
+function clearFilters() {
+  $("#searchBox").value = "";
+  $("#priorityFilter").value = "";
+  $("#datePreset").value = "";
+  $("#dateFrom").value = "";
+  $("#dateTo").value = "";
+  /* ชิปสถานะก็เป็นตัวกรองเหมือนกัน ไม่คืนค่าด้วยจะกลายเป็น "ล้างแล้วแต่ตารางยังสั้นอยู่"
+     แถมป้าย "กรองอยู่" หายไปพอดี คนเลยไม่มีทางรู้เลยว่ายังเหลือตัวกรองอะไรค้าง */
+  filter = "ALL";
   render();
 }
 
@@ -1172,6 +1302,56 @@ function openCopyBox(title, text) {
   $("#modal2").classList.remove("hidden");
 }
 
+/* ลิงก์หน้าบันทึกค่า — เว็บแอปต้นทางมีสองหน้าอยู่ในตัวเดียวกัน
+     ไม่ใส่อะไรต่อท้าย = ฟอร์ม Extrusion เดิมที่ช่างใช้อยู่ทุกวัน
+     ?app=cond          = ฟอร์มของเครื่องที่เหลือ สร้างช่องจากฟอร์ม ISO ของเครื่องนั้นเอง
+   ส่งช่างไปหน้าที่ตรงกับเครื่องที่เขากดมาเลย ดีกว่าให้ไปไล่เลือกเองอีกรอบแล้วเลือกผิดเครื่อง */
+function paramUrlFor(name) {
+  const base = paramStat?.formUrl || "";
+  if (!base || /^extrusion/i.test(String(name || "").trim())) return base;
+  return base + (base.indexOf("?") > -1 ? "&" : "?") + "app=cond";
+}
+
+/* อ่านคอลัมน์ "อะไหล่ที่ใช้" กลับเป็นรายการ — รูปแบบเดียวกับ parseParts_ ที่ server
+   ต่างกันตรงที่นี่ไม่โยน error: ใบเก่าที่เคยกรอกมือไว้มั่ว ๆ ต้องเปิดเข้าไปแก้ได้
+   บรรทัดที่อ่านไม่ออกก็ยกมาทั้งบรรทัดใส่ช่องรหัส ให้คนแก้เห็นของเดิมแล้วพิมพ์ทับ */
+function partList(text) {
+  return String(text || "").split(/[\r\n]+/).map((ln) => {
+    const s = ln.trim();
+    if (!s) return null;
+    /* กฎเดียวกับ parseParts_ ที่ server เป๊ะ ๆ — ต้องมีเว้นวรรคหน้าตัวคั่น และกินให้ยาวที่สุด
+       ถ้าสองฝั่งอ่านไม่ตรงกัน รหัสที่ออกไปในแผ่น "อะไหล่ตัดสต๊อก" จะไม่ใช่รหัสที่เก็บในชีต
+       ของเดิมอ่าน "Oil seal TC 35x52x7" เป็นรหัส "...35x52" จำนวน 7 แล้วคลังตัดไปเจ็ดตัว */
+    const m = s.match(/^(.*\S)\s+[x\u00d7*]\s*([0-9]+(?:\.[0-9]+)?)$/i);
+    return m ? { code: m[1].replace(/\s+/g, " ").toUpperCase(), qty: m[2] } : { code: s, qty: "" };
+  }).filter(Boolean);
+}
+
+/* flex-wrap + ขอฐานกว้าง 11rem ให้ช่องรหัส — บนจอ 360px แถวนี้เหลือ 288px
+   หักช่องจำนวนกับปุ่มลบแล้วช่องรหัสเหลือราว 146px ซึ่งโชว์รหัสจริงได้ไม่ถึงสิบตัว
+   ช่างพิมพ์รหัสที่ตัวเองมองไม่เห็นหัว ตรวจทานก่อนบันทึกไม่ได้ — ให้มันตกบรรทัดแทน
+   ปุ่ม ✕ บังคับ 2.75rem ตามเกณฑ์ขนาดจุดกดขั้นต่ำ ของเดิมราว 30px ติดกับช่องจำนวน
+   คนใส่ถุงมือกดพลาดแล้วแถวหายทั้งแถว ไม่มีปุ่มเรียกคืน */
+const partRow = (p) => `<div class="flex flex-wrap gap-2" data-part-row>
+  <input class="inp !w-auto grow min-w-0" data-part-code autocomplete="off" list="partCodes"
+         style="flex:1 1 11rem" value="${esc(p?.code || "")}" aria-label="รหัสอะไหล่"
+         placeholder="รหัสอะไหล่ เช่น 60002048M006-0005">
+  <input class="inp num" data-part-qty type="number" min="0" step="any" style="width:5.5rem"
+         value="${esc(p?.qty || "")}" placeholder="จำนวน" aria-label="จำนวน">
+  <button type="button" class="chip" data-part="del" aria-label="ลบรายการนี้"
+          style="min-width:2.75rem;min-height:2.75rem">✕</button>
+</div>`;
+
+/* รายการรหัสที่เคยใช้ไปแล้ว ให้คนที่สองเลือกของคนแรกแทนที่จะคิดสะกดใหม่เอง
+   ตัวกันรหัสแตกที่ถูกที่สุด และไม่ต้องรอให้ระบบ Stock เริ่มใช้งานจริงก่อน */
+function paintPartCodes() {
+  const dl = $("#partCodes");
+  if (!dl) return;
+  const seen = new Set();
+  tickets.forEach((t) => partList(t.parts).forEach((p) => p.code && seen.add(p.code)));
+  dl.innerHTML = [...seen].sort().map((c) => `<option value="${esc(c)}">`).join("");
+}
+
 function openModal(id) {
   const t = tickets.find((x) => x.ticket_id === id);
   if (!t) return;
@@ -1187,9 +1367,16 @@ function openModal(id) {
   let html = `
     <dl class="grid sm:grid-cols-2 gap-3">
       ${row("เครื่องจักร", t.machine_name)}
+      ${t.machine_down ? row("สภาพเครื่องตอนแจ้ง",
+        t.machine_down === "หยุดเดิน" ? "🔴 หยุดเดิน" : "🟢 ยังเดินต่อได้") : ""}
       ${row("ผู้แจ้ง", `${t.reporter || "-"}${t.department ? " (" + t.department + ")" : ""}`)}
       ${row("วันที่แจ้ง", fmtDT(t.created_at))}
       ${row("ค่าใช้จ่าย", Number(t.cost) ? money(t.cost) + " บาท" : "-")}
+      ${/* ขึ้นบรรทัดจริงตามที่เก็บไว้ — ไม่ใช้ row() เพราะ dd ธรรมดายุบบรรทัดเป็นช่องว่าง
+            กลายเป็นอะไหล่ 5 รายการต่อกันเป็นพืดอ่านไม่ออก */ ""}
+      ${t.parts ? `<div class="sm:col-span-2">
+        <dt class="text-[11px] font-semibold text-slate-500">อะไหล่ที่ใช้</dt>
+        <dd class="text-sm mt-0.5" style="white-space:pre-line">${esc(t.parts)}</dd></div>` : ""}
       ${t.pr_no ? row("เลขที่ PR (ERP)", t.pr_no) : ""}
       ${t.vendor ? row("ส่งซ่อมภายนอกที่", t.vendor) : ""}
       ${t.expect_back ? row("กำหนดรับคืน", fmtD(t.expect_back) +
@@ -1230,6 +1417,24 @@ function openModal(id) {
         <div id="mTech" class="flex flex-wrap gap-2">${nameChips(t.technician, "tech")}</div></div>
       <div><label class="lbl" for="mAction">การซ่อม — สิ่งที่ดำเนินการจริง</label>
         <textarea id="mAction" rows="2" class="inp" placeholder="เช่น เปลี่ยนลูกปืน พันขดลวดใหม่">${esc(t.repair_action)}</textarea></div>
+      <!-- ช่างเป็นคนเลือก ไม่ใช่ผู้แจ้ง — ผู้แจ้งเห็นแค่อาการ ช่างคือคนเดียวที่รู้สาเหตุจริง
+           หลังรื้อออกมาดูแล้ว บังคับเลือกตอนส่งตรวจรับ เหมือนช่อง "การซ่อม" -->
+      <div><label class="lbl" for="mCause">รหัสสาเหตุ <b class="req">*</b>
+          <span class="text-slate-400 font-normal">(เลือกตอนรู้สาเหตุจริงแล้ว)</span></label>
+        <select id="mCause" class="inp">
+          <option value="">-- ยังไม่ทราบสาเหตุ --</option>
+          ${/* รหัสเดิมของใบนี้ต้องมีในรายการเสมอ แม้จะถูกลบออกจากชีตตั้งค่าไปแล้ว
+                ไม่งั้น select จะตกไปที่ช่องว่าง แล้วการกดเปลี่ยนสถานะครั้งถัดไป
+                จะส่งค่าว่างไปลบรหัสเดิมทิ้งโดยที่ไม่มีใครตั้งใจ */ ""}
+          ${(t.cause_code && !CAUSE_CODES.includes(t.cause_code)
+             ? [t.cause_code + " (ถูกถอดออกจากรายการแล้ว)"] : []).map((c) =>
+            `<option value="${esc(t.cause_code)}" selected>${esc(c)}</option>`).join("")}
+          ${CAUSE_CODES.map((c) =>
+            `<option${t.cause_code === c ? " selected" : ""}>${esc(c)}</option>`).join("")}
+        </select>
+        <p class="text-[11px] text-slate-400 mt-1">
+          ใช้ทำ Pareto ว่าทั้งโรงงานเสียเพราะอะไรบ่อยที่สุด — ช่องนี้คือสิ่งเดียวที่ทำให้ระบบ
+          ตอบได้มากกว่า "เครื่องไหนเสียบ่อย"</p></div>
       <div class="grid sm:grid-cols-2 gap-3">
         <div><label class="lbl" for="mCost">ค่าใช้จ่าย (บาท)</label>
           <input id="mCost" type="number" min="0" step="1" value="${Number(t.cost) || 0}" class="inp num"></div>
@@ -1279,12 +1484,77 @@ function openModal(id) {
       </div>
       <div><label class="lbl" for="mComment">ความเห็นเพิ่มเติมถึงฝ่ายซ่อมบำรุง <span class="text-slate-400 font-normal">(ไม่บังคับ)</span></label>
         <input id="mComment" class="inp" placeholder="เช่น มาเร็วดี แต่ควรเก็บงานให้เรียบร้อยกว่านี้"></div>
+      ${/* ขึ้นเฉพาะใบที่ผู้แจ้งบอกไว้ว่าเครื่องหยุด — ใบที่เครื่องยังเดินได้ไม่มีอะไรให้ปลด
+            ติ๊กไว้ให้ก่อน เพราะตรวจรับผ่านแล้วส่วนใหญ่เครื่องก็กลับมาเดิน
+            คนที่เจอว่ายังเดินไม่ได้คือส่วนน้อย ให้เขาเป็นฝ่ายเอาติ๊กออก */ ""}
+      ${t.machine_down === "หยุดเดิน" && t.machine_name ? `
+      <label class="flex items-start gap-2 p-3 rounded-xl bg-white/70 cursor-pointer">
+        <input type="checkbox" id="mBackOn" class="mt-0.5" checked>
+        <span class="text-sm"><b>เครื่องกลับมาเดินปกติแล้ว</b>
+          <span class="block text-[11px] text-slate-400">
+            ติ๊กไว้แล้วสมุดเครื่องจักรจะขึ้นว่า ${esc(t.machine_name)} เดินปกติให้เอง
+            — ถ้ายังมีใบอื่นที่บอกว่าเครื่องนี้หยุดอยู่ ระบบจะยังไม่ปลดให้</span></span>
+      </label>` : ""}
       <div><label class="lbl" for="mReject">สาเหตุที่ต้องแก้ไขเพิ่ม (กรอกเฉพาะกรณีส่งกลับแก้ไข)</label>
         <textarea id="mReject" rows="2" class="inp" placeholder="ระบุสิ่งที่ยังไม่เรียบร้อย..."></textarea></div>
       <div class="flex gap-2 flex-wrap">
         <button class="btn" style="background:#16a34a" data-act="approve">✔ อนุมัติ (Approve)</button>
         <button class="btn" style="background:#dc2626" data-act="reject">↩ ส่งกลับแก้ไข (Reject)</button>
       </div></div>`;
+  }
+
+  /* ⏱ ลงเวลาย้อนหลัง — ขึ้นทั้งใบที่ยังเปิดและใบที่ปิดไปแล้ว เพราะกรณีที่ต้องแก้จริง ๆ
+     ส่วนใหญ่รู้ตัวตอนมาปิดยอดสิ้นเดือน ซึ่งใบปิดไปนานแล้ว
+     วางก่อนกล่องเขียว "ซ่อมเสร็จสมบูรณ์" เพราะกล่องนั้นมี -mb-5 ไว้ชิดขอบล่างของ modal
+     ปุ่มนี้ไม่ใช่การกันสิทธิ์ — apiUpdateTicket ตรวจ LEAD ซ้ำเองที่ server */
+  if (isLead() && !isDead(t)) {
+    html += `<div class="border-t border-slate-100 pt-4 space-y-3">
+      <h3 class="font-bold text-sm">⏱ ลงเวลาย้อนหลัง</h3>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div><label class="lbl" for="mStart">เวลาเริ่มซ่อมจริง</label>
+          <input id="mStart" type="datetime-local" class="inp" value="${dtLocal(t.started_at)}"></div>
+        <div><label class="lbl" for="mEnd">เวลาซ่อมเสร็จจริง</label>
+          <input id="mEnd" type="datetime-local" class="inp" value="${dtLocal(t.completed_at)}"></div>
+      </div>
+      <div><label class="lbl" for="mWhy">เหตุผลที่ลงย้อนหลัง</label>
+        <input id="mWhy" class="inp" autocomplete="off"
+               placeholder="เช่น ซ่อมจริงคืนวันที่ 3 แต่มาเปิดใบเช้าวันที่ 4">
+        <p class="text-[11px] text-slate-400 mt-1">
+          บังคับกรอก — เก็บลงชีต Audit คู่กับชื่อคนแก้และค่าเดิม ตามข้อกำหนด ISO</p></div>
+      <button class="btn" style="background:#0f766e" data-act="backdate">บันทึกเวลาย้อนหลัง</button>
+      <p class="text-[11px] text-slate-400">แก้แล้ว "ใช้เวลา (นาที)" กับ MTTR ถูกคิดใหม่จากสองช่องนี้</p>
+    </div>`;
+  }
+
+  /* 🔩 อะไหล่ — ขึ้นทั้งใบที่ยังเปิดและใบที่ปิดไปแล้ว เหตุผลเดียวกับแผงลงเวลาย้อนหลัง
+     คนมารู้ตัวว่ายังไม่ได้ลงรหัสอะไหล่ตอนปิดยอดสิ้นเดือน ซึ่งใบปิดไปนานแล้ว
+     ปุ่มนี้ไม่ใช่การกันสิทธิ์ — 'parts' อยู่ใน LEAD_ONLY_FIELDS, server ตรวจ LEAD ซ้ำเอง */
+  if (isUnlocked() && !isDead(t) && (isLead() || t.status !== STATUS.DONE)) {
+    const prs = partList(t.parts);
+    html += `<div class="border-t border-slate-100 pt-4 space-y-3">
+      <h3 class="font-bold text-sm">🔩 อะไหล่${t.status === STATUS.DONE ? "และค่าใช้จ่าย" : "ที่ใช้"}</h3>
+      <div id="mParts" class="space-y-2">${(prs.length ? prs : [null]).map(partRow).join("")}</div>
+      ${/* ช่อง "ค่าใช้จ่าย" ตัวจริงอยู่ในแผงของช่าง ซึ่งขึ้นเฉพาะตอนงานยังไม่ปิด
+            ใบที่ปิดไปแล้วจึงไม่มีทางแก้ยอดเลยสักทาง ทั้งที่บิลผู้รับเหมามาทีหลังเป็นเรื่องปกติ
+            ใส่ที่นี่เฉพาะตอนใบปิดแล้ว — ถ้าใส่ตลอดจะได้ id ซ้ำกับ #mCost ของแผงช่าง */ ""}
+      ${t.status === STATUS.DONE ? `<div>
+        <label class="lbl" for="mCostBack">ค่าใช้จ่าย (บาท)</label>
+        <input id="mCostBack" type="number" min="0" step="1" class="inp num"
+               value="${Number(t.cost) || 0}">
+        <p class="text-[11px] text-slate-400 mt-1">
+          ใบที่ปิดแล้วมาแก้ยอดได้ที่นี่ที่เดียว — บิลร้านนอกมาทีหลัง หรือตอนปิดยอดสิ้นเดือน
+          แล้วพบว่ากรอกตกไป · บันทึกพร้อมอะไหล่ด้วยปุ่มเดียวกัน</p>
+      </div>` : ""}
+      <div class="flex gap-2 flex-wrap">
+        <button type="button" class="chip" data-part="add">+ เพิ่มอีกรายการ</button>
+        <button class="btn" style="background:#0f766e" data-act="parts">
+          ${t.status === STATUS.DONE ? "บันทึกอะไหล่และค่าใช้จ่าย" : "บันทึกอะไหล่"}</button>
+      </div>
+      <p class="text-[11px] text-slate-400">
+        ใส่ได้หลายรหัสต่อหนึ่งใบ · ${isLead()
+          ? "ใบที่ปิดไปแล้วก็ยังมาเติมย้อนหลังได้" : "ใบที่ปิดแล้วต้องให้หัวหน้างานเป็นคนแก้"} ทุกครั้งลงชีต Audit
+        ว่าใครแก้ จากอะไรเป็นอะไร · รหัสที่กรอกจะไปอยู่ในกล่อง "อุปกรณ์และอะไหล่" ของ FM-MT-04</p>
+    </div>`;
   }
 
   if (t.status === STATUS.DONE) {
@@ -1304,9 +1574,7 @@ function openModal(id) {
   // จ่ายงาน / ปรับความเร่งด่วน / เลข PR — สิทธิ์ Management & Lead เท่านั้น
   // เดิมเช็คแค่ isUnlocked() ช่างจึงเห็นแผงนี้ กรอกเสร็จแล้วค่อยโดน server ปฏิเสธ
   if (isLead() && t.status !== STATUS.DONE) {
-    const due = t.due_at ? new Date(t.due_at) : null;
-    const localDue = due && !isNaN(due)
-      ? new Date(due.getTime() - due.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
+    const localDue = dtLocal(t.due_at);
     html += `<div class="border-t border-slate-100 pt-4 space-y-3">
       <h3 class="font-bold text-sm">📋 การจัดการงาน</h3>
       <div class="grid sm:grid-cols-3 gap-3">
@@ -1361,13 +1629,32 @@ function openModal(id) {
 
   $("#mBody").innerHTML = html;
   paintAssignNote();
+  paintPartCodes();        // รายการรหัสอะไหล่ที่เคยใช้ ไว้ให้เลือกแทนการสะกดเอง
   $("#mBody").onclick = (e) => {
+    const p = e.target.closest("button[data-part]");
+    if (p) {
+      /* ย้ายโฟกัสเองทุกครั้ง — ลบแถวที่ถืออยู่ แล้วโฟกัสตกไปที่ body
+         คนที่ใช้คีย์บอร์ดต้อง Tab กลับมาใหม่ทั้งหน้า ส่วนคนที่ใช้โปรแกรมอ่านหน้าจอ
+         จะเสียตำแหน่งอ่านกลางฟอร์มโดยไม่มีอะไรบอกว่าแถวหายไปแล้ว */
+      if (p.dataset.part === "add") {
+        $("#mParts").insertAdjacentHTML("beforeend", partRow(null));
+        $("#mParts").lastElementChild?.querySelector("[data-part-code]")?.focus();
+      } else {
+        const row = p.closest("[data-part-row]");
+        const next = row?.nextElementSibling || row?.previousElementSibling;
+        row?.remove();
+        (next?.querySelector("[data-part-code]") || $('[data-part="add"]'))?.focus();
+      }
+      return;
+    }
     const b = e.target.closest("button[data-act]");
     if (!b) return;
     if (b.dataset.act === "tech")    techAction(id, b.dataset.next);
     if (b.dataset.act === "approve") approve(id);
     if (b.dataset.act === "reject")  reject(id);
     if (b.dataset.act === "plan")    savePlan(id);
+    if (b.dataset.act === "backdate") saveBackdate(id);
+    if (b.dataset.act === "parts")   saveParts(id);
     if (b.dataset.act === "cancel")  cancelTicket(id);
     if (b.dataset.act === "restore") restoreTicket(id);
     if (b.dataset.act === "line")    openLineText(id);
@@ -1381,6 +1668,362 @@ const closeModal = () => $("#modal").classList.add("hidden");
 const closeModal2 = () => $("#modal2").classList.add("hidden");
 
 /* ─────────── ประวัติรายเครื่องจักร ─────────── */
+/* ═══════════ สมุดเครื่องจักร ═══════════
+   ทะเบียนบอกได้แค่ว่าเครื่องมีอยู่ ไทม์ไลน์ตอบได้ทีละเครื่อง หน้านี้ตอบคำถามที่เหลือ
+   คือ "ตอนนี้ทั้งโรงงานมีเครื่องไหนหยุดอยู่บ้าง และหยุดมานานแค่ไหนแล้ว"
+
+   สถานะขยับด้วยการกดเท่านั้น ไม่ผูกกับใบแจ้งซ่อม — เครื่องหยุดโดยไม่มีใบก็เกิดขึ้นจริง
+   และหลายใบเปิดค้างอยู่ทั้งที่เครื่องยังเดินได้ ผูกอัตโนมัติจะได้ตัวเลขที่ดูน่าเชื่อแต่ผิด */
+let mStatus = null;                 // { ชื่อเครื่อง: {status, since, note, by, at} }
+let mStation = "";                  // สถานีของคนที่ล็อกอิน — server ส่งมาให้ ไม่ต้องเดาเอง
+
+/* สามสถานะ ไม่ใช่สอง — "หยุดเสีย" กับ "หยุดตามแผน PM" ต้องแยกกันให้ได้
+   ไม่งั้นเวลาคิด Availability จะนับการหยุดที่วางแผนไว้เป็นของเสียไปด้วย ซึ่งทำให้ตัวเลขแย่กว่าจริง */
+const MS_RUN = "เดินปกติ", MS_STOP = "หยุดเสีย", MS_PLAN = "หยุดตามแผน PM";
+const MS_LOOK = {
+  [MS_RUN]:  { edge: "#16a34a", bg: "#dcfce7", fg: "#166534", short: "เดินปกติ", dot: "🟢" },
+  [MS_STOP]: { edge: "#dc2626", bg: "#fee2e2", fg: "#991b1b", short: "หยุดเสีย", dot: "🔴" },
+  [MS_PLAN]: { edge: "#d97706", bg: "#fef3c7", fg: "#92400e", short: "หยุด PM", dot: "🟠" },
+};
+const msLook = (st) => MS_LOOK[st] ||
+  { edge: "#cbd5e1", bg: "#f1f5f9", fg: "#64748b", short: "ยังไม่ระบุ", dot: "⚪" };
+const msStopped = (st) => st === MS_STOP || st === MS_PLAN;
+
+/** ช่างแตะได้เฉพาะเครื่องในสถานีตัวเอง หัวหน้าขึ้นไปแตะได้หมด
+    เป็นแค่การซ่อนปุ่มให้ถูก ตัวกันจริงคือ canTouchMachine_ ที่ server */
+const canTouch = (name) => {
+  if (isLead()) return true;
+  const st = (mStation || myStation() || "").trim();
+  if (!st) return false;
+  if (st.toUpperCase() === "ALL") return true;
+  const m = MACHINES.find((x) => x.name === name);
+  return !!m && String(m.owner || "").trim() === st;
+};
+
+async function openMachineLogTab() {
+  if (!mStatus) await loadMachineStatus();
+  renderMachineLog();
+  /* เช็คชีตกับพารามิเตอร์โหลดทีหลังแบบไม่รอ — การ์ดขึ้นก่อน คนได้เห็นของทันที
+     ทั้งสองตัวพังเองได้โดยไม่ลากหน้านี้ไปด้วย เพราะ popup เช็ค null อยู่แล้ว */
+  /* วาดการ์ดซ้ำเมื่อข้อมูลมาถึง — ปุ่ม "เช็ครายวัน" กับ "ลงค่า" บนการ์ดต้องใช้ข้อมูลสองชุดนี้
+     โหลดแล้วไม่วาดใหม่ ปุ่มจะไม่มีวันขึ้นจนกว่าจะสลับหน้าไปกลับ */
+  if (!dailyCheck) loadDailyCheck().then(renderMachineLog).catch(() => {});
+  if (!paramStat) loadParamStatus().then(renderMachineLog).catch(() => {});
+}
+
+async function loadMachineStatus(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "กำลังโหลด..."; }
+  try {
+    const res = await gsAuth("apiMachineLog");
+    mStatus = res.statuses || {};
+    mStation = res.station || "";
+  } catch (err) {
+    mStatus = mStatus || {};        // โหลดไม่ได้ก็ยังให้ดูทะเบียนได้ แค่ไม่มีสถานะ
+    toast("โหลดสถานะเครื่องไม่สำเร็จ: " + err.message, false);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = tt("↻ โหลดใหม่", "↻ Reload"); }
+  }
+}
+
+/** ใบที่ยังไม่จบของเครื่องนั้น — ใช้ tickets ที่โหลดไว้แล้ว ไม่ต้องยิง server ซ้ำ */
+const openTicketsOf = (name) =>
+  tickets.filter((t) => t.machine_name === name && !isDead(t) && t.status !== STATUS.DONE);
+
+function renderMachineLog() {
+  const q = ($("#mlSearch")?.value || "").trim().toLowerCase();
+  const want = $("#mlStatus")?.value || "";
+
+  const rowsAll = MACHINES.map((m) => {
+    const s = (mStatus || {})[m.name] || {};
+    return { m, status: s.status || "—", since: s.since || "", note: s.note || "", by: s.by || "" };
+  }).filter((r) => {
+    if (want && r.status !== want) return false;
+    if (!q) return true;
+    return [r.m.name, r.m.code, r.m.location, r.m.group]
+      .some((v) => String(v || "").toLowerCase().includes(q));
+  });
+
+  /* ช่างเห็นเฉพาะเครื่องในสถานีตัวเองเป็นค่าตั้งต้น — หน้านี้มีทั้งสวิตช์หยุด/เดิน
+     ปุ่มเช็ครายวัน และปุ่มลงค่า ถ้าโชว์ทั้งโรงงาน 34 เครื่อง โอกาสกดผิดเครื่องสูงมาก
+     และกดผิดเครื่องของคนอื่นคือไปแตะตัวเลขที่เขาต้องรับผิดชอบ
+
+     ตัวกันจริงไม่ใช่ตรงนี้ — server ตรวจ canTouchMachine_ ทุกครั้งที่เขียนอยู่แล้ว
+     ต่อให้เปิดดูทั้งโรงงานก็กดสวิตช์ของสถานีอื่นไม่ได้ ตรงนี้คือทำให้หน้าจอ
+     ตรงกับสิ่งที่เขาทำได้จริง ไม่ใช่เพิ่มการกันสิทธิ์ชั้นใหม่
+
+     หัวหน้ากับวิศวกรไม่มีสถานีประจำ จึงเห็นครบทั้งโรงงานเหมือนเดิมเสมอ */
+  const rows = mineOnlyBind("mlog", "#mlMineWrap", "#mlMineOnly", rowsAll,
+    (r) => isMyMachine(r.m.name), renderMachineLog);
+
+  const all = MACHINES.map((m) => ((mStatus || {})[m.name] || {}).status || "—");
+  const n = (v) => all.filter((x) => x === v).length;
+  $("#mlChips").innerHTML = [MS_STOP, MS_PLAN, MS_RUN, "—"].map((st) => {
+    const k = msLook(st);
+    return `<span class="px-3 py-1 rounded-full text-xs font-bold"
+      style="background:${k.bg};color:${k.fg}">${esc(k.dot + " " + k.short + " " + n(st))}</span>`;
+  }).join("");
+
+  $("#mlGrid").innerHTML = rows.length ? rows.map((r) => {
+    const k = msLook(r.status);
+    const stopped = msStopped(r.status);
+    const running = r.status === MS_RUN;
+    const state = stopped ? "off" : running ? "on" : "unset";
+    const mine = canTouch(r.m.name);
+    const chk = (dailyCheck?.machines || []).find((x) => x.name === r.m.name) || null;
+    const pm = (paramStat?.machines || []).find(
+      (x) => x.cmms === r.m.name || x.name === r.m.name || x.id === r.m.name) || null;
+    const open = openTicketsOf(r.m.name).length;
+    const hrs = r.since ? elapsedHours({ created_at: r.since }) : null;
+    /* แถบสีซ้ายการ์ด — อ่านสถานะได้จากหางตาโดยไม่ต้องอ่านตัวหนังสือ
+       สำคัญตอนกวาดดู 36 เครื่องเพื่อหาว่าเครื่องไหนหยุด */
+    const edge = k.edge;
+    /* การ์ดเป็น div ไม่ใช่ button — ซ้อนปุ่มในปุ่มเป็น HTML ที่ใช้ไม่ได้
+       ชื่อเครื่องเป็นปุ่มจริงเพื่อให้กด Tab เข้าถึงได้ ส่วนพื้นที่ว่างรอบ ๆ กดด้วยเมาส์ได้ */
+    return `<div class="panel p-4 hover:shadow-md transition cursor-pointer"
+            style="border-left:4px solid ${edge}" data-ml="open" data-name="${esc(r.m.name)}">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0">
+          <button type="button" class="font-bold truncate text-left hover:underline"
+                  data-ml="open" data-name="${esc(r.m.name)}">${esc(r.m.name)}</button>
+          <div class="text-[11px] text-slate-400 truncate">${esc(r.m.code || "")}${
+            r.m.location ? " · " + esc(r.m.location) : ""}</div>
+        </div>
+        ${/* สถานะเป็นป้ายสีมุมขวาบน อ่านได้จากหางตา ส่วนสวิตช์ย้ายลงไปอยู่กับปุ่มงานอื่น
+              ข้อมูลอยู่บน ปุ่มอยู่ล่าง การ์ดเลยอ่านง่ายกว่าเอาปนกัน */ ""}
+        <span class="shrink-0 px-2 py-1 rounded-lg text-xs font-bold"
+              style="background:${k.bg};color:${k.fg}">${esc(k.dot + " " + k.short)}</span>
+      </div>
+      ${stopped && hrs !== null
+        ? `<div class="mt-2 text-xs font-bold text-rose-600">⏱ หยุดมา ${esc(fmtDuration(hrs))}</div>` : ""}
+      ${r.note ? `<div class="mt-1 text-xs text-slate-500 line-clamp-2">${esc(r.note)}</div>` : ""}
+      <div class="mt-2 flex items-center gap-3 text-[11px] text-slate-400">
+        ${open ? `<span class="font-bold text-amber-600">ใบค้าง ${open}</span>` : ""}
+        ${r.since ? `<span>${esc(fmtDT(r.since))}</span>` : ""}
+        ${r.by ? `<span class="truncate">${esc(r.by)}</span>` : ""}
+      </div>
+
+      ${/* งานประจำวันของช่างอยู่บนการ์ดเลย ไม่ต้องเปิด popup ก่อน
+            สามอย่างนี้คือสิ่งที่เขาทำซ้ำทุกวัน เอาไว้ลึกอีกชั้นคือเพิ่มการกดให้เปล่า ๆ */ ""}
+      <div class="mt-3 pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2"
+           data-ml-actions>
+        <button type="button" class="sw" role="switch" data-state="${state}"
+                aria-checked="${running}" data-ml="toggle" data-name="${esc(r.m.name)}"
+                aria-label="สถานะของ ${esc(r.m.name)} ตอนนี้คือ ${esc(k.short)}"${mine ? "" : " disabled"}
+                title="${mine ? (stopped ? "กดเพื่อให้กลับมาเดิน" : "กดเพื่อสั่งหยุด")
+                              : "เครื่องนี้ไม่ได้อยู่ในสถานีที่คุณดูแล"}"></button>
+
+        ${chk && chk.formUrl
+          ? `<a class="chip !py-1 text-xs" style="text-decoration:none${
+               chk.checked ? "" : ";background:#dcfce7;color:#166534;font-weight:700"}"
+               target="_blank" rel="noopener" href="${esc(chk.formUrl)}"
+               title="${chk.checked ? "ตรวจแล้ววันนี้ — กดเพื่อตรวจรอบใหม่" : "ยังไม่ได้ตรวจวันนี้"}"
+            >${chk.checked ? "✅ ตรวจแล้ว" : "📋 เช็ครายวัน"}</a>`
+          : ""}
+
+        ${pm && paramStat?.formUrl
+          ? `<a class="chip !py-1 text-xs" style="text-decoration:none${
+               pm.stale ? ";background:#ffedd5;color:#9a3412;font-weight:700" : ""}"
+               target="_blank" rel="noopener" href="${esc(paramUrlFor(r.m.name))}"
+               title="${pm.stale
+                 ? "ยังไม่ได้ลงค่ารอบนี้" + (pm.date ? " — ลงล่าสุด " + esc(pm.date + " " + pm.round) : "")
+                 : "ลงค่ารอบนี้แล้ว (" + esc(pm.date + " " + pm.round) + ") — กดเพื่อลงรอบใหม่"}"
+            >${pm.stale ? "🌡 ลงค่า" : "✅ ลงค่าแล้ว"}</a>`
+          : ""}
+      </div>
+    </div>`;
+  }).join("") : `<p class="empty sm:col-span-2 lg:col-span-3">${
+    mineOnlyOn("mlog") && (q || $("#mlStatus")?.value)
+      ? `ไม่เจอในเครื่องที่คุณดูแล — เอาติ๊ก "เฉพาะเครื่องที่ฉันดูแล" ออกเพื่อค้นทั้งโรงงาน`
+      : "ไม่มีเครื่องจักรที่ตรงกับที่ค้นหา"}</p>`;
+}
+
+/** กดสวิตช์บนการ์ด — เปิดกลับมาเดินบันทึกเลย ปิดต้องถามสาเหตุก่อน
+    เหตุผลตอนกลับมาเดินคือ "ซ่อมเสร็จแล้ว" ซึ่งรู้กันอยู่ ถามไปก็ได้คำตอบซ้ำ ๆ ที่ไม่มีใครอ่าน */
+function toggleMachine(name, el) {
+  if (!canTouch(name)) { toast("เครื่องนี้ไม่ได้อยู่ในสถานีที่คุณดูแล", false); return; }
+  const cur = (mStatus || {})[name] || {};
+  if (msStopped(cur.status)) {
+    postMachineStatus(name, { status: MS_RUN, since: new Date().toISOString(), note: "" }, el);
+  } else {
+    openStopReason(name);
+  }
+}
+
+/** ถามสาเหตุตอนสั่งหยุด — เลือกได้ว่าหยุดเสียหรือหยุดตามแผน PM
+    saveMachineStatus อ่าน radio ตัวนี้ก่อน แล้วค่อยตกไปที่ select ของกล่องรายละเอียด
+    ทางบันทึกจึงมีเส้นเดียว ไม่ต้องเขียนซ้ำสองที่ */
+function openStopReason(name) {
+  $("#m2Title").textContent = "⏹ สั่งหยุด " + name;
+  $("#m2Body").innerHTML = `
+    <div><span class="lbl block">หยุดแบบไหน</span>
+      <div class="flex flex-wrap gap-2">
+        <label class="chip cursor-pointer">
+          <input type="radio" name="msKind" value="${esc(MS_STOP)}" class="mr-1.5" checked> 🔴 หยุดเสีย
+        </label>
+        <label class="chip cursor-pointer">
+          <input type="radio" name="msKind" value="${esc(MS_PLAN)}" class="mr-1.5"> 🟠 หยุดตามแผน PM
+        </label>
+      </div>
+      <p class="text-[11px] text-slate-400 mt-1">
+        แยกให้ถูก — เวลาคิด Availability การหยุดที่วางแผนไว้ไม่ควรถูกนับเป็นของเสีย</p></div>
+    <div><label class="lbl" for="msNote">สาเหตุที่หยุด <b class="req">*</b></label>
+      <input id="msNote" class="inp" autocomplete="off" placeholder="เช่น มอเตอร์หลักไหม้ · รอคิวอะไหล่ · ไม่มีแผนผลิต">
+    </div>
+    <div><label class="lbl" for="msSince">หยุดตั้งแต่</label>
+      <input id="msSince" type="datetime-local" class="inp" value="${dtLocal(new Date().toISOString())}">
+      <p class="text-[11px] text-slate-400 mt-1">หยุดตั้งแต่เมื่อวาน เพิ่งมาบันทึกเช้านี้ ก็ย้อนได้ — ตัวเลข "หยุดมานาน" นับจากเวลานี้</p></div>
+    <button type="button" class="btn" style="background:#dc2626"
+            data-ms="save" data-name="${esc(name)}">ยืนยันหยุดเครื่อง</button>`;
+  $("#modal2").classList.remove("hidden");
+  $("#msNote").focus();
+}
+
+/** กดการ์ด = เด้ง popup ใบเดียวที่มีทั้งเปลี่ยนสถานะและไทม์ไลน์ของเครื่องนั้น
+    ใช้ modal2 ตัวเดิม ไม่เพิ่มโมดอลใบที่สาม
+
+    ids ของไทม์ไลน์ (tlMachine/tlFrom/tlTo/tlGo/tlChips/tlBody) ถูกย้ายมาอยู่ในนี้ทั้งชุด
+    ชื่อเดิมทุกตัว openTimelineTab/loadTimeline/renderTimeline จึงทำงานต่อได้โดยไม่ต้องแก้
+    ช่องเลือกเครื่องถูกซ่อนไว้ เพราะ popup นี้เจาะจงเครื่องเดียวอยู่แล้ว แต่ loadTimeline อ่านค่าจากมัน */
+function openMachinePopup(name) {
+  const cur = (mStatus || {})[name] || {};
+  const m = MACHINES.find((x) => x.name === name) || {};
+  const lead = canTouch(name);          // "แก้ได้ไหม" ไม่ใช่ "เป็นหัวหน้าไหม" อีกต่อไป
+  const k = msLook(cur.status);
+  const open = openTicketsOf(name);
+  const chk = (dailyCheck?.machines || []).find((x) => x.name === name) || null;
+  /* ระบบพารามิเตอร์ใช้รหัสของตัวเอง (EXT2-92) ไม่ใช่ชื่อในทะเบียน จับคู่ได้สามทาง
+     ต้องอ่านจาก paramStat ไม่ใช่ paramData — paramData.machines เป็นรายชื่อสตริงไว้เติม dropdown
+     ส่วนอ็อบเจกต์ที่มี id/cmms อยู่ใน paramStat เทียบผิดตัวแปรแล้ว pm เป็น null ตลอด
+     ปุ่มดูพารามิเตอร์เลยไม่เคยขึ้นสักเครื่อง */
+  const pm = (paramStat?.machines || []).find(
+    (x) => x.cmms === name || x.name === name || x.id === name) || null;
+
+  $("#m2Title").textContent = "🛠 " + name;
+  $("#m2Body").innerHTML = `
+    <div class="text-xs text-slate-400">${esc(m.code || "")}${
+      m.location ? " · " + esc(m.location) : ""}${m.owner ? " · ผู้ดูแล " + esc(m.owner) : ""}</div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="px-2 py-1 rounded-lg text-xs font-bold"
+            style="background:${k.bg};color:${k.fg}">${esc(cur.status || "ยังไม่เคยระบุ")}</span>
+      ${cur.since ? `<span class="text-xs text-slate-500">ตั้งแต่ ${esc(fmtDT(cur.since))}</span>` : ""}
+      ${open.length ? `<span class="text-xs font-bold text-amber-600">ใบที่ยังค้าง ${open.length}</span>` : ""}
+    </div>
+    ${cur.note ? `<p class="text-sm text-slate-600">${esc(cur.note)}${
+      cur.by ? ` <span class="text-slate-400">— ${esc(cur.by)}</span>` : ""}</p>` : ""}
+
+    ${lead ? `<div class="border-t border-slate-100 pt-4 space-y-3">
+      <h3 class="font-bold text-sm">⚙ เปลี่ยนสถานะ</h3>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div><label class="lbl" for="msStatus">สถานะตอนนี้</label>
+          <select id="msStatus" class="inp">${[MS_RUN, MS_STOP, MS_PLAN].map((o) =>
+            `<option value="${esc(o)}"${cur.status === o ? " selected" : ""}>${esc(msLook(o).dot + " " + o)}</option>`
+          ).join("")}</select></div>
+        <div><label class="lbl" for="msSince">เวลาที่เกิดจริง</label>
+          <input id="msSince" type="datetime-local" class="inp" value="${dtLocal(new Date().toISOString())}">
+          <p class="text-[11px] text-slate-400 mt-1">หยุดตั้งแต่เมื่อวาน เพิ่งมาบันทึกเช้านี้ ก็ย้อนได้</p></div>
+      </div>
+      <div><label class="lbl" for="msNote">สาเหตุ / อาการ</label>
+        <input id="msNote" class="inp" autocomplete="off" placeholder="เช่น มอเตอร์หลักไหม้ · รอคิวอะไหล่">
+        <p class="text-[11px] text-slate-400 mt-1">บังคับกรอกเฉพาะตอนหยุด — แถวที่ไม่บอกเหตุผล อ่านย้อนแล้วไม่ได้อะไร</p></div>
+      <button type="button" class="btn" style="background:#0f766e"
+              data-ms="save" data-name="${esc(name)}">บันทึกสถานะ</button>
+      <p class="text-[11px] text-slate-400">บันทึกแบบต่อท้าย แถวเก่าไม่ถูกทับ ย้อนดูได้ว่าหยุดกี่ครั้ง ครั้งละนานเท่าไหร่</p>
+    </div>` : ""}
+
+    ${/* เช็คชีตของวันนี้ — ดึงมาจากข้อมูลชุดเดียวกับหน้าเช็คชีตเดิม ไม่ได้ยิง server ซ้ำ */ ""}
+    <div class="border-t border-slate-100 pt-4 space-y-2">
+      <h3 class="font-bold text-sm">📋 เช็คชีตวันนี้</h3>
+      ${chk ? `
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="badge" style="background:${chk.checked ? "#dcfce7" : "#f1f5f9"};color:${
+            chk.checked ? "#166534" : "#64748b"}">${chk.checked ? "✅ ตรวจแล้ว" : "⏳ ยังไม่ตรวจ"}</span>
+          ${chk.checked ? `<span class="text-xs text-slate-500">${
+            chk.by ? esc(chk.by) + " · " : ""}${esc(fmtDT(chk.at))}${
+            chk.done ? " · ตรวจ " + chk.done + " ข้อ" : ""}</span>` : ""}
+          ${chk.badCount ? `<span class="text-xs font-bold text-rose-600">ไม่ผ่าน ${chk.badCount} ข้อ</span>` : ""}
+        </div>
+        <div class="flex flex-wrap gap-2">
+          ${chk.checked ? `<button class="chip" data-check-open="${esc(name)}">🔍 ดูรายข้อ</button>` : ""}
+          ${chk.formUrl ? `<a class="chip" style="text-decoration:none" target="_blank" rel="noopener"
+             href="${esc(chk.formUrl)}">✏️ ${chk.checked ? "ตรวจรอบใหม่" : "ไปตรวจ"}</a>` : ""}
+        </div>`
+        : `<p class="text-xs text-slate-400">ยังไม่มีข้อมูลเช็คชีตของเครื่องนี้</p>`}
+    </div>
+
+    <div class="border-t border-slate-100 pt-4 space-y-2">
+      <h3 class="font-bold text-sm">🌡 พารามิเตอร์เครื่องจักร</h3>
+      <div class="flex flex-wrap gap-2">
+        ${/* ลิงก์ไปหน้าบันทึกค่าต้องมาก่อนปุ่มดูค่า — งานประจำวันของช่างคือ "ไปลง" ไม่ใช่ "มาดู"
+              ขึ้นได้แม้เครื่องนี้ยังไม่เคยมีค่าในระบบ เพราะการลงค่าครั้งแรกก็ต้องเริ่มจากที่นี่ */ ""}
+        ${paramStat?.formUrl
+          ? `<a class="btn !py-1.5 !px-3 text-xs" style="background:#0284c7;text-decoration:none"
+               target="_blank" rel="noopener" href="${esc(paramUrlFor(name))}">✏️ บันทึกค่ารอบนี้</a>` : ""}
+        ${pm ? `<button class="chip" data-ml-param="${esc(pm.id)}">📈 ดูค่าล่าสุดกับพิกัดมาตรฐาน</button>` : ""}
+      </div>
+      ${!pm ? `<p class="text-xs text-slate-400">เครื่องนี้ยังไม่มีค่าที่บันทึกไว้ในระบบพารามิเตอร์</p>` : ""}
+      ${!paramStat?.formUrl && isLead()
+        ? `<p class="text-[11px] text-amber-600">ยังไม่ได้ตั้งลิงก์หน้าบันทึกค่า —
+             ใส่ที่ชีต "ตั้งค่า" ช่อง "ลิงก์ฟอร์มพารามิเตอร์" แล้วปุ่มบันทึกค่าจะขึ้นให้ช่างทุกคน</p>` : ""}
+    </div>
+
+    <div class="border-t border-slate-100 pt-4 space-y-3">
+      <h3 class="font-bold text-sm">🕘 ไทม์ไลน์ย้อนเหตุการณ์</h3>
+      <select id="tlMachine" class="inp" hidden></select>
+      <div class="flex flex-wrap items-end gap-3">
+        <div><label class="lbl" for="tlFrom">ตั้งแต่</label>
+          <input id="tlFrom" type="date" class="inp !w-auto"></div>
+        <div><label class="lbl" for="tlTo">ถึง</label>
+          <input id="tlTo" type="date" class="inp !w-auto"></div>
+        <button type="button" id="tlGo" class="btn" style="background:var(--brand)">🕘 ดูไทม์ไลน์</button>
+      </div>
+      <p class="text-[11px] text-slate-400">
+        รวมใบแจ้งซ่อม · งาน PM · เช็คชีตประจำวัน · บันทึกพารามิเตอร์ ไว้บนแกนเวลาเดียว เรียงจากใหม่ไปเก่า</p>
+      <div id="tlChips" class="flex flex-wrap gap-2"></div>
+      <div id="tlBody" class="tl"></div>
+    </div>`;
+
+  $("#modal2").classList.remove("hidden");
+
+  openTimelineTab();                       // เติมรายชื่อในช่องที่ซ่อนไว้ + ตั้งช่วงวันที่ตั้งต้น
+  const sel = $("#tlMachine");
+  sel.value = name;
+  if (sel.value === name) loadTimeline($("#tlGo"));
+  else $("#tlBody").innerHTML = `<p class="empty">ชื่อนี้ไม่ตรงกับทะเบียน จึงดึงไทม์ไลน์ไม่ได้</p>`;
+}
+
+/** ทางบันทึกทางเดียวที่ทั้งสวิตช์บนการ์ดและปุ่มในกล่องใช้ร่วมกัน
+    สำเร็จแล้ว renderMachineLog() วาดการ์ดใหม่ทั้งกริด ตัว el เดิมหายไปเอง ไม่ต้องปลดล็อกคืน
+    ล้มเหลวต้องปลดคืน ไม่งั้นปุ่มค้างกดไม่ได้ทั้งที่ยังไม่ได้บันทึกอะไรเลย */
+async function postMachineStatus(name, payload, el, label) {
+  if (el) { el.disabled = true; if (label) el.textContent = "กำลังบันทึก..."; }
+  try {
+    const res = await gsAuth("apiSetMachineStatus", name, payload);
+    mStatus = res.statuses || mStatus;    // server คืนชุดใหม่มาให้ ไม่ต้องยิงโหลดซ้ำ
+    closeModal2();
+    renderMachineLog();
+    toast(`บันทึกสถานะ ${name} เป็น "${payload.status}" แล้ว`);
+  } catch (err) {
+    toast("บันทึกไม่สำเร็จ: " + err.message, false);
+    if (el) { el.disabled = false; if (label) el.textContent = label; }
+  }
+}
+
+function saveMachineStatus(name, btn) {
+  /* กล่อง "สั่งหยุด" ใช้ radio เลือกชนิดการหยุด ส่วนกล่องรายละเอียดเครื่องใช้ select
+     อ่านอันที่มีอยู่จริงบนจอ จะได้ใช้ทางบันทึกเส้นเดียวกันทั้งสองกล่อง */
+  const status = $('[name="msKind"]:checked')?.value || $("#msStatus")?.value || "";
+  const note = $("#msNote").value.trim();
+  if (status !== MS_RUN && !note) {
+    toast("ระบุสาเหตุที่เครื่องหยุดด้วย", false);
+    $("#msNote").focus();
+    return;
+  }
+  const raw = $("#msSince").value;
+  postMachineStatus(name, { status, note, since: raw ? new Date(raw).toISOString() : "" },
+                    btn, btn.textContent);
+}
+
 function openMachineHistory(name) {
   const list = tickets.filter((t) => t.machine_name === name)
                       .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
@@ -1500,6 +2143,47 @@ function savePlan(id) {
   updateTicket(id, changes, `บันทึกการจัดการงาน ${id} แล้ว`);
 }
 
+/** อะไหล่ที่ใช้ — ส่งทั้งชุดไปทับของเดิมเสมอ ไม่ได้ส่งเฉพาะที่แก้
+    เพราะ "ลบรายการที่ 2 ออก" บอกเป็นการแก้รายช่องไม่ได้ ต้องส่งรายการที่เหลือไปทั้งก้อน
+    แถวที่ไม่ได้ใส่รหัสถือว่าแถวเปล่า ไม่ใช่ error — กด "เพิ่มอีกรายการ" แล้วไม่ได้ใช้เกิดขึ้นทุกวัน */
+function saveParts(id) {
+  const lines = $$("#mParts [data-part-row]").map((r) => {
+    const code = r.querySelector("[data-part-code]").value.trim();
+    const qty = r.querySelector("[data-part-qty]").value.trim();
+    return code ? `${code} x ${qty || 1}` : "";
+  }).filter(Boolean);
+  const changes = { parts: lines.join("\n") };
+  /* ช่องค่าใช้จ่ายตัวนี้มีเฉพาะใบที่ปิดแล้ว — เช็คว่ามีช่องอยู่บนจอไหม ไม่ใช่เช็คว่ามีค่าไหม
+     แบบเดียวกับช่องผู้รับซ่อมภายนอก เพราะแก้ยอดกลับเป็น 0 ก็ต้องทำได้ */
+  if ($("#mCostBack")) changes.cost = Number($("#mCostBack").value) || 0;
+  updateTicket(id, changes,
+    lines.length ? `บันทึกอะไหล่ ${lines.length} รายการของใบ ${id} แล้ว` : `บันทึกใบ ${id} แล้ว`);
+}
+
+/** ลงเวลาย้อนหลัง — server คิด repair_minutes ใหม่ให้เอง ไม่ต้องส่งนาทีไปด้วย */
+function saveBackdate(id) {
+  const t = tickets.find((x) => x.ticket_id === id) || {};
+  const why = $("#mWhy").value.trim();
+  if (!why) { toast("กรุณาระบุเหตุผลที่ลงย้อนหลัง", false); return; }
+
+  /* ส่งเฉพาะช่องที่ค่าเปลี่ยนจริง — เทียบในหน่วย "นาที" ของช่องกรอก ไม่ใช่หน่วย ISO ของใบ
+     เพราะ server ประทับเวลาด้วย new Date() ซึ่งมีวินาทีติดมา พอ dtLocal ตัดวินาทีทิ้ง
+     ค่าที่โชว์กับค่าในใบจะไม่มีวันเท่ากัน แล้วช่องที่ไม่ได้แตะเลยจะถูกส่งไปทุกครั้ง
+     ได้แถว Audit ปลอมแบบ 14:03:27 → 14:03:00 และ repair_minutes ถูกคิดใหม่จากค่าที่ปัดแล้ว
+     เทียบแบบนี้ยังกัน RangeError จากใบเก่าที่ช่องเวลาเป็นข้อความมั่วด้วย (dtLocal คืน "") */
+  const changes = { backdate_reason: why };
+  const put = (key, sel) => {
+    const raw = $(sel).value;
+    if (raw === dtLocal(t[key])) return;
+    changes[key] = raw ? new Date(raw).toISOString() : "";
+  };
+  put("started_at", "#mStart");
+  put("completed_at", "#mEnd");
+
+  if (Object.keys(changes).length === 1) { toast("ยังไม่ได้แก้เวลาอะไรเลย", false); return; }
+  updateTicket(id, changes, `ลงเวลาย้อนหลังใบ ${id} แล้ว`);
+}
+
 /* ═══════════ หน้าติดตามสถานะ ═══════════ */
 /* โครงร่างระหว่างรอข้อมูล — ใส่จำนวนคอลัมน์ให้ตรงกับตารางจริง
    จะได้ไม่เกิดอาการ "หน้ากระตุก" ตอนข้อมูลมาถึงแล้วความกว้างเปลี่ยน */
@@ -1544,6 +2228,10 @@ function ticketRow(t, repeatIds, bulk) {
     <td class="td whitespace-nowrap text-slate-600" data-label="วันที่แจ้ง">${fmtDT(t.created_at)}</td>
     <td class="td whitespace-nowrap" data-label="กำหนดเสร็จ"><span class="${due.cls}">${esc(due.text)}</span></td>
     <td class="td" data-label="สถานะ"><span class="badge ${BADGE[t.status]}">${esc(t.status)}</span></td>
+    ${/* 0 แปลว่า "ยังไม่ได้ลง" พอ ๆ กับ "ไม่มีค่าใช้จ่าย" — ขึ้น 0 เรียงกันทั้งคอลัมน์
+          ทำให้ตาไหลผ่านโดยไม่เห็นใบที่ลงจริง ขีดกลางอ่านง่ายกว่า */ ""}
+    <td class="td cost-col num whitespace-nowrap" data-label="ค่าใช้จ่าย">${
+      Number(t.cost) ? esc(money(t.cost)) : `<span class="text-slate-300">—</span>`}</td>
     <td class="td text-slate-300 text-center">›</td>
   </tr>`;
 }
@@ -1560,6 +2248,7 @@ const ticketScope = (list, f) => list.filter((t) =>
              .join(" ").toLowerCase().includes(f.q)));
 
 function render() {
+  syncFilterUI();          // ป้าย "กรองอยู่" ต้องตรงกับผลที่กำลังจะวาด ไม่ใช่รอบก่อน
   const repeatWin = Number($("#repeatWindow")?.value) || 30;
   const repeatIds = new Set(findRepeats(tickets, repeatWin).map((r) => r.curr.ticket_id));
 
@@ -1602,7 +2291,7 @@ function render() {
 
   $("#ticketBody").innerHTML = rows.length
     ? rows.map((t) => ticketRow(t, repeatIds, bulk)).join("")
-    : `<tr><td colspan="${bulk ? 10 : 9}" class="empty">— ไม่พบรายการที่ตรงกับเงื่อนไข —</td></tr>`;
+    : `<tr><td colspan="${bulk ? 11 : 10}" class="empty">— ไม่พบรายการที่ตรงกับเงื่อนไข —</td></tr>`;
   paintBulk();
 
   // filter chips
@@ -1892,7 +2581,7 @@ function renderMine() {
   const rows = pool.filter((t) => inMineRange(t, bd));
   $("#mineBody").innerHTML = rows.length
     ? rows.map((t) => ticketRow(t, repeatIds)).join("")
-    : `<tr><td colspan="9" class="empty">— ${!mine.length
+    : `<tr><td colspan="10" class="empty">— ${!mine.length
         ? "ยังไม่มีงานที่มอบหมายให้ " + esc(ME.name)
         : pool.length ? "ไม่มีงานในช่วงเวลานี้" : "ไม่มีงานค้าง เคลียร์หมดแล้ว 👍"} —</td></tr>`;
 }
@@ -1938,10 +2627,220 @@ function period() {
 }
 
 const PANELS = {
+  improve: panelImprove,
   overview: panelOverview, pivot: panelPivot, cost: panelCost, repeat: panelRepeat,
   heat: panelHeat, rank: panelRank, workload: panelWorkload,
   feedback: panelFeedback, kpi: panelKpi,
 };
+
+/* ── วิเคราะห์เพื่อปรับปรุง ──
+   Dashboard เดิมตอบว่า "เครื่องไหนแย่" หน้านี้ตอบว่า "แย่เพราะอะไร"
+   ซึ่งเป็นคำถามที่วิศวกรเอาไปทำอะไรต่อได้จริง */
+let upData = null;
+
+function panelImprove(p) {
+  // รายชื่อเครื่องในดรอปดาวน์ เติมครั้งเดียวพอ
+  const sel = $("#impMachine");
+  if (sel.options.length <= 1) {
+    sel.innerHTML = `<option value="">ทุกเครื่อง</option>` +
+      MACHINES.map((m) => `<option>${esc(m.name)}</option>`).join("");
+  }
+  const only = sel.value;
+  const list = only ? p.list.filter((t) => t.machine_name === only) : p.list;
+
+  /* นับเฉพาะใบที่ติดรหัสแล้ว และบอกตรง ๆ ว่ายังขาดอีกกี่ใบ
+     Pareto ที่คิดจาก 20 ใบจาก 347 ใบ ไม่ได้แปลว่าสาเหตุนั้นเป็นสาเหตุหลักของโรงงาน */
+  const coded = list.filter((t) => t.cause_code);
+  const byCause = {};
+  coded.forEach((t) => {
+    const c = (byCause[t.cause_code] ||= { n: 0, cost: 0, machines: {} });
+    c.n++;
+    c.cost += Number(t.cost) || 0;
+    c.machines[t.machine_name] = (c.machines[t.machine_name] || 0) + 1;
+  });
+  const rows = Object.entries(byCause)
+    .map(([code, v]) => ({ code, ...v }))
+    .sort((a, b) => b.n - a.n);
+
+  const pctCoded = list.length ? Math.round((coded.length / list.length) * 100) : 0;
+  $("#impNote").textContent = tt(
+    `ใบในช่วงนี้ ${nf(list.length)} ใบ · ติดรหัสสาเหตุแล้ว ${nf(coded.length)} ใบ (${pctCoded}%)` +
+    (pctCoded < 60 ? " — ยังน้อยเกินกว่าจะสรุปว่าอะไรคือสาเหตุหลัก ใช้ดูแนวโน้มไปก่อน" : ""),
+    `${nf(coded.length)} of ${nf(list.length)} tickets coded (${pctCoded}%)`);
+
+  const total = coded.length;
+  let run = 0;
+  const cum = rows.map((r) => { run += r.n; return Math.round((run / total) * 1000) / 10; });
+
+  $("#impCauseBody").innerHTML = rows.length ? rows.map((r, i) => {
+    const top = Object.entries(r.machines).sort((a, b) => b[1] - a[1])[0];
+    return `<tr>
+      <td class="td font-bold" data-label="รหัสสาเหตุ">${esc(r.code)}</td>
+      <td class="td num" data-label="จำนวนใบ">${nf(r.n)}</td>
+      <td class="td num" data-label="สะสม">${cum[i]}%</td>
+      <td class="td num" data-label="ค่าใช้จ่าย">${r.cost ? money(r.cost) : "—"}</td>
+      <td class="td" data-label="เครื่องที่เจอบ่อยสุด">${top ? esc(top[0]) + " (" + top[1] + ")" : "—"}</td>
+    </tr>`;
+  }).join("") : `<tr><td class="td empty" colspan="5">— ยังไม่มีใบที่ติดรหัสสาเหตุในช่วงนี้ —</td></tr>`;
+
+  if (rows.length) {
+    drawChart("chartCause", {
+      data: {
+        labels: rows.map((r) => r.code),
+        datasets: [
+          { type: "bar", label: tt("จำนวนใบ", "Tickets"), data: rows.map((r) => r.n),
+            backgroundColor: "#0ea5e9", yAxisID: "y", order: 2 },
+          { type: "line", label: tt("สะสม %", "Cumulative %"), data: cum,
+            borderColor: "#f97316", backgroundColor: "#f97316",
+            yAxisID: "y1", tension: .25, order: 1 },
+        ],
+      },
+      options: {
+        scales: { y: { beginAtZero: true }, y1: { position: "right", min: 0, max: 100, grid: { display: false } } },
+        plugins: { datalabels: { display: false } },
+      },
+    });
+  }
+
+  renderUptime();
+}
+
+/* ── ไล่ติดรหัสสาเหตุย้อนหลัง ──
+   เฉพาะใบที่ปิดงานแล้วและยังไม่มีรหัส — ใบที่ยังค้าง ช่างจะเลือกเองตอนส่งตรวจรับ
+   โหลดทีละ 25 ใบ ไม่ใช่ 347 ใบรวด เพราะหน้าที่มี 347 ดรอปดาวน์คือหน้าที่ไม่มีใครตรวจจริง */
+let bcPage = { items: [], offset: 0, total: 0 };
+
+async function loadBackcode(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "กำลังดึง..."; }
+  try {
+    bcPage = await gsAuth("apiCauseSuggest", bcPage.offset, 25);
+    renderBackcode();
+  } catch (err) {
+    toast("ดึงใบไม่สำเร็จ: " + err.message, false);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = tt("📥 ดึงใบที่ยังไม่มีรหัส", "📥 Load uncoded"); }
+  }
+}
+
+function renderBackcode() {
+  const body = $("#bcBody"), save = $("#bcSave");
+  const items = bcPage.items || [];
+  save.classList.toggle("hidden", !items.length);
+
+  $("#bcNote").textContent = bcPage.total
+    ? tt(`เหลือใบที่ยังไม่มีรหัส ${nf(bcPage.total)} ใบ · กำลังดู ${nf(items.length)} ใบ — ตรวจก่อนบันทึกทุกใบ`,
+         `${nf(bcPage.total)} uncoded tickets left`)
+    : tt("ไม่มีใบที่ต้องติดรหัสแล้ว", "Nothing left to code");
+
+  body.innerHTML = items.length ? items.map((t) => `
+    <div class="panel p-3" data-bc="${esc(t.ticket_id)}">
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <div class="min-w-0">
+          <span class="font-bold" style="color:var(--brand)">${esc(t.ticket_id)}</span>
+          <span class="text-xs text-slate-400 ml-2">${esc(t.machine_name || "—")} · ${esc(fmtD(t.created_at))}</span>
+          <p class="text-xs text-slate-600 mt-1">${esc(t.description) || "—"}</p>
+          ${t.repair_action ? `<p class="text-[11px] text-slate-400">ซ่อม: ${esc(t.repair_action)}</p>` : ""}
+        </div>
+        <div class="shrink-0">
+          <select class="inp !w-auto bc-sel">
+            <option value="">— ข้าม ไว้ก่อน —</option>
+            ${(bcPage.codes || CAUSE_CODES).map((c) =>
+              `<option${t.suggest === c ? " selected" : ""}>${esc(c)}</option>`).join("")}
+          </select>
+          ${t.word ? `<p class="text-[11px] text-slate-400 mt-1 text-right">เดาจากคำว่า "${esc(t.word)}"</p>`
+                   : `<p class="text-[11px] text-amber-600 mt-1 text-right">เดาไม่ได้ ต้องเลือกเอง</p>`}
+        </div>
+      </div>
+    </div>`).join("")
+    : `<p class="empty">— กดปุ่มด้านบนเพื่อดึงใบที่ยังไม่มีรหัส —</p>`;
+}
+
+async function saveBackcode(btn) {
+  const rows = $$("#bcBody [data-bc]").map((el) => ({
+    ticket_id: el.dataset.bc,
+    cause_code: el.querySelector(".bc-sel").value,
+  })).filter((r) => r.cause_code);
+
+  const skipped = $$("#bcBody [data-bc]").length - rows.length;
+  if (!rows.length) {
+    /* กด "ข้าม" ทั้งหน้า = ตั้งใจจะผ่านใบชุดนี้ไป ไม่ใช่กดพลาด
+       เดิมเด้ง toast แล้วจบ ใบ 25 ใบแรกที่เดารหัสไม่ได้เลยกลายเป็นกำแพง
+       ไม่มีทางไปดูใบที่เหลืออีก 300 ใบได้เลยนอกจากยัด "อื่น ๆ" ซึ่งทำ Pareto พัง */
+    bcPage.offset += skipped;
+    toast("ข้ามไปชุดถัดไปแล้ว");
+    await loadBackcode();
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = "กำลังบันทึก...";
+  try {
+    const res = await gsAuth("apiCauseApply", rows);
+    toast(`ติดรหัสให้ ${res.saved} ใบแล้ว`);
+    /* ใบที่เพิ่งติดรหัสจะหลุดออกจากรายการเอง จึงไม่ต้องขยับ offset ให้มัน
+       แต่ใบที่ถูกกด "ข้าม" ยังอยู่ที่เดิม ต้องขยับข้ามเท่าจำนวนนั้น ไม่งั้นมันวนกลับมาหน้าเดิมตลอด */
+    bcPage.offset += skipped;
+    await refresh();
+    await loadBackcode();
+  } catch (err) {
+    toast("บันทึกไม่สำเร็จ: " + err.message, false);
+  } finally {
+    btn.disabled = false; btn.textContent = tt("บันทึกหน้านี้", "Save this page");
+  }
+}
+
+/** ตารางเวลาหยุดจริง — ดึงแยกจาก Dashboard เพราะมันอ่านชีตคนละใบ */
+function renderUptime() {
+  const body = $("#impUpBody"), note = $("#impUpNote");
+  if (!upData) {
+    body.innerHTML = `<tr><td class="td empty" colspan="7">— กด "คำนวณใหม่" เพื่อดึงเวลาหยุดจริง —</td></tr>`;
+    note.textContent = "";
+    return;
+  }
+  const only = $("#impMachine").value;
+  const rows = only ? upData.machines.filter((m) => m.machine === only) : upData.machines;
+
+  /* บอกจำนวนวันที่มีข้อมูลจริงเสมอ — Availability 99% ที่คิดจากข้อมูล 3 วัน
+     ไม่ได้แปลว่าเครื่องดี มันแปลว่ายังไม่รู้ */
+  note.textContent = upData.days < 30
+    ? tt(`มีข้อมูลสถานะแค่ ${upData.days} วัน — ตัวเลขยังเชื่อไม่ได้ ต้องสะสมอย่างน้อย 1-2 เดือน`,
+         `Only ${upData.days} days of status data — not yet reliable`)
+    : tt(`คิดจากข้อมูล ${upData.days} วัน (${fmtD(upData.from)} – ${fmtD(upData.to)})`,
+         `Based on ${upData.days} days`);
+
+  body.innerHTML = rows.length ? rows.map((m) => `<tr>
+    <td class="td font-bold" data-label="เครื่องจักร">${esc(m.machine)}</td>
+    <td class="td num" data-label="Availability">${m.availability === null ? "—" :
+      `<b style="color:${m.availability >= 95 ? "#16a34a" : m.availability >= 85 ? "#d97706" : "#dc2626"}">${m.availability}%</b>`}</td>
+    <td class="td num" data-label="หยุดเสีย (ชม.)">${m.hoursDown || "—"}</td>
+    <td class="td num" data-label="หยุดตามแผน (ชม.)">${m.hoursPlanned || "—"}</td>
+    <td class="td num" data-label="จำนวนครั้งที่เสีย">${m.breakdowns || "—"}</td>
+    <td class="td num" data-label="MTBF (ชม.)">${m.mtbf === null ? "—" : nf(m.mtbf)}</td>
+    <td class="td num" data-label="MTTR (ชม.)">${m.mttr === null ? "—" : nf(m.mttr)}</td>
+  </tr>`).join("") : `<tr><td class="td empty" colspan="7">— ยังไม่มีข้อมูลเวลาหยุดของเครื่องนี้ —</td></tr>`;
+}
+
+async function loadUptime(btn) {
+  /* period() คืนปี/เดือนที่เลือก ไม่ได้คืนช่วงวันที่ — ประกอบเอง
+     เลือก "ทั้งปี" ก็เอาทั้งปี เลือกเดือนก็เอาเฉพาะเดือนนั้น
+     ปลายช่วงไม่เกินตอนนี้ ไม่งั้นเดือนปัจจุบันจะถูกนับเวลาเดินล่วงหน้าไปถึงสิ้นเดือน */
+  const p = period();
+  const y = Number(p.year), mo = Number(p.month) || 0;
+  const from = mo ? new Date(y, mo - 1, 1) : new Date(y, 0, 1);
+  const end  = mo ? new Date(y, mo, 0, 23, 59, 59) : new Date(y, 11, 31, 23, 59, 59);
+  const now = new Date();
+  const to = end > now ? now : end;
+
+  if (btn) { btn.disabled = true; btn.textContent = "กำลังคำนวณ..."; }
+  try {
+    // ส่งเป็น ISO ไม่ใช่ ymd — ymd ตัดเวลาทิ้ง เดือนปัจจุบันจะหายไปทั้งวันนี้
+    upData = await gsAuth("apiMachineUptime", from.toISOString(), to.toISOString());
+  } catch (err) {
+    toast("ดึงเวลาหยุดไม่สำเร็จ: " + err.message, false);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = tt("↻ คำนวณใหม่", "↻ Recalculate"); }
+  }
+  renderDashboard();
+}
 
 function renderDashboard() {
   if (!$("#yearPicker").options.length) return;
@@ -3675,7 +4574,21 @@ function attachChartSave(id) {
 
 function drawChart(id, cfg) {
   const el = $("#" + id);
-  if (!el || !window.Chart) return;
+  if (!el) return;
+  /* ยามอยู่ในฟังก์ชันกลางที่กราฟทุกใบวิ่งผ่าน ผู้เรียกทั้ง 8 จุดจึงไม่ต้องแก้สักจุด
+     ของเดิม return เงียบ ๆ ตอน Chart ยังไม่มา = กราฟหายไปดื้อ ๆ โดยไม่มีใครรู้ว่าเพราะอะไร */
+  if (!chartsReady) {
+    ensureCharts().then(() => drawChart(id, cfg))
+      .catch(() => {
+        // ขึ้นข้อความเดียวพอ กราฟหลายใบในพาเนลเดียวจะได้ไม่ซ้อนข้อความเดิมหลายบรรทัด
+        const box = el.closest(".panel");
+        if (box && !box.querySelector("[data-chart-err]")) {
+          box.insertAdjacentHTML("beforeend",
+            `<p class="empty" data-chart-err>โหลดไลบรารีกราฟไม่สำเร็จ — ตรวจอินเทอร์เน็ตแล้วกดรีเฟรช</p>`);
+        }
+      });
+    return;
+  }
   if (!dataLabelsReady && window.ChartDataLabels) {
     Chart.register(window.ChartDataLabels);
     dataLabelsReady = true;
@@ -3709,7 +4622,8 @@ const SHEET1_HEADERS = ["ลำดับ", "เวลาแจ้ง", "วั�
   "ค่าใช้จ่าย", "เลขที่ PR", "สถานะ", "ลำดับความสำคัญ", "กำหนดเสร็จ", "ผู้รับผิดชอบ",
   "เริ่มซ่อม", "เวลาซ่อมจบ", "ผู้เข้าซ่อม", "การซ่อม", "ใช้เวลา",
   "ผู้ตรวจรับงาน", "วันที่ตรวจรับ", "ผลการตรวจรับ", "สาเหตุที่ส่งกลับแก้ไข", "รูป",
-  "ผู้รับซ่อมภายนอก", "กำหนดรับคืน"];   // ฝ่ายจัดซื้อขอดูว่าของอยู่ที่ร้านไหน ค้างมากี่วัน
+  "ผู้รับซ่อมภายนอก", "กำหนดรับคืน",   // ฝ่ายจัดซื้อขอดูว่าของอยู่ที่ร้านไหน ค้างมากี่วัน
+  "อะไหล่ที่ใช้"];                      // รหัส SKU ที่ช่างกรอก — คลังเอาไปกระทบยอดตัดสต๊อก ERP
 
 /** วันที่แบบ Excel อ่านออก (ไม่ใช่ ISO string) */
 const xlDate = (iso) => (iso ? new Date(iso) : "");
@@ -3745,23 +4659,93 @@ function sheet1Rows(list) {
     t.has_image ? "มีรูปแนบ" : "",
     t.vendor || "",
     xlDate(t.expect_back),
+    /* คั่นด้วย , ไม่ใช่ขึ้นบรรทัดใหม่ — ช่องที่มีบรรทัดในตัวทำให้ VLOOKUP กับการ copy
+       ไปวางใน ERP เพี้ยน แผ่น "อะไหล่ตัดสต๊อก" ข้างล่างคือตัวที่เอาไปนำเข้าจริง */
+    String(t.parts || "").split(/[\r\n]+/).map((s) => s.trim()).filter(Boolean).join(", "),
   ]);
 }
 
-function exportExcel() {
+/* แผ่นสำหรับตัดสต๊อกใน ERP — หนึ่งแถวต่อหนึ่งรหัส ไม่ใช่หนึ่งแถวต่อหนึ่งใบ
+   ใบเดียวเปลี่ยนอะไหล่ 5 รหัส คลังต้องตัดห้ารายการ เซลล์เดียวที่มีห้ารหัสอยู่ข้างในนำเข้าไม่ได้
+   คอลัมน์ "ใบแจ้งซ่อม" กับ "เลขที่ PR" เอาไว้ไล่กลับมาหาต้นเรื่องตอนยอดไม่ตรง */
+/* "กุญแจรายการ" เป็นคอลัมน์แรก — นำเข้าซ้ำคือเรื่องที่จะเกิดแน่ ๆ ครั้งแรกที่มีคน
+   ส่งออกสัปดาห์เดิมซ้ำ ถ้าไม่มีกุญแจ คลังจะตัดสต๊อกซ้ำทั้งชุดโดยไม่มีอะไรเตือน
+   "วันที่ตัดสต๊อก" ใช้เวลาซ่อมจบ ไม่ใช่เวลาแจ้ง — ของถูกใส่เข้าเครื่องวันที่ซ่อมจบ
+   ใบที่แจ้งวันจันทร์แล้วซ่อมเสร็จวันพฤหัส ถ้าลงวันจันทร์ยอดจะไม่ตรงกับของที่เบิกจริง */
+const PARTS_HEADERS = ["กุญแจรายการ", "หมายเลขแจ้งซ่อม", "วันที่ตัดสต๊อก", "วันที่แจ้ง",
+                       "เครื่องจักร", "รหัสอะไหล่", "จำนวน", "ผู้เข้าซ่อม", "สถานะ", "เลขที่ PR"];
+
+function partsRows(list) {
+  const out = [];
+  list.forEach((t) => {
+    partList(t.parts).forEach((p, i) => {
+      out.push([`${t.ticket_id || "?"}#${i + 1}`, t.ticket_id || "",
+                xlDate(t.completed_at || t.created_at), xlDate(t.created_at),
+                t.machine_name || "", p.code, Number(p.qty) || "", t.technician || "",
+                legacyStatus(t.status), t.pr_no || ""]);
+    });
+  });
+  return out;
+}
+
+/* ช่วงรายสัปดาห์ — สัปดาห์เริ่มวันจันทร์ตามที่โรงงานนับกะ ไม่ใช่วันอาทิตย์แบบ getDay()
+   คืน null = ใช้ปี/เดือนที่เลือกบน Dashboard เหมือนเดิม */
+function expWindow() {
+  const v = $("#expRange")?.value || "";
+  if (!v) return null;
+  const n = new Date(); n.setHours(0, 0, 0, 0);
+  const from = new Date(n);
+  from.setDate(n.getDate() - ((n.getDay() + 6) % 7) - (v === "w1" ? 7 : 0));
+  const to = new Date(from); to.setDate(from.getDate() + 7);
+  return { from, to, label: `${ymd(from)}_ถึง_${ymd(new Date(to.getTime() - 864e5))}` };
+}
+
+/* แผ่นที่ยังมีความหมายเมื่อส่งออกเป็นรายสัปดาห์ — ที่เหลือคิดจากปี/เดือนทั้งก้อน
+   แปะไปด้วยจะได้ไฟล์ชื่อ "สัปดาห์" ที่ข้างในเป็นตัวเลขทั้งเดือน ซึ่งหลอกคนอ่าน */
+const WEEK_SHEETS = ["Sheet1", "อะไหล่ตัดสต๊อก", "KPI"];
+
+async function exportExcel() {
   if (!isUnlocked()) { toast("ต้องเข้าสู่ระบบก่อนจึงจะส่งออกข้อมูลได้", false); return; }
-  if (!window.XLSX) { toast("ยังโหลดไลบรารี Excel ไม่เสร็จ ลองใหม่อีกครั้ง", false); return; }
-  const p = period();
-  if (!p.list.length) { toast("ไม่มีข้อมูลในช่วงเวลาที่เลือก", false); return; }
+  let p = period();
+  const win = expWindow();
+  /* สัปดาห์คร่อมปีใหม่ได้ จึงกรองจากใบทั้งหมด ไม่ใช่จาก p.yearList ที่ตัดตามปีไปแล้ว */
+  /* "สัปดาห์นี้" ต้องหมายถึงงานที่แตะสัปดาห์นี้ ไม่ใช่เฉพาะใบที่เปิดในสัปดาห์นี้
+     ใบที่เปิดเดือนกันยายนแล้วเพิ่งซ่อมจบเมื่อวันศุกร์ คืองานของสัปดาห์นี้เต็ม ๆ
+     ถ้ากรองจากวันแจ้งอย่างเดียว ใบนั้นจะไม่โผล่ในแฟ้มสัปดาห์ไหนเลยที่อะไหล่ถูกใช้จริง */
+  const inWin = (v) => { const d = new Date(v); return !isNaN(d) && d >= win.from && d < win.to; };
+  const list = win
+    ? live(tickets).filter((t) => inWin(t.created_at) || inWin(t.completed_at))
+    : p.list;
+  if (!list.length) { toast("ไม่มีข้อมูลในช่วงเวลาที่เลือก", false); return; }
+  /* แผ่นวิเคราะห์ด้านล่างถูกข้ามตอนส่งออกรายสัปดาห์ก็จริง แต่ยังถูกคำนวณอยู่
+     ถ้าเดือนที่เลือกบน Dashboard ไม่มีใบเลย ของพวกนั้นจะเจอลิสต์ว่าง ซึ่งไม่เคยต้องรับมือมาก่อน
+     เพราะโค้ดเดิมตัดจบไปตั้งแต่บรรทัดบนแล้ว — ชี้ p ไปที่ใบของสัปดาห์เสียเลย ปลอดภัยกว่า */
+  if (win) p = { ...p, list, yearList: list };
+
+  /* ไลบรารี Excel หนัก 861 KB โหลดตอนกดปุ่มนี้เท่านั้น — คนที่ไม่เคยส่งออกไม่ต้องจ่ายค่านี้
+     เช็คว่ามีข้อมูลจะส่งออกก่อนค่อยโหลด จะได้ไม่ดึงทั้งก้อนมาแล้วพบว่าไม่มีอะไรให้ส่ง */
+  const btn = $("#exportBtn"), label = btn?.textContent;
+  if (btn) { btn.disabled = true; btn.textContent = "กำลังเตรียมไฟล์..."; }
+  try {
+    await ensureXlsx();
+  } catch (err) {
+    toast("โหลดไลบรารี Excel ไม่สำเร็จ — ตรวจอินเทอร์เน็ตแล้วลองใหม่", false);
+    return;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+  }
 
   const sla = slaInput();
   const k   = kpiSummary(p.list, sla, p.pm);
   const aoa = (rows) => XLSX.utils.aoa_to_sheet(rows);
   const wb  = XLSX.utils.book_new();
-  const add = (name, ws) => XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));
+  const add = (name, ws) => {
+    if (win && !WEEK_SHEETS.includes(name)) return;
+    XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));
+  };
 
   // 1) Sheet1 — ข้อมูลดิบ
-  const s1 = aoa([SHEET1_HEADERS, ...sheet1Rows(p.list)]);
+  const s1 = aoa([SHEET1_HEADERS, ...sheet1Rows(list)]);
   s1["!cols"] = SHEET1_HEADERS.map((h) => ({ wch: ["ระบุรายละเอียด", "การซ่อม", "สาเหตุ"].includes(h) ? 38 : 16 }));
 
   // SheetJS ใส่รูปแบบ m/d/yy มาให้ — เปลี่ยนเป็นแบบไทย วัน/เดือน/ปี
@@ -3772,13 +4756,25 @@ function exportExcel() {
   Object.entries(DATE_FMT).forEach(([header, fmt]) => {
     const c = SHEET1_HEADERS.indexOf(header);
     if (c === -1) return;
-    for (let r = 1; r <= p.list.length; r++) {
+    for (let r = 1; r <= list.length; r++) {
       const cell = s1[XLSX.utils.encode_cell({ r, c })];
       if (cell && cell.t === "n") cell.z = fmt;
     }
   });
-  s1["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: p.list.length, c: SHEET1_HEADERS.length - 1 } }) };
+  s1["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: list.length, c: SHEET1_HEADERS.length - 1 } }) };
   add("Sheet1", s1);
+
+  // 1b) อะไหล่ตัดสต๊อก — หนึ่งแถวต่อหนึ่งรหัส ให้คลังนำเข้า ERP ได้ตรง ๆ
+  const pr = partsRows(list);
+  const sp = aoa([PARTS_HEADERS, ...pr]);
+  sp["!cols"] = PARTS_HEADERS.map((h) => ({ wch: h === "รหัสอะไหล่" ? 26 : 16 }));
+  [2, 3].forEach((c) => {                 // วันที่ตัดสต๊อก · วันที่แจ้ง
+    for (let r = 1; r <= pr.length; r++) {
+      const cell = sp[XLSX.utils.encode_cell({ r, c })];
+      if (cell && cell.t === "n") cell.z = "dd/mm/yyyy";
+    }
+  });
+  add("อะไหล่ตัดสต๊อก", sp);
 
   // 2) จำนวนแจ้งซ่อม-ค่าใช้จ่ายรวม
   const cnt = Array(12).fill(0), cost = Array(12).fill(0);
@@ -3878,7 +4874,9 @@ function exportExcel() {
       .map(([key, w]) => [key, w]),
   ]));
 
-  const fname = `แจ้งซ่อม_${p.month ? p.year + "-" + p.month : p.year}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const fname = win
+    ? `แจ้งซ่อม_สัปดาห์_${win.label}.xlsx`
+    : `แจ้งซ่อม_${p.month ? p.year + "-" + p.month : p.year}_${new Date().toISOString().slice(0, 10)}.xlsx`;
   XLSX.writeFile(wb, fname);
   toast(`ส่งออก ${nf(p.list.length)} รายการ เป็นไฟล์ ${fname} แล้ว`);
 }
@@ -4078,7 +5076,13 @@ function buildQrFilter() {
 
 function renderQr() {
   const grid = $("#qrGrid");
-  if (!grid || typeof QRCode === "undefined") return;
+  if (!grid) return;
+  if (typeof QRCode === "undefined") {
+    grid.innerHTML = `<p class="empty">กำลังโหลดตัวสร้าง QR...</p>`;
+    ensureQr().then(renderQr)
+      .catch(() => { grid.innerHTML = `<p class="empty">โหลดตัวสร้าง QR ไม่สำเร็จ — ตรวจอินเทอร์เน็ต</p>`; });
+    return;
+  }
   const group = $("#qrFilter").value;
   const base = CONFIG.webAppUrl || location.href;
 
@@ -4141,10 +5145,19 @@ const PM_KIND_META = {
 };
 const pmKindMeta = (k) => PM_KIND_META[k] || PM_KIND_META["อื่นๆ"];
 
+/* ตัวกรองตัวเดียวที่ทั้งปฏิทิน สถิติ ข้อความไลน์ และใบงานทั้งเดือนใช้ร่วมกัน
+
+   รายการที่ยกเลิกถูกซ่อนเป็นค่าตั้งต้น — ทุกตัวเลขในหน้านี้ตัดมันออกจากฐานคิดอยู่แล้ว
+   (active = items ที่ไม่ใช่ "ยกเลิก") เหลือแค่ปฏิทินที่ยังวาดมันเป็นกล่องสีจาง ๆ ค้างอยู่
+   ซึ่งทั้งรกและทำให้คนเข้าใจผิดว่ายังมีงานต้องทำ โดยเฉพาะรอบที่มาจากแผนที่ถูกลบไปแล้ว
+   ติ๊ก "แสดงที่ยกเลิก" เพื่อเรียกกลับมาดูเวลากดยกเลิกพลาดแล้วอยากแก้ */
 const pmVisible = () => {
   const f = $("#pmMachineFilter")?.value || "";
   const k = $("#pmKindFilter")?.value || "";
-  return pmCal.items.filter((x) => (!f || x.machine === f) && (!k || (x.kind || "PM ตามรอบ") === k));
+  const skip = $("#pmShowSkip")?.checked;
+  return pmCal.items.filter((x) =>
+    (!f || x.machine === f) && (!k || (x.kind || "PM ตามรอบ") === k) &&
+    (skip || x.status !== "ยกเลิก"));
 };
 
 async function openPmTab() {
@@ -4528,6 +5541,11 @@ async function openPmPlan() {
   $("#ppPick").innerHTML = `<option value="">— เพิ่มแผนใหม่ —</option>` +
     pmPlanRows.map((r, i) => `<option value="${i}">${esc(r.machine)} · ${esc(r.task)}</option>`).join("");
   $("#ppPick").value = "";
+  /* ต้องซ่อนเองตรงนี้ด้วย — การตั้ง .value ด้วยโค้ดไม่ยิง event change
+     fillPmPlanForm จึงไม่ถูกเรียก แล้วปุ่ม 🗑/♻ ค้างจากรอบที่แล้วบนจอทั้งที่
+     ดรอปดาวน์กลับไปเป็น "เพิ่มแผนใหม่" กดแล้ว Number("") = 0 คือแผนแถวแรก
+     ซึ่ง apiGetPMPlan เรียงตาม daysLeft = แผนที่ค้างนานที่สุดของโรงงาน */
+  $("#ppRowActions").classList.add("hidden");
 }
 
 /* เดิมหน้าต่างนี้ไม่เติมค่าเดิมให้เลย จะแก้หัวข้อตรวจทีต้องพิมพ์ใหม่ทั้งหมดตั้งแต่ชื่อเครื่อง
@@ -4536,6 +5554,8 @@ function fillPmPlanForm(idx) {
   /* เทียบกับ "" ตรง ๆ ก่อน — Number("") คืน 0 ไม่ใช่ NaN
      ถ้าปล่อยให้ตกไปที่ pmPlanRows[0] การเลือก "เพิ่มแผนใหม่" จะกลายเป็นหยิบแผนแถวแรกมาแก้ทับ */
   const r = (idx === "" || idx == null) ? null : pmPlanRows[Number(idx)];
+  $("#ppRowActions").classList.toggle("hidden", !r);
+  $("#ppMsg").textContent = "";        // error ของแผนก่อนหน้า ไม่ใช่ของแผนที่เพิ่งเลือก
   if (!r) {
     ["#ppMachine", "#ppTask", "#ppLast", "#ppOwner", "#ppChecklist"]
       .forEach((x) => ($(x).value = ""));
@@ -4555,6 +5575,69 @@ function fillPmPlanForm(idx) {
   $("#ppActive").checked = true;
 }
 const closePmPlan = () => $("#pmPlanModal").classList.add("hidden");
+
+/* ล้างตารางล่วงหน้าของแผนนี้แล้วกางใหม่ — ท่าที่ต้องใช้ทุกครั้งหลังแก้ "รอบ (วัน)"
+   ย้ำในคำถามว่าต้องกดบันทึกก่อน เพราะปุ่มนี้อ่านรอบจากชีต ไม่ใช่จากช่องที่เพิ่งพิมพ์ไว้ในฟอร์ม
+   แก้รอบแล้วกดปุ่มนี้เลยโดยไม่บันทึก = กางใหม่ด้วยรอบเดิม แล้วงงว่าทำไมไม่เปลี่ยน */
+async function rebuildPmPlan() {
+  const idx = $("#ppPick").value;              // Number("") = 0 ไม่ใช่ NaN ต้องกันเอง
+  const r = idx === "" ? null : pmPlanRows[Number(idx)];
+  if (!r) return;
+  if (!confirm(`ล้างตารางล่วงหน้าของ "${r.machine} · ${r.task}" แล้วกางใหม่ ?\n\n` +
+               `ถ้าเพิ่งแก้ "รอบ (วัน)" ต้องกดบันทึกก่อน ปุ่มนี้อ่านรอบจากที่บันทึกไว้แล้ว\n` +
+               `ครั้งที่ทำไปแล้วและครั้งที่เลยวันมาแล้วไม่ถูกแตะ`)) return;
+
+  const btn = $("#ppRebuild"), old = btn.textContent, msg = $("#ppMsg");
+  msg.textContent = "";
+  btn.disabled = true; btn.textContent = "กำลังกางตาราง...";
+  try {
+    const res = await gsAuth("apiPmClearSchedule", r.machine, r.task);
+    closePmPlan();
+    toast(`แผนนี้ได้ตารางใหม่ ${res.mine} ครั้ง · ล้างของเดิมไป ${res.dropped} ครั้ง` +
+          ` (ทั้งระบบกางเพิ่ม ${res.created})`, res.mine > 0);
+    loadPmCalendar();
+    /* แผนที่ถูกข้ามต้องบอกเป็นรายการ เหมือนปุ่ม "ออกตารางล่วงหน้า"
+       ล้างของแผนตัวเองไปแล้วแต่มันกางกลับไม่ได้ ถ้าเงียบคือปฏิทินหายไปเฉย ๆ */
+    if (res.skipped?.length) {
+      openCopyBox("แผน PM ที่ถูกข้าม " + res.skipped.length + " รายการ",
+        res.skipped.join(String.fromCharCode(10)));
+    }
+  } catch (err) {
+    /* เด้ง toast ด้วย — #ppMsg อยู่ก้นฟอร์มที่ยาวเกินจอ ใต้ textarea เจ็ดบรรทัด
+       คนกดปุ่มอยู่บนสุดจะเห็นแค่ปุ่มเด้งกลับเป็นข้อความเดิม เหมือนปุ่มเสีย */
+    msg.textContent = err.message;
+    toast(err.message, false);
+  } finally {
+    btn.disabled = false; btn.textContent = old;
+  }
+}
+
+/* ลบแผน PM — ถามซ้ำก่อนเสมอ เพราะกดพลาดแล้วตารางล่วงหน้าของงานนั้นหายไปด้วย
+   บอกจำนวนครั้งที่ถูกล้างกลับมาด้วย ไม่ใช่แค่ "ลบแล้ว" — หัวหน้าต้องเห็นว่ากระทบปฏิทินแค่ไหน */
+async function deletePmPlan() {
+  const idx = $("#ppPick").value;              // Number("") = 0 ไม่ใช่ NaN ต้องกันเอง
+  const r = idx === "" ? null : pmPlanRows[Number(idx)];
+  if (!r) return;
+  if (!confirm(`ลบแผน "${r.machine} · ${r.task}" ?\n\n` +
+               `เคลียร์ออกจากปฏิทินทั้งหมดที่ยังไม่ได้ทำ — ทั้งที่เลยกำหนดและที่วางไว้ล่วงหน้า\n` +
+               `ครั้งที่ทำไปแล้ว และครั้งที่เปิดใบแจ้งซ่อมไปแล้ว ยังอยู่ครบในประวัติ\n\n` +
+               `รอบ · ผู้รับผิดชอบ · หัวข้อตรวจ ของแผนนี้ถูกเก็บไว้ในชีต Audit ก่อนลบ`)) return;
+
+  const btn = $("#ppDelete"), old = btn.textContent, msg = $("#ppMsg");
+  msg.textContent = "";
+  btn.disabled = true; btn.textContent = "กำลังลบ...";
+  try {
+    const res = await gsAuth("apiPmDeletePlan", r.machine, r.task);
+    closePmPlan();
+    toast(`ลบแผน PM แล้ว${res.dropped ? ` · เคลียร์ออกจากปฏิทิน ${res.dropped} ครั้ง` : ""}`);
+    loadPmCalendar();
+  } catch (err) {
+    msg.textContent = err.message;
+    toast(err.message, false);        // เหตุผลเดียวกับปุ่มล้างตาราง
+  } finally {
+    btn.disabled = false; btn.textContent = old;
+  }
+}
 
 async function savePmPlan(e) {
   e.preventDefault();
@@ -4802,7 +5885,11 @@ function openBeer() {
 /* QRCode ต่อท้าย element ทุกครั้งที่เรียก ไม่ได้แทนที่ของเดิม
    เปิดกล่องสิบรอบโดยไม่ล้างก่อน = QR สิบใบซ้อนกัน */
 function drawQr(box, text) {
-  if (!box || typeof QRCode === "undefined" || box.dataset.src === text) return;
+  if (!box || box.dataset.src === text) return;
+  if (typeof QRCode === "undefined") {
+    ensureQr().then(() => drawQr(box, text)).catch(() => {});   // ไม่มี QR ก็แค่ไม่มีรูป ไม่ต้องขึ้น error
+    return;
+  }
   box.innerHTML = "";
   new QRCode(box, { text, width: 148, height: 148, correctLevel: QRCode.CorrectLevel.M });
   box.dataset.src = text;
@@ -5448,6 +6535,19 @@ const DICT_EN = {
   "กลุ่มในทะเบียน": "Registry group", "จำนวนครั้งในรอบนี้": "Times this period",
   "กดที่แถวเพื่อเปิดใบแจ้งซ่อมนั้น": "Click a row to open that ticket",
   "ไทม์ไลน์ย้อนเหตุการณ์": "Event timeline",
+  "งานเครื่องจักร": "Machine work", "เช็คชีตวันนี้": "Today checksheet",
+  "หยุดเสีย": "Breakdown", "หยุดตามแผน PM": "Planned PM stop", "หยุดแบบไหน": "Stop type",
+  "เครื่องไหนหยุดอยู่ · หยุดมานานเท่าไหร่ · ใบที่ยังค้าง · ไทม์ไลน์ย้อนเหตุการณ์รายเครื่อง":
+    "What is down, for how long, what is still open, and the event timeline per machine",
+  /* "สถานะ" กับ "เครื่องจักร" มีอยู่แล้วในก้อนล่าง อย่าใส่ซ้ำ — คีย์ซ้ำในอ็อบเจกต์
+     ตัวหลังทับตัวหน้าเงียบ ๆ แล้วการแปลของหน้าอื่นเปลี่ยนตามโดยไม่มีใครรู้ */
+  "เลือกวันที่เอง…": "Pick dates…", "✕ ล้างตัวกรอง": "✕ Clear filters",
+  "เริ่มต้น": "Start", "ล่าสุด": "Latest",
+  "ค้นหาเครื่องจักร": "Search machines", "↻ โหลดใหม่": "↻ Reload",
+  "เปลี่ยนสถานะ": "Change status", "บันทึกสถานะ": "Save status",
+  "หยุดอยู่": "Down", "เดินปกติ": "Running", "ยังไม่เคยระบุ": "Never set",
+  "สาเหตุ / อาการ": "Reason / symptom", "เวลาที่เกิดจริง": "Actual time",
+  "ใบที่ยังค้าง": "Still open",
   "ทุกอย่างที่เกิดกับเครื่องหนึ่งบนแกนเวลาเดียว · ใบแจ้งซ่อม · PM · เช็คชีต · พารามิเตอร์":
     "Everything that happened to one machine on a single time axis",
   "รวมใบแจ้งซ่อม · งาน PM · เช็คชีตประจำวัน · บันทึกพารามิเตอร์ ของเครื่องนั้นไว้บนแกนเวลาเดียว เรียงจากใหม่ไปเก่า":
@@ -5961,7 +7061,7 @@ const PAGE = {
   feedback: ["แนะนำ / ติชม", "บอกฝ่ายวิศวกรรมและซ่อมบำรุงว่าอะไรดีอยู่แล้ว และอะไรควรปรับ"],
   param:  ["พารามิเตอร์เครื่องจักร", "ดูค่าที่ช่างบันทึกไว้ในระบบบันทึกพารามิเตอร์ · เทียบกับพิกัดมาตรฐาน"],
   check:  ["เช็คชีตประจำวัน", "ติดตามว่าเครื่องไหนตรวจแล้วบ้างวันนี้"],
-  timeline: ["ไทม์ไลน์ย้อนเหตุการณ์", "ทุกอย่างที่เกิดกับเครื่องหนึ่งบนแกนเวลาเดียว · ใบแจ้งซ่อม · PM · เช็คชีต · พารามิเตอร์"],
+  mlog:   ["งานเครื่องจักร", "สถานะเดิน/หยุด · เช็คชีตวันนี้ · พารามิเตอร์ · ใบที่ยังค้าง · ไทม์ไลน์ย้อนเหตุการณ์ — กดการ์ดเครื่องเพื่อทำงานทั้งหมดในที่เดียว"],
   qr:     ["QR ติดเครื่องจักร", "พิมพ์สติกเกอร์ติดหน้าเครื่องเพื่อให้สแกนแจ้งซ่อมได้ทันที"],
   create: ["แจ้งซ่อมใหม่", "กรอกใบแจ้งซ่อมและแนบรูปถ่าย"],
   report: ["Dashboard Summary", "จำนวน · ค่าใช้จ่าย · ซ่อมซ้ำ · Heatmap · Ranking · ภาระงานช่าง"],
@@ -5969,7 +7069,7 @@ const PAGE = {
 };
 
 /* ต้องตรงกับคลาส needs-login ใน index.html — กันคนพิมพ์เรียกตรงๆ ตอนเมนูถูกซ่อน */
-const NEED_LOGIN = ["mine", "param", "check", "report", "qr", "pm", "timeline", "kpi"];
+const NEED_LOGIN = ["mine", "param", "check", "report", "qr", "pm", "kpi", "mlog"];
 let currentTab = "list";
 
 /* เมนู "KPI" กับ "Dashboard Summary" ใช้ panel เดียวกัน (#tab-report) ต่างกันแค่โชว์อะไรบ้าง
@@ -6001,7 +7101,7 @@ function showTab(name) {
   if (name === "pm") openPmTab();
   if (name === "mine") { renderMine(); loadMinePm(); }
   if (name === "param") openParamTab();
-  if (name === "timeline") openTimelineTab();
+  if (name === "mlog") openMachineLogTab();
   if (name === "check" && !dailyCheck) loadDailyCheck();
   if (name === "qr") renderQr();
   if (panelOf(name) === "report") {
@@ -6130,6 +7230,11 @@ async function handleLogin(e) {
     await loadConfig();
     await refresh();                            // โหลดข้อมูลเต็มจาก server ก่อนค่อยวาด
     renderDashboard();
+
+    /* ช่างที่มีสถานีประจำ ลงที่หน้างานเครื่องจักรเลย ไม่ใช่หน้ารายการใบแจ้งซ่อมทั้งโรงงาน
+       งานประจำวันของเขาคือ ตรวจเช็คชีต · ลงพารามิเตอร์ · บอกว่าเครื่องเดินหรือหยุด
+       หัวหน้ากับวิศวกรยังลงหน้ารายการเหมือนเดิม เพราะงานของเขาคือดูภาพรวมทั้งโรงงาน */
+    if (!isLead() && myStation()) showTab("mlog");
     // สรุปต้องรอข้อมูลเต็มก่อน ไม่งั้นนับจาก cache ที่ยังเป็น scope public แล้วได้ตัวเลขน้อยกว่าจริง
     if (!showWelcome(res.user)) {
       toast(res.firstTime
@@ -6183,10 +7288,15 @@ function openTimelineTab() {
 async function loadTimeline(btn) {
   const machine = $("#tlMachine").value;
   if (!machine) { toast("เลือกเครื่องจักรก่อน", false); return; }
+  /* GAS ตอบช้า เปิดเครื่อง A ปิด เปิดเครื่อง B ทัน คำตอบของ A จะมาทีหลังแล้ววาดทับของ B
+       ได้ไทม์ไลน์ของ A อยู่ใต้หัวเรื่องของ B ซึ่งอ่านแล้วเชื่อสนิทเพราะไม่มีอะไรบอกว่าผิด
+       จำชื่อไว้ก่อนรอ แล้วเทียบอีกทีหลังรอ ถ้าไม่ตรงแปลว่าคนเปลี่ยนใจไปแล้ว ทิ้งผลนี้ */
   btn.disabled = true; btn.textContent = "กำลังรวบรวม...";
   $("#tlBody").innerHTML = `<p class="empty">กำลังรวบรวม...</p>`;
   try {
-    tlData = await gsAuth("apiTimeline", machine, $("#tlFrom").value, $("#tlTo").value);
+    const res = await gsAuth("apiTimeline", machine, $("#tlFrom").value, $("#tlTo").value);
+    if ($("#tlMachine")?.value !== machine) return;   // ผู้ใช้เปลี่ยนเครื่องไปแล้วระหว่างรอ
+    tlData = res;
     tlHide = {};
     renderTimeline();
   } catch (err) {
@@ -6243,6 +7353,7 @@ const SUB_TABS = [
   ["heat",     "🔥 Heatmap"],
   ["rank",     "🏆 Machine Ranking"],
   ["workload", "🧑‍🔧 ภาระงานช่าง"],
+  ["improve",  "🔬 วิเคราะห์เพื่อปรับปรุง"],
   ["feedback", "💬 ความคิดเห็น"],
   /* ไม่มี KPI ในแถบนี้แล้ว — เมนู KPI แยกออกมาเป็นหน้าของตัวเองแล้ว
      ซ้ำสองที่ทำให้แถบยาวจนล้นขอบจอ และคนกดเข้าได้สองทางโดยไม่รู้ว่าต่างกันตรงไหน
@@ -6306,6 +7417,7 @@ async function loadConfig() {
     if (c.priorities && c.priorities.length) PRIORITIES = c.priorities;
     if (c.priorityDefault) PRIORITY_DEFAULT = c.priorityDefault;
     if (c.actionNeeded && c.actionNeeded.length) ACTION_NEEDED = c.actionNeeded;
+    if (c.causeCodes && c.causeCodes.length) CAUSE_CODES = c.causeCodes;
     CONFIG = { ...CONFIG, ...c };
     if ($("#slaHours")) $("#slaHours").value = CONFIG.slaHours;
   } catch (_) { MACHINES = []; }
@@ -6430,9 +7542,18 @@ async function init() {
   buildPeriodPickers();
   $("#monthPicker").value = String(new Date().getMonth() + 1).padStart(2, "0");
 
+  $("#impMachine").addEventListener("change", renderDashboard);
+  $("#bcLoad").addEventListener("click", (e) => loadBackcode(e.target));
+  $("#bcSave").addEventListener("click", (e) => saveBackcode(e.target));
+  $("#impReload").addEventListener("click", (e) => loadUptime(e.target));
+
   ["#yearPicker", "#monthPicker", "#heatMode", "#rankBy", "#slaTarget", "#bdGroup",
    "#pvStatus", "#pvMachine", "#pvTop"]
     .forEach((s) => $(s)?.addEventListener("change", renderDashboard));
+  /* เลือกช่วงรายสัปดาห์ไว้ครั้งหนึ่งแล้วมันค้างทั้งหน้า พอเปลี่ยนปี/เดือนทีหลัง
+     Dashboard โชว์เดือนใหม่แต่ปุ่ม Export ยังส่งออกสัปดาห์เดิม — รีเซ็ตให้เลยดีกว่า */
+  ["#yearPicker", "#monthPicker"].forEach((s) =>
+    $(s)?.addEventListener("change", () => { if ($("#expRange")) $("#expRange").value = ""; }));
   // สองตัวนี้มีผลกับตารางหน้าแรกด้วย จึงเรียก render() ที่ครอบ renderDashboard() อยู่แล้ว
   $("#slaHours").addEventListener("change", render);
   $("#repeatWindow").addEventListener("change", render);
@@ -6460,17 +7581,35 @@ async function init() {
 
   $("#ticketForm").addEventListener("submit", handleSubmit);
   $("#workType").addEventListener("change", syncMachineRequired);
-  $("#searchBox").addEventListener("input", render);
+  /* หน่วงไว้ก่อนค่อยวาด — เดิมวาดใหม่ทุกตัวอักษรที่พิมพ์ ใบ 347 ใบ × 10 ช่อง
+     คือสร้าง DOM ใหม่ราว 3,500 ชิ้นต่อการกดแป้นหนึ่งครั้ง แล้ว Tailwind CDN
+     ยังต้องไล่สแกนคลาสใหม่ซ้ำอีกรอบทุกครั้ง นี่คือจังหวะที่หน้าจอกระตุกชัดที่สุด
+     180 ms สั้นพอที่จะยังรู้สึกว่าพิมพ์แล้วผลขึ้นทันที */
+  let searchTimer = null;
+  $("#searchBox").addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(render, 180);
+  });
   $("#datePreset").addEventListener("change", applyDatePreset);
   ["#dateFrom", "#dateTo"].forEach((sel) =>
     $(sel).addEventListener("change", () => {
-      $("#datePreset").value = "";     // แก้วันที่เองแล้ว ช่วงสำเร็จรูปไม่ตรงกับที่เลือกอีกต่อไป
+      /* แก้วันที่เองแล้ว ช่วงสำเร็จรูปไม่ตรงกับที่เลือกอีกต่อไป — ตั้งเป็น "เลือกวันที่เอง"
+         ไม่ใช่ค่าว่าง ไม่งั้นช่องวันที่จะหุบหายไปทั้งที่คนกำลังกรอกอยู่ */
+      $("#datePreset").value = "custom";
       render();
     }));
+  $("#priorityFilter").addEventListener("change", render);
+  // ปุ่มล้างถูกวาดใหม่ทุกครั้งที่ป้ายเปลี่ยน ผูกกับตัวพ่อที่อยู่นิ่ง
+  $("#filterNote").addEventListener("click", (e) => {
+    if (e.target.closest("#filterClear")) clearFilters();
+  });
   $("#refreshBtn").addEventListener("click", refresh);
   $("#exportBtn").addEventListener("click", exportExcel);
 
-  $("#checkDate").value = new Date().toISOString().slice(0, 10);
+  /* ymd() ไม่ใช่ toISOString() — toISOString คืนเวลา UTC ไทยเร็วกว่า 7 ชั่วโมง
+     ช่วงเที่ยงคืนถึงเจ็ดโมงเช้า "วันนี้" จึงกลายเป็นเมื่อวาน ซึ่งคือช่วงที่กะดึกทำงานพอดี
+     ช่างกะดึกเปิดมาเห็นเช็คชีตของเมื่อวาน แล้วนึกว่าตัวเองตรวจไปแล้ว */
+  $("#checkDate").value = ymd(new Date());
   $("#checkDate").addEventListener("change", () => {
     $("#checkDetail").classList.add("hidden");   // เปลี่ยนวันแล้วรายข้อของวันเก่าต้องไม่ค้าง
     loadDailyCheck();
@@ -6511,16 +7650,57 @@ async function init() {
     if (r) openModal(r.dataset.kd);
   });
 
-  $("#tlGo").addEventListener("click", (e) => loadTimeline(e.target));
-  $("#tlChips").addEventListener("click", (e) => {
+  /* สมุดเครื่องจักร — กรองฝั่งจอล้วน ไม่ยิง server ซ้ำ สถานะกับทะเบียนโหลดมาครบแล้ว */
+  $("#mlSearch").addEventListener("input", renderMachineLog);
+  $("#mlStatus").addEventListener("change", renderMachineLog);
+  $("#mlReload").addEventListener("click", async (e) => {
+    await loadMachineStatus(e.target);
+    renderMachineLog();
+  });
+  $("#mlGrid").addEventListener("click", (e) => {
+    /* ต้องเช็คสวิตช์ก่อน — มันอยู่ในการ์ดที่ทั้งใบก็กดเปิดรายละเอียดได้
+       ถ้าเช็ค open ก่อน กดสวิตช์ทีเดียวจะได้ทั้งเปลี่ยนสถานะและเด้งกล่องรายละเอียดพร้อมกัน */
+    const sw = e.target.closest('[data-ml="toggle"]');
+    if (sw) { if (!sw.disabled) toggleMachine(sw.dataset.name, sw); return; }
+
+    /* ลิงก์ในแถบปุ่มล่างการ์ด — ปล่อยให้มันเปิดแท็บใหม่ไปตามปกติ
+       ไม่ดักออกตรงนี้ คลิกจะไหลต่อไปถึง div ของการ์ดที่มี data-ml="open"
+       ได้ทั้งเปิดฟอร์มในแท็บใหม่และเด้ง popup ขึ้นมาพร้อมกัน */
+    if (e.target.closest("[data-ml-actions]")) return;
+
+    const b = e.target.closest('[data-ml="open"]');
+    if (b) openMachinePopup(b.dataset.name);
+  });
+
+  /* ปุ่มของไทม์ไลน์กับฟอร์มสถานะอยู่ใน popup ซึ่งถูกสร้างใหม่ทุกครั้งที่เปิด
+     จึงผูกที่ #m2Body ตัวเดียวแบบ delegate — ผูกกับปุ่มตรง ๆ จะหลุดทันทีที่ปิดใบแรก */
+  $("#m2Body").addEventListener("click", (e) => {
+    const save = e.target.closest('[data-ms="save"]');
+    if (save) { saveMachineStatus(save.dataset.name, save); return; }
+
+    const go = e.target.closest("#tlGo");
+    if (go) { loadTimeline(go); return; }
+
+    /* หน้ารายละเอียดพารามิเตอร์เป็น section เต็มหน้าที่มีอยู่เดิม ไม่ได้ย้ายเข้ามาใน popup
+       แค่ปิด popup แล้วพาไปที่นั่น — ย้ายเข้ามาคือก๊อป DOM ทั้งหน้าซึ่งจะได้ id ซ้ำทั้งชุด */
+    const pmBtn = e.target.closest("[data-ml-param]");
+    if (pmBtn) { closeModal2(); showTab("param"); openParamMachine(pmBtn.dataset.mlParam); return; }
+
+    /* "ดูรายข้อ" เขียนผลลงใน #checkDetail ซึ่งอยู่ในหน้าเช็คชีตที่ถูกซ่อนไว้
+       เรียกจาก popup เฉย ๆ จะไม่มีอะไรขึ้นให้เห็นเลย ต้องปิด popup แล้วพาไปที่หน้านั้น
+       แบบเดียวกับปุ่มพารามิเตอร์ — หน้ายังอยู่ครบ แค่ไม่มีปุ่มในเมนูแล้ว */
+    const ck = e.target.closest("[data-check-open]");
+    if (ck) { closeModal2(); showTab("check"); openCheckDetail(ck.dataset.checkOpen); return; }
+
+    /* แถวในไทม์ไลน์กดแล้วเปิดใบแจ้งซ่อมใบนั้น — ใบแจ้งซ่อมใช้ #modal ซึ่ง z สูงกว่า
+       จึงทับขึ้นมาเอง ปิดใบแล้วยังเจอ popup เครื่องเดิมค้างอยู่ ไม่ต้องกดเปิดใหม่ */
+    const row = e.target.closest("[data-tl-open]");
+    if (row) { openModal(row.dataset.tlOpen); return; }
+
     const b = e.target.closest("[data-tl]");
     if (!b || b.disabled) return;
     tlHide[b.dataset.tl] = !tlHide[b.dataset.tl];
     renderTimeline();
-  });
-  $("#tlBody").addEventListener("click", (e) => {
-    const b = e.target.closest("[data-tl-open]");
-    if (b) openModal(b.dataset.tlOpen);
   });
 
   $("#paramRefresh").addEventListener("click", () => { paramData = { rows: [], machines: [], limits: [] }; loadParamStatus(true); });
@@ -6565,6 +7745,7 @@ async function init() {
   $("#pmNext").addEventListener("click", () => { pmCursor.setMonth(pmCursor.getMonth() + 1); loadPmCalendar(); });
   $("#pmToday").addEventListener("click", () => { pmCursor = new Date(); loadPmCalendar(); });
   $("#pmMachineFilter").addEventListener("change", renderPm);
+  $("#pmShowSkip").addEventListener("change", renderPm);
   $("#pmKindFilter").addEventListener("change", renderPm);
   $("#pmBuildBtn").addEventListener("click", buildPmSchedule);
   $("#pmPlanBtn").addEventListener("click", openPmPlan);
@@ -6572,6 +7753,8 @@ async function init() {
   $("#pmPlanModal").addEventListener("click", (e) => { if (e.target.id === "pmPlanModal") closePmPlan(); });
   $("#pmPlanForm").addEventListener("submit", savePmPlan);
   $("#ppPick").addEventListener("change", (e) => fillPmPlanForm(e.target.value));
+  $("#ppDelete").addEventListener("click", deletePmPlan);
+  $("#ppRebuild").addEventListener("click", rebuildPmPlan);
   $("#pmItemPdf").addEventListener("click", (e) => downloadPmWorkOrder(pmOpenId, e.target, "📄 ใบงาน PM"));
   // พิมพ์ "ทุกใบที่เห็นอยู่ตอนนี้" ตามตัวกรอง ไม่ใช่ทั้งเดือนดิบ ๆ
   // กรองเฉพาะงานอาคารแล้วกดพิมพ์ ต้องได้เฉพาะงานอาคาร ไม่งั้นตัวกรองก็ไม่มีความหมาย
@@ -6646,7 +7829,7 @@ async function init() {
   }
 
   setFlowChip("กำลังโหลดข้อมูล...", "flow-off");
-  skelRows($("#ticketBody"), 9, 6);           // อย่าปล่อยให้เป็นตารางว่างระหว่างรอ GAS ตอบ
+  skelRows($("#ticketBody"), 10, 6);           // อย่าปล่อยให้เป็นตารางว่างระหว่างรอ GAS ตอบ
   // token ที่ค้างจากแท็บก่อนหน้าอาจหมดอายุแล้ว เช็คก่อนเพื่อให้ปุ่มแสดงตรงกับสิทธิ์จริง
   if (isUnlocked()) {
     try { const r = await gs("apiCheckToken", getToken()); if (!r.valid) dropToken(); }
