@@ -3236,12 +3236,6 @@ function paramStdSheets_() {
   });
 }
 
-/** ใบแรก — เหลือไว้ให้โค้ดเดิมที่ยังอ่านทีละใบเรียกใช้ */
-function paramStdSheet_() {
-  var all = paramStdSheets_();
-  return all.length ? all[0] : null;
-}
-
 /* ═══ ชีตพิกัดทรงกว้าง ═══
    ไฟล์จริงของโรงงาน (ชีต "Std.parameter") เก็บแถวละหนึ่งเครื่อง แล้วแตกคอลัมน์ตามจุดวัด
      Machine | STD Z1 … STD Z7 | STD T-Die Z1 … STD T-Die Z7 | หมายเหตุ

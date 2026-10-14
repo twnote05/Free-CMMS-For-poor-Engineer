@@ -163,6 +163,18 @@ let qrSignature = "";                         // กัน render QR ซ้ำ�
 /* ─────────── helpers ─────────── */
 const $  = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
+/* ปุ่มที่กดแล้วต้องรอผลจาก server — ปิดปุ่ม เปลี่ยนป้ายเป็น "กำลัง..." แล้วคืนค่าเดิมเมื่อจบ
+   ท่านี้เขียนซ้ำอยู่สิบกว่าที่ และแต่ละที่ลืมคืนค่าได้คนละแบบ
+   คืนฟังก์ชันสำหรับเรียกใน finally แทนที่จะรับ callback เพราะตัวเรียกส่วนใหญ่
+   มี try/catch ของตัวเองอยู่แล้ว การห่อ callback จะทำให้ต้องรื้อ catch ทุกตัวตาม */
+const busyBtn = (btn, label) => {
+  if (!btn) return () => {};
+  const was = btn.textContent;
+  btn.disabled = true;
+  if (label) btn.textContent = label;
+  return () => { btn.disabled = false; btn.textContent = was; };
+};
+
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -2081,8 +2093,7 @@ function savePdfBlob(res) {
 }
 
 async function downloadPdf(id, btn) {
-  const old = btn.textContent;
-  btn.disabled = true; btn.textContent = "กำลังสร้าง PDF...";
+  const done = busyBtn(btn, "กำลังสร้าง PDF...");
   try {
     const res = await gsAuth("apiTicketPdf", id);
     const bin = atob(res.base64);
@@ -2097,7 +2108,7 @@ async function downloadPdf(id, btn) {
   } catch (err) {
     toast("สร้าง PDF ไม่สำเร็จ: " + err.message, false);
   } finally {
-    btn.disabled = false; btn.textContent = old;
+    done();
   }
 }
 
@@ -4970,9 +4981,7 @@ async function ticketFromCheckDetail(btn) {
   if (!checkOpen) return;
   const msg = $("#cdTicketMsg");
   msg.className = "text-sm mt-2 text-red-600";
-  const was = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = tt("กำลังเปิดใบ...", "Creating...");
+  const done = busyBtn(btn, tt("กำลังเปิดใบ...", "Creating..."));
   try {
     const res = await gsAuth("apiCheckMakeTicket", checkOpen.machine, checkOpen.date, {});
     msg.className = "text-sm mt-2 text-green-700";
@@ -4981,8 +4990,7 @@ async function ticketFromCheckDetail(btn) {
   } catch (err) {
     msg.textContent = err.message;
   } finally {
-    btn.disabled = false;
-    btn.textContent = was;
+    done();
   }
 }
 
@@ -5386,9 +5394,9 @@ function openPmItem(id) {
 const closePmItem = () => $("#pmItemModal").classList.add("hidden");
 
 async function savePmItem() {
-  const btn = $("#pmItemSave"), old = btn.textContent, msg = $("#pmItemMsg");
+  const btn = $("#pmItemSave"), msg = $("#pmItemMsg");
   msg.textContent = "";
-  btn.disabled = true; btn.textContent = "กำลังบันทึก...";
+  const done = busyBtn(btn, "กำลังบันทึก...");
   try {
     await gsAuth("apiPmUpdate", pmOpenId, {
       status: $("#pmItemStatus").value,
@@ -5404,17 +5412,17 @@ async function savePmItem() {
   } catch (err) {
     msg.textContent = err.message;
   } finally {
-    btn.disabled = false; btn.textContent = old;
+    done();
   }
 }
 
 async function movePmItem() {
-  const btn = $("#pmMoveBtn"), old = btn.textContent, msg = $("#pmItemMsg");
+  const btn = $("#pmMoveBtn"), msg = $("#pmItemMsg");
   msg.textContent = "";
   if (!$("#pmMoveDate").value) { msg.textContent = "ต้องเลือกวันที่ใหม่"; return; }
   if (!$("#pmMoveReason").value.trim()) { msg.textContent = "ต้องระบุเหตุผลที่เลื่อน"; return; }
 
-  btn.disabled = true; btn.textContent = "กำลังเลื่อน...";
+  const done = busyBtn(btn, "กำลังเลื่อน...");
   try {
     const res = await gsAuth("apiPmReschedule", pmOpenId,
       $("#pmMoveDate").value, $("#pmMoveReason").value.trim());
@@ -5424,7 +5432,7 @@ async function movePmItem() {
   } catch (err) {
     msg.textContent = err.message;
   } finally {
-    btn.disabled = false; btn.textContent = old;
+    done();
   }
 }
 
@@ -5491,8 +5499,7 @@ async function downloadPmWorkOrder(ids, btn, label) {
 async function downloadPmReport(btn) {
   const items = pmVisible();
   if (!items.length) { toast("ไม่มีรายการ PM ให้ออกรายงาน", false); return; }
-  const old = btn.textContent;
-  btn.disabled = true; btn.textContent = "กำลังสร้างรายงาน...";
+  const done = busyBtn(btn, "กำลังสร้างรายงาน...");
   try {
     const res = await gsAuth("apiPmReport", pmCal.month, items.map((x) => x.id));
     savePdfBlob(res);
@@ -5500,7 +5507,7 @@ async function downloadPmReport(btn) {
   } catch (err) {
     toast("ออกรายงานไม่สำเร็จ: " + err.message, false);
   } finally {
-    btn.disabled = false; btn.textContent = old;
+    done();
   }
 }
 
@@ -5513,8 +5520,8 @@ async function makeTicketFromPm() {
   msg.textContent = "";
   if (!detail) { msg.textContent = "ต้องระบุสิ่งที่พบจากการตรวจ"; return; }
 
-  const btn = $("#pmMakeTicket"), old = btn.textContent;
-  btn.disabled = true; btn.textContent = "กำลังเปิดใบ...";
+  const btn = $("#pmMakeTicket");
+  const done = busyBtn(btn, "กำลังเปิดใบ...");
   try {
     const res = await gsAuth("apiPmMakeTicket", pmOpenId,
       { description: detail, priority: $("#pmFoundPri").value });
@@ -5525,7 +5532,7 @@ async function makeTicketFromPm() {
   } catch (err) {
     msg.textContent = err.message;
   } finally {
-    btn.disabled = false; btn.textContent = old;
+    done();
   }
 }
 
@@ -5587,9 +5594,9 @@ async function rebuildPmPlan() {
                `ถ้าเพิ่งแก้ "รอบ (วัน)" ต้องกดบันทึกก่อน ปุ่มนี้อ่านรอบจากที่บันทึกไว้แล้ว\n` +
                `ครั้งที่ทำไปแล้วและครั้งที่เลยวันมาแล้วไม่ถูกแตะ`)) return;
 
-  const btn = $("#ppRebuild"), old = btn.textContent, msg = $("#ppMsg");
+  const btn = $("#ppRebuild"), msg = $("#ppMsg");
   msg.textContent = "";
-  btn.disabled = true; btn.textContent = "กำลังกางตาราง...";
+  const done = busyBtn(btn, "กำลังกางตาราง...");
   try {
     const res = await gsAuth("apiPmClearSchedule", r.machine, r.task);
     closePmPlan();
@@ -5608,7 +5615,7 @@ async function rebuildPmPlan() {
     msg.textContent = err.message;
     toast(err.message, false);
   } finally {
-    btn.disabled = false; btn.textContent = old;
+    done();
   }
 }
 
@@ -5623,9 +5630,9 @@ async function deletePmPlan() {
                `ครั้งที่ทำไปแล้ว และครั้งที่เปิดใบแจ้งซ่อมไปแล้ว ยังอยู่ครบในประวัติ\n\n` +
                `รอบ · ผู้รับผิดชอบ · หัวข้อตรวจ ของแผนนี้ถูกเก็บไว้ในชีต Audit ก่อนลบ`)) return;
 
-  const btn = $("#ppDelete"), old = btn.textContent, msg = $("#ppMsg");
+  const btn = $("#ppDelete"), msg = $("#ppMsg");
   msg.textContent = "";
-  btn.disabled = true; btn.textContent = "กำลังลบ...";
+  const done = busyBtn(btn, "กำลังลบ...");
   try {
     const res = await gsAuth("apiPmDeletePlan", r.machine, r.task);
     closePmPlan();
@@ -5635,15 +5642,15 @@ async function deletePmPlan() {
     msg.textContent = err.message;
     toast(err.message, false);        // เหตุผลเดียวกับปุ่มล้างตาราง
   } finally {
-    btn.disabled = false; btn.textContent = old;
+    done();
   }
 }
 
 async function savePmPlan(e) {
   e.preventDefault();
-  const btn = $("#ppSave"), old = btn.textContent, msg = $("#ppMsg");
+  const btn = $("#ppSave"), msg = $("#ppMsg");
   msg.textContent = "";
-  btn.disabled = true; btn.textContent = "กำลังบันทึก...";
+  const done = busyBtn(btn, "กำลังบันทึก...");
   try {
     const res = await gsAuth("apiPmSavePlan", {
       machine: $("#ppMachine").value, task: $("#ppTask").value.trim(),
@@ -5660,13 +5667,13 @@ async function savePmPlan(e) {
   } catch (err) {
     msg.textContent = err.message;
   } finally {
-    btn.disabled = false; btn.textContent = old;
+    done();
   }
 }
 
 async function buildPmSchedule() {
-  const btn = $("#pmBuildBtn"), old = btn.textContent;
-  btn.disabled = true; btn.textContent = "กำลังออกตาราง...";
+  const btn = $("#pmBuildBtn");
+  const done = busyBtn(btn, "กำลังออกตาราง...");
   try {
     const res = await gsAuth("apiPmBuildSchedule", 12);
     toast(res.message, !res.skipped?.length);
@@ -5680,7 +5687,7 @@ async function buildPmSchedule() {
   } catch (err) {
     toast(err.message, false);
   } finally {
-    btn.disabled = false; btn.textContent = old;
+    done();
   }
 }
 
@@ -5816,7 +5823,7 @@ function initFeedback() {
 
 async function sendFeedback(e) {
   e.preventDefault();
-  const btn = $("#fbSend"), msg = $("#fbMsg"), old = btn.textContent;
+  const btn = $("#fbSend"), msg = $("#fbMsg");
   msg.className = "text-sm text-red-600";
 
   const type = $("#fbTypes .chip.active")?.dataset.type || "";
@@ -5826,7 +5833,7 @@ async function sendFeedback(e) {
   if (!dept)    { msg.textContent = "กรุณาเลือกแผนกของคุณ"; return; }
 
   const box = $("#fbStarWrap [data-stars]");
-  btn.disabled = true; btn.textContent = "กำลังส่ง...";
+  const done = busyBtn(btn, "กำลังส่ง...");
   msg.textContent = "";
   try {
     await gs("apiSendFeedback", {
@@ -5845,7 +5852,7 @@ async function sendFeedback(e) {
   } catch (err) {
     msg.textContent = "ส่งไม่สำเร็จ: " + err.message;
   } finally {
-    btn.disabled = false; btn.textContent = old;
+    done();
   }
 }
 
@@ -5898,10 +5905,10 @@ function drawQr(box, text) {
 const closeBeer = () => $("#beerModal").classList.add("hidden");
 
 async function sendBeer() {
-  const btn = $("#beerSend"), note = $("#beerNote"), old = btn.textContent;
+  const btn = $("#beerSend"), note = $("#beerNote");
   const who = $("#beerWho").value;
   note.className = "text-sm text-red-600 min-h-[1.25rem]";
-  btn.disabled = true; btn.textContent = "กำลังส่ง...";
+  const done = busyBtn(btn, "กำลังส่ง...");
   try {
     await gs("apiSendFeedback", {
       type: BEER_TYPE,
@@ -5917,7 +5924,7 @@ async function sendBeer() {
   } catch (err) {
     note.textContent = "ส่งไม่สำเร็จ: " + err.message;
   } finally {
-    btn.disabled = false; btn.textContent = old;
+    done();
   }
 }
 
@@ -6138,9 +6145,7 @@ async function pdApprove(btn, result) {
   if (!paramOpen) return;
   const msg = $("#pdOkMsg");
   msg.className = "text-sm w-full text-red-600";
-  const was = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = tt("กำลังบันทึก...", "Saving...");
+  const done = busyBtn(btn, tt("กำลังบันทึก...", "Saving..."));
   try {
     const d = await gsAuth("apiParamApprove", paramOpen.id, {
       date: paramOpen.date, round: paramOpen.round,
@@ -6154,8 +6159,7 @@ async function pdApprove(btn, result) {
   } catch (err) {
     msg.textContent = err.message;
   } finally {
-    btn.disabled = false;
-    btn.textContent = was;
+    done();
   }
 }
 
