@@ -355,6 +355,26 @@ assert.strictEqual(kpiSummary(data, 24, {}).pmRate, null);
   assert.strictEqual(kb.machineHandsCount, 0, "ไม่มีใบไหนกดปุ่มเริ่มซ่อม");
   assert.strictEqual(kb.wrenchRate, 0);
 
+  /* ═══ ใบที่แจ้งว่าเครื่องเดินต่อได้ ไม่ใช่เวลาที่สายการผลิตหยุด ═══
+     ส่งใบมีดไปลับคมที่ร้านนอก ใบค้างสิบวันรอของกลับ แต่เครื่องเดินด้วยใบสำรองตลอด
+     ของจริงเดือน ก.ย. 2569 ใบแบบนี้ดันตัวเศษขึ้นไปถึง 106 วัน */
+  {
+    const base = { status: STATUS.DONE, completed_at: "2026-01-05T18:00:00Z" };
+    const run = [
+      mk("D1", "Cut Slot2", "2026-01-05T08:00:00Z", { ...base, machine_down: "หยุดเดิน" }),
+      mk("D2", "Cut Slot2", "2026-01-05T08:00:00Z", { ...base, machine_down: "เดินต่อได้" }),
+    ];
+    const kd = kpiSummary(run, 24, { workHours: 100 });
+    assert.strictEqual(kd.machineStops, 1, 'ใบที่แจ้ง "เดินต่อได้" ต้องไม่ถูกนับเป็นเวลาหยุด');
+    assert.strictEqual(kd.machineDowntime, 10, "เหลือเฉพาะใบที่หยุดจริง 10 ชม.");
+
+    /* ค่าว่าง = ยังไม่มีใครระบุ ต้องนับไว้ก่อน ไม่ใช่ตัดทิ้ง
+       ใบเก่า 347 ใบที่นำเข้ามาไม่มีค่านี้ ถ้าตีเป็นไม่นับ ตัวเลขจะร่วงเป็นศูนย์เงียบ ๆ */
+    const blank = [mk("D3", "Cut Slot2", "2026-01-05T08:00:00Z", base)];
+    assert.strictEqual(kpiSummary(blank, 24, { workHours: 100 }).machineStops, 1,
+                       "ค่าว่างต้องถูกนับไว้ก่อน");
+  }
+
   const withStart = mixed.map((t, i) => i === 0
     ? { ...t, started_at: "2026-01-05T16:00:00Z" }   // ลงมือ 2 ชม. สุดท้ายของ 10 ชม.
     : t);
@@ -3360,4 +3380,55 @@ console.log("OK — ผ่านทั้งหมด");
   // ชีตที่ไม่มีคอลัมน์ขึ้นต้นด้วย STD เลย = ไม่ใช่ทรงกว้าง ต้องคืนค่าว่าง ไม่ใช่เดามั่ว
   assert.strictEqual(Object.keys(paramStdWide_([["A", 1]], ["Machine", "อะไรสักอย่าง"], 0)).length, 0,
     "ไม่มีคอลัมน์ขึ้นต้นด้วย STD = ไม่ใช่ทรงกว้าง ต้องคืนค่าว่าง ไม่ใช่เดามั่ว");
+}
+
+
+/* ═══ ช่องโหว่ที่เจอตอนผูก machine_down เข้ากับ %Breakdown ═══
+   ทั้งสามข้อเป็นกฎที่อ่านจากซอร์สตรง ๆ ได้ ไม่ต้องรันทั้ง Apps Script
+   เขียนไว้เพราะทั้งสามข้อ "ยังทำงานได้ปกติ" ตอนที่มันพัง จึงไม่มีอะไรฟ้อง */
+{
+  const gas = fs.readFileSync("gas/Code.gs", "utf8");
+  const html = fs.readFileSync("gas/index.html", "utf8");
+  const app = fs.readFileSync("gas/app.html", "utf8");
+
+  /* ฟอร์มแจ้งซ่อมห้ามติ๊ก "เดินต่อได้" ไว้ให้ล่วงหน้า — ค่านี้ตัดใบออกจากตัวเศษ
+     ของ %Breakdown คนแจ้งที่ไม่ได้คิดอะไรแล้วกดส่ง จะกดตัวเลขให้ต่ำเกินจริง */
+  const radios = html.match(/<input[^>]*name="machine_down"[^>]*>/g) || [];
+  assert.strictEqual(radios.length, 2, "ฟอร์มต้องมีตัวเลือกสองตัว");
+  assert.ok(!radios.some((r) => /\bchecked\b/.test(r)),
+    'ห้ามติ๊กค่าใดไว้ล่วงหน้า — ค่าเริ่มต้นจะกลายเป็นตัวกด %Breakdown ให้ต่ำเกินจริง');
+  assert.ok(/machine && !fd\.get\("machine_down"\)/.test(app),
+    "หน้าจอต้องกันก่อนส่งเมื่อเลือกเครื่องแล้วแต่ยังไม่ระบุสถานะเครื่อง");
+  assert.ok(/if \(machine && !down\)/.test(gas),
+    "server ต้องบังคับเองด้วย ไม่ใช่เชื่อหน้าจอ");
+
+  /* ผลการตรวจรับยิงผ่าน apiUpdateTicket ไม่ได้ — ค่าที่มีคำว่า "ส่งกลับ" สั่งล้าง
+     completed_at ซึ่งเป็นเงื่อนไขเดียวของประตูกันแก้อะไหล่/ค่าใช้จ่ายย้อนหลัง
+     ยิงสองครั้งก็ปลดประตูได้โดยไม่ต้องเป็นหัวหน้างาน */
+  const upd = gas.slice(gas.indexOf("function apiUpdateTicket"),
+                        gas.indexOf("จัดการงานทีละหลายใบ"));
+  assert.ok(/changes\.verification_status !== undefined/.test(upd),
+    "apiUpdateTicket ต้องกัน verification_status ไม่ให้ตั้งคำตัดสินเอง");
+  assert.ok(/VERIFY_PENDING/.test(upd) && /var VERIFY_PENDING = 'รอตรวจรับ';/.test(gas),
+    'ต้องเหลือทางให้ช่างตั้ง "รอตรวจรับ" ตอนส่งงาน ไม่ใช่ปิดทั้งช่อง');
+
+  /* ประตูกันแก้ย้อนหลังต้องครอบ machine_down ด้วย ไม่ใช่แค่อะไหล่กับค่าใช้จ่าย */
+  assert.ok(/changes\.machine_down !== undefined\)\) \{/.test(gas.replace(/\s+/g, " ")) ||
+            /changes\.machine_down !== undefined/.test(gas),
+    "ใบที่ปิดแล้ว ช่างต้องแก้ machine_down ย้อนหลังไม่ได้");
+
+  /* ปลดเครื่องต้องใช้ตัวเดียวกันทั้งสองทาง ไม่งั้นทางที่ไม่มีจะทิ้งเครื่องค้าง "หยุดเสีย" */
+  assert.ok(/function releaseMachine_/.test(gas));
+  assert.strictEqual((gas.match(/releaseMachine_\(/g) || []).length, 3,
+    "ประกาศ 1 + เรียกจากตอนตรวจรับ 1 + เรียกตอนแก้ใบเป็นเดินต่อได้ 1");
+
+  /* ใบที่ระบบเปิดเองต้องส่งค่ามาด้วย ไม่งั้นติดกฎบังคับที่เพิ่งใส่ไป แล้วเปิดใบไม่ได้เลย */
+  const auto = (gas.match(/apiCreateTicket\(\{[\s\S]{0,900}?\n  \}\)/g) || []);
+  assert.ok(auto.length >= 3, "ต้องเจอจุดที่ระบบเปิดใบเองอย่างน้อยสามจุด");
+  auto.forEach((blk, i) => {
+    if (/machine_name:/.test(blk) && !/machine_name: ''/.test(blk)) {
+      assert.ok(/machine_down:/.test(blk),
+        `ใบที่ระบบเปิดเองจุดที่ ${i + 1} ต้องระบุ machine_down มาด้วย`);
+    }
+  });
 }

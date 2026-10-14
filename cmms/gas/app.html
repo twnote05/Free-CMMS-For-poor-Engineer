@@ -580,6 +580,15 @@ const isProductionStop = (t, group) =>
   group ? machineGroupOf(t.machine_name) === group
         : (!MACHINES.length || PRODUCTION_GROUPS.includes(machineGroupOf(t.machine_name)));
 
+/* ใบที่ระบุไว้ว่าเครื่องเดินอยู่ตลอด — ส่งใบมีดไปลับคม ส่งชิ้นส่วนไปซ่อมนอก
+   โดยมีของสำรองใส่แทน ใบค้างเป็นสัปดาห์แต่สายการผลิตไม่ได้หยุดสักนาที
+
+   แยกเป็นตัวตัดสินของมันเอง ไม่ยัดรวมใน isProductionStop เพราะคนละคำถามกัน —
+   อันนั้นถามว่า "เครื่องนี้อยู่ในกลุ่มที่นับไหม" อันนี้ถามว่า "ครั้งนี้มันหยุดจริงไหม"
+   ค่าว่างแปลว่ายังไม่มีใครระบุ = นับไว้ก่อน ไม่ใช่ตัดทิ้ง */
+const MACHINE_DOWN_YES = "หยุดเดิน", MACHINE_DOWN_NO = "เดินต่อได้";
+const machineKeptRunning = (t) => String(t.machine_down || "").trim() === MACHINE_DOWN_NO;
+
 /** จำนวนเครื่องจักรผลิตในทะเบียน — เป็นตัวคูณของตัวหาร %Breakdown
     ยังไม่ได้โหลดทะเบียนคืน 1 = ไม่คูณ ดีกว่าหารด้วย 0 แล้วได้ Infinity */
 const productionFleet = (group) =>
@@ -673,9 +682,16 @@ function periodWindow(p) {
 function breakdownSpan(list, win, kind) {
   const nowMs = Date.now();
   const byMachine = {};
-  let count = 0;
+  let count = 0, kept = 0;
   list.forEach((t) => {
     if (!isProductionStop(t, win.group)) return;
+    /* นับไว้ด้วยว่าตัดออกไปกี่ใบ แล้วไปขึ้นบนการ์ด — ใบที่หายไปเงียบ ๆ
+       คือสิ่งที่ทำให้คนเลิกเชื่อตัวเลข เร็วกว่าตัวเลขที่ผิดเสียอีก */
+    if (machineKeptRunning(t)) {
+      const s0 = stopSpan(t, kind, nowMs);
+      if (s0 && Math.min(s0[1], win.to) > Math.max(s0[0], win.from)) kept++;
+      return;
+    }
     const sp = stopSpan(t, kind, nowMs);
     if (!sp) return;
     const a = Math.max(sp[0], win.from), b = Math.min(sp[1], win.to);
@@ -699,7 +715,7 @@ function breakdownSpan(list, win, kind) {
     if (h > cap) { capped++; h = cap; }
     hours += h;
   });
-  return { hours, count, capped, merged };
+  return { hours, count, capped, merged, kept };
 }
 
 /** สรุป KPI ของชุดข้อมูลที่ส่งเข้ามา
@@ -717,7 +733,7 @@ function kpiSummary(list, slaHours = 72, pm = {}, repeatWin = 30, win = null) {
   const overdue  = open.filter((t) => isOverdue(t, slaHours)).length;
   const downtime = durations.reduce((a, b) => a + b, 0);
   const bdGroup = (win && win.group) || "";
-  const prod = done.filter((t) => isProductionStop(t, bdGroup));
+  const prod = done.filter((t) => isProductionStop(t, bdGroup) && !machineKeptRunning(t));
   const stops  = prod.map(waitHours).filter((h) => h !== null);
   const hands  = prod.map(wrenchHours).filter((h) => h !== null);
   // 1 ใบนับได้ครั้งเดียว ถึงจะถูกจับคู่ซ้ำกับใบก่อนหน้าหลายคู่ก็ตาม
@@ -775,6 +791,7 @@ function kpiSummary(list, slaHours = 72, pm = {}, repeatWin = 30, win = null) {
     machineHandsCount: bdWrench.count,
     // ตัดตามเดือนแล้วหรือยัง และมีเครื่องไหนชนเพดานบ้าง — หน้าจอต้องบอกได้ ไม่ใช่ปัดเงียบ ๆ
     breakdownClipped: !!win,
+    keptRunning: bdWait.kept || 0,
     cappedMachines: bdWait.capped,
     mergedTickets: bdWait.merged || 0,
     /* ═══ ตัวหารต้องเป็นชั่วโมงของ "ทั้งกองเครื่อง" ไม่ใช่ของเครื่องเดียว ═══
@@ -1016,6 +1033,13 @@ async function handleSubmit(e) {
   if (!String(fd.get("description") || "").trim()) {
     toast("กรุณากรอกรายละเอียดอาการเสีย", false); return;
   }
+  /* เดิมติ๊ก "เดินต่อได้" ไว้ให้ล่วงหน้า คนแจ้งที่ไม่ได้คิดอะไรก็กดส่งผ่านไปเลย
+     ตอนที่ช่องนี้มีผลแค่กับสมุดเครื่องจักรยังพอรับได้ แต่ตอนนี้มันตัดใบออกจาก
+     ตัวเศษของ %Breakdown ด้วย ค่าที่ติ๊กค้างไว้จึงกลายเป็นตัวกดตัวเลขให้ต่ำเกินจริง
+     บังคับให้เลือกเองจริง ๆ แทนการเดาแทนผู้แจ้ง */
+  if (machine && !fd.get("machine_down")) {
+    toast("กรุณาระบุว่าตอนนี้เครื่องหยุดเดินหรือยังเดินต่อได้", false); return;
+  }
 
   btn.disabled = true;
   btn.textContent = "กำลังส่ง...";
@@ -1092,6 +1116,30 @@ async function updateTicket(id, changes, msg, opts = {}) {
   refresh();
 }
 
+/* ช่องเดียวกันนี้ขึ้นสองที่ — แผงช่าง (ใบที่ยังเปิด) กับแผงอะไหล่ (ใบที่ปิดแล้ว)
+   id คนละตัวเหมือน mCost / mCostBack ไม่งั้นได้ id ซ้ำในหน้าเดียวกันเวลาขึ้นพร้อมกัน */
+/* ช่องนี้มีอยู่แล้วตอนเปิดใบ (ฟอร์มแจ้งซ่อมบังคับเลือก) แต่ไม่เคยมีที่ให้แก้ทีหลังเลย
+   ของจริงคนแจ้งไม่รู้ตอนนั้นว่าต้องส่งใบมีดไปลับคม — รู้ตอนช่างไปดูแล้ว
+   ค่าเดิมจึงค้างเป็น "หยุดเดิน" ทั้งที่เครื่องเดินด้วยใบสำรองมาตลอดทั้งสัปดาห์
+
+   id คนละตัวเหมือน mCost / mCostBack เพราะสองแผงขึ้นพร้อมกันได้ ห้าม id ซ้ำ
+   ไม่มีตัวเลือก "ยังไม่ระบุ" ให้ใบที่มีค่าอยู่แล้ว — ล้างค่าทิ้งไม่ได้แก้ปัญหาอะไร
+   มีแต่ทำให้ใบนั้นกลับไปกำกวม และปลดกฎกันปลดเครื่องก่อนเวลาไปด้วยโดยไม่ตั้งใจ */
+function downSelect(id, t) {
+  const v = String(t.machine_down || "").trim();
+  const opt = (val, label) =>
+    `<option value="${esc(val)}"${v === val ? " selected" : ""}>${esc(label)}</option>`;
+  return `<div><label class="lbl" for="${id}">ใบนี้ทำให้เครื่องหยุดผลิตจริงหรือไม่</label>
+    <select id="${id}" class="inp">
+      ${v ? "" : opt("", "— ยังไม่ระบุ (ระบบนับว่าหยุด) —")}
+      ${opt(MACHINE_DOWN_YES, "🔴 หยุดเดิน — สายการผลิตหยุดจริง")}
+      ${opt(MACHINE_DOWN_NO, "🟢 เดินต่อได้ — ส่งลับคม / ส่งซ่อมนอก โดยมีของสำรองใส่แทน")}
+    </select>
+    <p class="text-[11px] text-slate-400 mt-1">
+      "เดินต่อได้" = ใบนี้ไม่ถูกนับเป็นเวลาหยุดใน % Breakdown
+      — แต่ยังอยู่ในรายงาน ประวัติเครื่อง และยอดค่าใช้จ่ายตามเดิมทุกอย่าง</p></div>`;
+}
+
 function techAction(id, next) {
   const t = tickets.find((x) => x.ticket_id === id) || {};
 
@@ -1113,6 +1161,7 @@ function techAction(id, next) {
 
   /* ส่งค่าว่างไปด้วยโดยตั้งใจ — ลบชื่อร้านทิ้งแล้วต้องลบจริง ไม่ใช่ค้างของเก่าไว้
      เช็คว่ามีช่องอยู่บนจอไหม ไม่ใช่เช็คว่ามีค่าไหม */
+  if ($("#mDown"))   changes.machine_down = $("#mDown").value;
   if ($("#mVendor")) changes.vendor = $("#mVendor").value.trim();
   if ($("#mBack"))   changes.expect_back = $("#mBack").value;
 
@@ -1464,6 +1513,7 @@ function openModal(id) {
           <input id="mBack" type="date" class="inp" value="${ymd(t.expect_back)}">
           <p class="text-[11px] text-slate-400 mt-1">เลยกำหนดแล้วระบบจะเตือนให้ตามของทุกเช้า</p></div>
       </div>
+      ${downSelect("mDown", t)}
       <div class="flex gap-2 flex-wrap">
         ${t.status === STATUS.WAIT
           ? `<button class="btn" style="background:#f97316" data-act="tech" data-next="${esc(STATUS.REPAIR)}">▶ เริ่มซ่อม</button>` : ""}
@@ -1557,6 +1607,7 @@ function openModal(id) {
           ใบที่ปิดแล้วมาแก้ยอดได้ที่นี่ที่เดียว — บิลร้านนอกมาทีหลัง หรือตอนปิดยอดสิ้นเดือน
           แล้วพบว่ากรอกตกไป · บันทึกพร้อมอะไหล่ด้วยปุ่มเดียวกัน</p>
       </div>` : ""}
+      ${t.status === STATUS.DONE ? downSelect("mDownBack", t) : ""}
       <div class="flex gap-2 flex-wrap">
         <button type="button" class="chip" data-part="add">+ เพิ่มอีกรายการ</button>
         <button class="btn" style="background:#0f766e" data-act="parts">
@@ -2167,6 +2218,7 @@ function saveParts(id) {
   /* ช่องค่าใช้จ่ายตัวนี้มีเฉพาะใบที่ปิดแล้ว — เช็คว่ามีช่องอยู่บนจอไหม ไม่ใช่เช็คว่ามีค่าไหม
      แบบเดียวกับช่องผู้รับซ่อมภายนอก เพราะแก้ยอดกลับเป็น 0 ก็ต้องทำได้ */
   if ($("#mCostBack")) changes.cost = Number($("#mCostBack").value) || 0;
+  if ($("#mDownBack")) changes.machine_down = $("#mDownBack").value;
   updateTicket(id, changes,
     lines.length ? `บันทึกอะไหล่ ${lines.length} รายการของใบ ${id} แล้ว` : `บันทึกใบ ${id} แล้ว`);
 }
@@ -3916,7 +3968,9 @@ function kpiDrill(key, k, p, sla, into) {
         const wsp = stopSpan(t, "wrench", nowMs);
         return { t, inMonth, full: (sp[1] - sp[0]) / 36e5,
                  wIn: wsp ? overlapHours(wsp[0], wsp[1], win.from, win.to) : null,
-                 inn: isProductionStop(t, win.group), g: machineGroupOf(t.machine_name) };
+                 kept: machineKeptRunning(t),
+                 inn: isProductionStop(t, win.group) && !machineKeptRunning(t),
+                 g: machineGroupOf(t.machine_name) };
       }).filter(Boolean)
         .sort((a, b) => (b.inn - a.inn) || (b.inMonth - a.inMonth))
         .map((r) => dRow(r.t.ticket_id, [...base(r.t),
@@ -3924,6 +3978,7 @@ function kpiDrill(key, k, p, sla, into) {
           r.full - r.inMonth > 0.02 ? fmtDuration(r.full) : "—",
           r.wIn === null ? tt("ไม่ได้ลงเวลาซ่อม", "repair time not recorded") : fmtDuration(r.wIn),
           r.inn ? (r.g || tt("นับ (ยังไม่ได้โหลดทะเบียน)", "counted (registry not loaded)"))
+          : r.kept ? (r.g || "—") + tt(" — แจ้งว่าเครื่องเดินต่อได้ ไม่นับ", " — reported as still running, not counted")
                 : (r.g || tt("ไม่มีเครื่องในทะเบียน", "not in the registry")) + tt(" — ไม่นับ", " — not counted")], !r.inn));
       /* รวมเฉพาะใบที่ถูกนับ ไม่ใช่ทุกแถวที่แสดง — ในตารางมีใบของอาคาร/เครื่องใช้ไฟฟ้าปนอยู่
          เพื่อให้เห็นว่าอะไรถูกตัดออกและเพราะอะไร ถ้าบวกรวมไปด้วยจะไม่ตรงกับตัวเลขบนการ์ด */
@@ -3944,6 +3999,7 @@ function kpiDrill(key, k, p, sla, into) {
                       `นับเฉพาะส่วนที่อยู่ในเดือนนี้` +
                       (k.mergedTickets ? ` · ใบที่เวลาซ้อนกันบนเครื่องเดียวกัน ${nf(k.mergedTickets)} ใบ นับครั้งเดียว ` +
                         `(ยอดรวมหัวตารางจึงน้อยกว่าเอาทุกแถวมาบวกกัน)` : "") +
+                      (k.keptRunning ? ` · ตัดออก ${nf(k.keptRunning)} ใบที่แจ้งว่าเครื่องเดินต่อได้ (อยู่ท้ายตาราง)` : "") +
                       (k.cappedMachines ? ` · ปัดลงเพราะชนเพดานของเดือน ${nf(k.cappedMachines)} เครื่อง` : ""),
                       (k.bdGroup ? `${k.bdGroup} only · ` : "") +
                       `denominator ${nf(k.fleet)} machines × ${nf(p.pm.workHours)} h = ${nf(k.availHours)} h · ` +
@@ -4161,10 +4217,12 @@ function panelKpi(p) {
                  : tt(`ค่าสูง — เครื่องรอเฉพาะส่วนที่อยู่ในเดือนนี้ ${fmtDuration(k.machineDowntime)} ` +
                       `÷ (${nf(k.fleet)} เครื่อง × ${nf(p.pm.workHours)} ชม. = ${nf(k.availHours)} ชม.)` +
                       (k.mergedTickets ? ` · ใบที่เวลาซ้อนกันบนเครื่องเดียวกัน ${nf(k.mergedTickets)} ใบ นับครั้งเดียว` : "") +
+                      (k.keptRunning ? ` · ไม่นับ ${nf(k.keptRunning)} ใบที่แจ้งว่าเครื่องเดินต่อได้` : "") +
                       (k.cappedMachines ? ` · ${nf(k.cappedMachines)} เครื่องชนเพดานของเดือน` : ""),
                       `Upper — waiting time falling inside this month ${fmtDuration(k.machineDowntime)} ` +
                       `÷ (${nf(k.fleet)} machines × ${nf(p.pm.workHours)} h = ${nf(k.availHours)} h)` +
                       (k.mergedTickets ? ` · ${nf(k.mergedTickets)} overlapping tickets counted once` : "") +
+                      (k.keptRunning ? ` · ${nf(k.keptRunning)} tickets excluded (machine kept running)` : "") +
                       (k.cappedMachines ? ` · ${nf(k.cappedMachines)} machines hit the monthly cap` : "")),
            /* ค่าต่ำ — เวลาที่ช่างลงมือจริง ตัวหารเดียวกัน ต่างกันแค่ตัวเศษ
               ความจริงอยู่ระหว่างสองค่านี้ เพราะระบบไม่ได้เก็บ "เครื่องหยุดกี่โมง เดินอีกทีกี่โมง"

@@ -1387,6 +1387,12 @@ function apiCreateTicket(payload) {
       throw new Error('สถานะเครื่องต้องเป็น: ' + MACHINE_DOWN.join(' หรือ '));
     }
     if (down && !machine) down = '';          // ไม่มีเครื่อง ก็ไม่มีอะไรให้หยุด
+    /* ค่าว่างบนใบที่มีเครื่องจักร แปลไม่ได้ว่าอะไร — สมุดเครื่องจักรอ่านว่า "ไม่หยุด"
+       ส่วน %Breakdown อ่านว่า "หยุด" สองหน้าจอพูดคนละเรื่องเกี่ยวกับใบเดียวกัน
+       บังคับให้มีค่าเสมอ แล้วความกำกวมก็จบที่ต้นทาง ไม่ต้องไปตีความทีหลัง */
+    if (machine && !down) {
+      throw new Error('ต้องระบุว่าเครื่องหยุดเดินหรือยังเดินต่อได้ — ค่านี้ใช้ทั้งสมุดเครื่องจักรและ % Breakdown');
+    }
 
     var priority = PRIORITIES.filter(function (p) { return p.key === payload.priority; }).length
       ? payload.priority : PRIORITY_DEFAULT;
@@ -1499,9 +1505,14 @@ function updateTicketInternal_(ticketId, changes, ctx) {
        เดิมกันด้วยการซ่อนปุ่มอย่างเดียว ซึ่งไม่ใช่การกันสิทธิ์ — ใบที่ปิดและส่งให้คลัง
        ตัดสต๊อกไปแล้วเมื่อสัปดาห์ก่อน ถ้าใครแก้รหัสทีหลังได้ ยอดที่ไม่ตรงจะหาสาเหตุไม่เจอ
        ctx.rank ไม่ถูกส่ง = เส้นทางภายใน (ตรวจรับ · จ่ายงานหลายใบ) ซึ่งไม่แตะช่องนี้อยู่แล้ว */
+    /* "เครื่องหยุดเดิน" อยู่ในกองเดียวกับอะไหล่และค่าใช้จ่าย เพราะมันขยับ %Breakdown
+       ของทั้งแผนกโดยตรง ช่างกดเองได้ตอนใบยังเปิด (ตอนนั้นเขาคือคนเดียวที่รู้ว่า
+       เครื่องเดินอยู่ไหม) แต่ใบที่ปิดไปแล้วแก้ได้เฉพาะหัวหน้า ไม่งั้นเดือนไหนตัวเลขไม่สวย
+       ก็ย้อนไปติ๊ก "ไม่หยุด" ให้ใบเก่าได้เรื่อย ๆ */
     if (changes && ctx.rank !== undefined && ctx.rank < RANK.LEAD && getVal('completed_at') &&
-        (changes.parts !== undefined || changes.cost !== undefined)) {
-      throw new Error('ใบนี้ซ่อมจบแล้ว การแก้อะไหล่หรือค่าใช้จ่ายย้อนหลังต้องให้หัวหน้างานขึ้นไปเป็นคนแก้');
+        (changes.parts !== undefined || changes.cost !== undefined ||
+         changes.machine_down !== undefined)) {
+      throw new Error('ใบนี้ซ่อมจบแล้ว การแก้อะไหล่ ค่าใช้จ่าย หรือสถานะเครื่องหยุดย้อนหลัง ต้องให้หัวหน้างานขึ้นไปเป็นคนแก้');
     }
 
     var work = {};
@@ -1692,6 +1703,33 @@ function partsText_(items) {
    อยู่แล้ว ขาดข้อเดียวคือ "เพราะอะไร" จึงบังคับกรอกเหตุผลแล้วเขียนลงคอลัมน์การกระทำของ Audit */
 var BACKDATE_FIELDS = ['started_at', 'completed_at'];
 
+/* ค่าเดียวที่ช่างตั้งเองได้ตอนส่งงานให้ฝ่ายผลิต — คำตัดสินอีกสองค่าต้องมาจากหน้าตรวจรับ */
+var VERIFY_PENDING = 'รอตรวจรับ';
+
+/* ปลดเครื่องกลับมาเดิน ถ้าไม่มีอะไรค้างไว้แล้ว
+   ใช้ร่วมกันสองทาง — ตอนฝ่ายผลิตตรวจรับงานผ่าน กับตอนแก้ใบเป็น "เดินต่อได้" ทีหลัง
+   ก่อนหน้านี้มีแค่ทางแรก ทางที่สองจึงทิ้งเครื่องค้างเป็น "หยุดเสีย" ถาวร:
+   ใบที่ถูกแก้แล้วไม่ใช่ "หยุดเดิน" อีกต่อไป ทางปลดปกติจะข้ามมันไป (เช็คที่ apiVerifyTicket)
+   และ isDownTicket_ ก็มองไม่เห็นมันแล้ว ไม่เหลือทางไหนปลดให้เลยนอกจากหัวหน้าไปกดเอง */
+function releaseMachine_(machine, ticketId, by, why) {
+  if (!machine) return;
+  /* เครื่องถูกสั่งหยุดตามแผน PM อยู่ — ปลดตรงนี้คือไปลบสถานะที่คนอื่นตั้งใจตั้งไว้ */
+  var cur = machineStatus_()[machine];
+  if (cur && cur.status === MSTATUS_PLAN) {
+    Logger.log('ไม่ปลด ' + machine + ' เพราะกำลังหยุดตามแผน PM อยู่');
+    return;
+  }
+  /* ยังมีใบอื่นที่บอกว่าเครื่องนี้หยุดอยู่ ปิดใบนี้ใบเดียวไม่ได้แปลว่าเครื่องเดินได้แล้ว
+     ปล่อยให้ขึ้นว่าเดินทั้งที่ยังซ่อมไม่เสร็จ คือตัวเลข Availability ที่โกหก */
+  var still = otherDownTickets_(machine, ticketId);
+  if (still.length) {
+    Logger.log('ไม่ปลด ' + machine + ' เพราะยังมีใบค้าง: ' +
+      still.map(function (x) { return x.ticket_id; }).join(', '));
+    return;
+  }
+  logMachineStatus_(machine, MSTATUS_RUN, ticketId + ' — ' + why, by, new Date());
+}
+
 function apiUpdateTicket(token, ticketId, changes) {
   var user = requireAuth_(token);
   if (!ticketId) throw new Error('ต้องระบุหมายเลขใบแจ้งซ่อม');
@@ -1715,7 +1753,9 @@ function apiUpdateTicket(token, ticketId, changes) {
   /* ตอนเปิดใบตรวจไว้แล้ว แต่ตอนแก้ใบไม่ได้ตรวจ — ช่างจึงยัดข้อความอะไรก็ได้ลงช่องนี้
      ค่าที่ไม่ใช่ "หยุดเดิน" เป๊ะ ๆ ทำให้ isDownTicket_ มองไม่เห็นใบนั้น
      กฎกันปลดเครื่องก่อนเวลาเลยถูกปิดไปเงียบ ๆ และคอลัมน์กลับไปเป็นข้อความอิสระ */
-  if (changes && changes.machine_down) {
+  /* เช็ค !== undefined ไม่ใช่ truthy — ค่าว่างเคยลอดไปเขียนทับคอลัมน์ได้
+     แล้วใบนั้นกลายเป็นใบที่สมุดเครื่องจักรกับ %Breakdown อ่านคนละอย่าง */
+  if (changes && changes.machine_down !== undefined) {
     var md = String(changes.machine_down).trim();
     if (MACHINE_DOWN.indexOf(md) === -1) {
       throw new Error('สถานะเครื่องต้องเป็น: ' + MACHINE_DOWN.join(' หรือ '));
@@ -1750,19 +1790,51 @@ function apiUpdateTicket(token, ticketId, changes) {
     throw new Error('ปิดงานเองไม่ได้ — ต้องให้ฝ่ายผลิตกดตรวจรับงานตามขั้นตอน ISO');
   }
 
+  /* ผลการตรวจรับตั้งจากทางนี้ไม่ได้ เหตุผลเดียวกับที่ปิดงานเองไม่ได้ —
+     แต่ร้ายกว่า เพราะค่าที่มีคำว่า "ส่งกลับ" สั่งล้าง completed_at กับ repair_minutes
+     (ดู updateTicketInternal_) ยิงสองครั้งก็ปลดประตูที่กันการแก้อะไหล่ ค่าใช้จ่าย
+     และสถานะเครื่องหยุดย้อนหลังได้ทั้งหมด โดยไม่ต้องเป็นหัวหน้างานเลยสักขั้น
+
+     "รอตรวจรับ" ผ่านได้ เพราะเป็นค่าที่ช่างตั้งตอนส่งงานให้ฝ่ายผลิต ไม่ใช่คำตัดสิน */
+  if (changes && changes.verification_status !== undefined &&
+      String(changes.verification_status).trim() &&
+      String(changes.verification_status).trim() !== VERIFY_PENDING) {
+    throw new Error('ผลการตรวจรับต้องมาจากหน้าตรวจรับงานเท่านั้น');
+  }
+
   /* ยกเลิกใบเป็นสิทธิ์ของหัวหน้างานเท่านั้น และต้องมีเหตุผลเสมอ
      ใบที่หายไปจากสถิติโดยไม่มีคำอธิบาย คือช่องโหว่ที่ทำให้ตัวเลขถูกแต่งได้ */
   if (changes && changes.status === STATUS_CANCEL) {
     requireAuth_(token, 'LEAD');
     if (!String(changes.cancel_reason || '').trim()) throw new Error('ต้องระบุเหตุผลที่ยกเลิก');
   }
-  return updateTicketInternal_(ticketId, changes, {
+  /* อ่านค่าเดิมไว้ก่อน เพราะหลังเขียนแล้วแยกไม่ออกว่าใบนี้เคยบอกว่าเครื่องหยุดไหม
+     ปลดเฉพาะใบที่ "เคยเป็นหยุดเดินจริง" — ถ้าปลดทุกครั้งที่เห็นค่า "เดินต่อได้"
+     จะไปลบสถานะหยุดที่หัวหน้าตั้งไว้เองด้วยมือ ซึ่งไม่เกี่ยวกับใบนี้เลย */
+  var backFrom = '';
+  if (changes && changes.machine_down === MACHINE_DOWN_NO) {
+    var before = rowsToObjects_().filter(function (x) { return x.ticket_id === ticketId; })[0];
+    if (before && before.machine_down === MACHINE_DOWN_YES) backFrom = before.machine_name || '';
+  }
+
+  var out = updateTicketInternal_(ticketId, changes, {
     action: why ? 'ลงเวลาย้อนหลัง — ' + why : 'แก้ไขใบแจ้งซ่อม',
     who: user.name + ' (' + user.role + ')',    // Audit ต้องรู้ว่าใครเป็นคนแก้
     /* ส่งระดับสิทธิ์ลงไปตรวจตอนอ่านแถวแล้ว — ตรงนั้นที่เดียวที่รู้ว่าใบปิดไปหรือยัง
        โดยไม่ต้องอ่านชีตซ้ำ และยังอยู่ในล็อก สถานะจึงเปลี่ยนแทรกกลางทางไม่ได้ */
     rank: RANK[user.role] || 0
   });
+
+  /* ปลดไม่สำเร็จไม่ควรทำให้การแก้ใบล้มทั้งใบ — ใบถูกเขียนไปแล้วตอนนี้
+     แบบเดียวกับที่ apiVerifyTicket ครอบ try ไว้รอบการปลดของมัน */
+  if (backFrom) {
+    try {
+      releaseMachine_(backFrom, ticketId, user.name, 'แก้ใบเป็น "เดินต่อได้" เครื่องเดินปกติ');
+    } catch (e) {
+      Logger.log('ปลดสถานะเครื่องจาก ' + ticketId + ' ไม่สำเร็จ: ' + e.message);
+    }
+  }
+  return out;
 }
 
 /* ═══════════ จัดการงานทีละหลายใบ ═══════════
@@ -1872,23 +1944,7 @@ function apiVerifyTicket(ticketId, payload) {
         Logger.log('ข้ามการปลด ' + mc + ' — ใบ ' + ticketId + ' ไม่ได้แจ้งว่าเครื่องหยุด');
         mc = '';
       }
-      if (mc) {
-        /* เครื่องถูกสั่งหยุดตามแผน PM อยู่ ปิดใบซ่อมไม่ได้แปลว่างาน PM จบไปด้วย
-           ปลดให้ตรงนี้คือไปลบสถานะที่คนอื่นตั้งใจตั้งไว้ */
-        var cur = machineStatus_()[mc];
-        var still = otherDownTickets_(mc, ticketId);
-        if (cur && cur.status === MSTATUS_PLAN) {
-          Logger.log('ไม่ปลด ' + mc + ' เพราะกำลังหยุดตามแผน PM อยู่');
-        } else if (still.length) {
-          /* ยังมีใบอื่นที่บอกว่าเครื่องนี้หยุดอยู่ ปิดใบนี้ใบเดียวไม่ได้แปลว่าเครื่องเดินได้แล้ว
-             ปล่อยให้ขึ้นว่าเดินทั้งที่ยังซ่อมไม่เสร็จ คือตัวเลข Availability ที่โกหก */
-          Logger.log('ไม่ปลด ' + mc + ' เพราะยังมีใบค้าง: ' +
-            still.map(function (x) { return x.ticket_id; }).join(', '));
-        } else {
-          logMachineStatus_(mc, MSTATUS_RUN, ticketId + ' — ตรวจรับงานผ่าน เครื่องกลับมาเดินปกติ',
-                            safe.verified_by, new Date());
-        }
-      }
+      releaseMachine_(mc, ticketId, safe.verified_by, 'ตรวจรับงานผ่าน เครื่องกลับมาเดินปกติ');
     } catch (e) {
       Logger.log('ปลดสถานะเครื่องจาก ' + ticketId + ' ไม่สำเร็จ: ' + e.message);
     }
@@ -2221,6 +2277,7 @@ function apiPmMakeTicket(token, id, payload) {
        ในสถิติเหมือนงานเสียอื่น ๆ ที่มาจาก PM คือ "ที่มา" ไม่ใช่ "ประเภทงาน" */
     work_type: o.machine ? 'เครื่องจักร' : 'งานโครงสร้างอาคารและสถานที่',
     machine_name: o.machine,
+    machine_down: MACHINE_DOWN_NO,    // เจอตอนตรวจ PM — เครื่องยังไม่ได้หยุดเพราะเรื่องนี้
     description: detail,
     cause: 'พบจากการตรวจ PM: ' + o.task,
     action_needed: 'ต้องการเรียกช่างซ่อมบำรุง',
@@ -4124,6 +4181,7 @@ function apiParamMakeTicket(token, id, payload) {
     reporter: user.name,
     work_type: 'เครื่องจักร',
     machine_name: info.cmms,
+    machine_down: MACHINE_DOWN_NO,    // อ่านค่าพารามิเตอร์ได้ แปลว่าเครื่องเดินอยู่
     description: 'พารามิเตอร์หลุดมาตรฐาน ' + bad.length + ' ค่า - ' + bad.join(' · ') +
                  (payload.note ? ' | ' + String(payload.note).trim() : ''),
     /* อ้างรหัสแบบฟอร์มและผู้บันทึกไว้ในใบ เพราะผู้ตรวจ ISO จะตามจากใบนี้กลับไปหาบันทึกต้นทาง */
@@ -5483,6 +5541,7 @@ function apiCheckMakeTicket(token, machine, dateStr, payload) {
     reporter: user.name,
     work_type: 'เครื่องจักร',
     machine_name: name,
+    machine_down: MACHINE_DOWN_NO,    // เจอตอนเช็คชีตประจำวัน เครื่องเดินระหว่างผลิต
     description: 'พบจากเช็คชีตประจำวัน ' + thDate_(d.date) +
       (d.by ? ' โดย ' + d.by : '') + ' — ไม่ผ่าน ' + d.bad.length + ' ข้อ\n' + lines,
     cause: String(payload.cause || ''),
