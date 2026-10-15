@@ -3467,3 +3467,70 @@ console.log("OK — ผ่านทั้งหมด");
   assert.strictEqual(getPM(2025, "01").pmPlan, undefined);
   assert.strictEqual(Object.keys(getPM(2025, "")).length, 0);
 }
+
+
+/* ═══ ค่าใช้จ่ายแยกเป็นรายการ (parseCosts_ / costsText_ ใน Code.gs) ═══
+   ของจริงช่างพิมพ์ราคาลงช่องรายละเอียดอาการเสีย เพราะช่องอะไหล่บังคับรหัส SKU
+   ที่คลังต้องมี ส่วนของซื้อจากซัพกับค่าบริการร้านนอกไม่มีรหัสให้กรอก
+   คำอธิบายจึงเป็นข้อความอิสระที่มีทั้งช่องว่าง ตัวเลข และตัว x ปนอยู่ */
+{
+  const gas = {};
+  vm.runInNewContext(fs.readFileSync("gas/Code.gs", "utf8"), gas);
+  const { parseCosts_, costsText_, costsSum_, COSTS_MAX } = gas;
+  const J = JSON.stringify;
+
+  assert.strictEqual(J(parseCosts_("ค่าบริการลับคมใบมีด 6 ใบ = 1200")),
+    J([{ note: "ค่าบริการลับคมใบมีด 6 ใบ", amount: 1200 }]),
+    "คำอธิบายมีตัวเลขปนได้ ต้องตัดที่ = ตัวสุดท้ายเท่านั้น");
+
+  /* ตัวคั่นของอะไหล่คือ " x " ซึ่งโผล่กลางคำอธิบายค่าใช้จ่ายได้ตลอด
+     นี่คือเหตุผลที่ช่องนี้ใช้ = ไม่ใช่ x — เคยพลาดกับ "Oil seal TC 35x52x7" มาแล้ว */
+  assert.strictEqual(J(parseCosts_("Oil seal 60*90*12 x 2 ตัว = 320")),
+    J([{ note: "Oil seal 60*90*12 x 2 ตัว", amount: 320 }]));
+
+  // คัดลอกยอดมาจากใบเสนอราคาแล้วมีจุลภาคติดมา ต้องรับได้ ไม่ใช่เด้ง error ใส่คนกรอกถูก
+  assert.strictEqual(parseCosts_("ใบโปรไฟล์ 1 ใบ = 6,840")[0].amount, 6840);
+  assert.strictEqual(parseCosts_("ค่าขนส่ง = 107.50")[0].amount, 107.5);
+
+  // หลายบรรทัด + บวกยอด
+  const many = parseCosts_("ใบมีดตัดตรง 1 ใบ = 1260\nใบโปรไฟล์ 1 ใบ = 6,840");
+  assert.strictEqual(many.length, 2);
+  assert.strictEqual(costsSum_(many), 8100, "ยอดรวมต้องเป็นผลบวกของรายการย่อย");
+
+  // เขียนกลับเป็นรูปแบบเดียวเสมอ — จุลภาคหายไป อ่านซ้ำแล้วต้องได้ของเดิม
+  assert.strictEqual(costsText_(many), "ใบมีดตัดตรง 1 ใบ = 1260\nใบโปรไฟล์ 1 ใบ = 6840");
+  assert.strictEqual(costsSum_(parseCosts_(costsText_(many))), 8100, "อ่านกลับแล้วยอดต้องไม่เพี้ยน");
+
+  // บรรทัดว่างข้ามไป ไม่ใช่ error
+  assert.strictEqual(parseCosts_("\n\nค่าแรง = 500\n\n").length, 1);
+  assert.strictEqual(parseCosts_("").length, 0);
+  assert.strictEqual(parseCosts_(null).length, 0);
+
+  // ไม่มีตัวคั่น = คนกรอกผิดช่อง ต้องฟ้อง ไม่ใช่เก็บเป็นยอด 0 เงียบ ๆ
+  assert.throws(() => parseCosts_("ค่าบริการลับคม 1200"), /ผิดรูปแบบ/);
+  assert.throws(() => parseCosts_("ค่าแรง = abc"), /ผิดรูปแบบ/);
+  assert.throws(() => parseCosts_("ค่าแรง ="), /ผิดรูปแบบ/);
+  assert.throws(() => parseCosts_("= 500"), /ผิดรูปแบบ/, "ไม่มีคำอธิบาย = ไม่รู้ว่าจ่ายค่าอะไร");
+  assert.throws(() => parseCosts_("ค่าแรง = 1000000000"), /ไม่สมเหตุสมผล/);
+
+  const over = Array.from({ length: COSTS_MAX + 1 }, (_, i) => `x${i} = 1`).join("\n");
+  assert.throws(() => parseCosts_(over), new RegExp("ไม่เกิน " + COSTS_MAX));
+
+  /* ยอดรวมต้องถูกบวกที่ server ไม่ใช่รับจากหน้าเว็บ — เหตุผลเดียวกับ repair_minutes
+     ใบที่รายการย่อยกับยอดรวมไม่ตรงกัน คือเลขที่ไม่มีใครกล้าใช้ในที่ประชุม */
+  const src = fs.readFileSync("gas/Code.gs", "utf8");
+  assert.ok(/work\.cost = costsSum_\(costItems\)/.test(src),
+    "updateTicketInternal_ ต้องบวกยอดเอง ไม่ใช่เชื่อ cost ที่หน้าเว็บส่งมา");
+  assert.ok(/changes\.cost_items !== undefined/.test(src),
+    "ประตูกันแก้ย้อนหลังต้องครอบ cost_items ด้วย ไม่งั้นแก้ยอดเลี่ยงประตูได้");
+
+  /* หน้าจอกับ server ต้องอ่านรูปแบบเดียวกัน ไม่งั้นยอดที่หน้าจอบวกให้ดู
+     ไม่ใช่ยอดที่ถูกเขียนลงชีต ซึ่งแย่กว่าไม่โชว์ยอดเลย */
+  const app = fs.readFileSync("gas/app.html", "utf8");
+  const cli = app.match(/function costList\(text\)[\s\S]*?const m = s\.match\((\/.*?\/)\);/);
+  const srv = src.match(/function parseCosts_[\s\S]*?var m = s\.match\((\/.*?\/)\);/);
+  assert.ok(cli && srv, "หา regex ของ costList / parseCosts_ ไม่เจอ");
+  assert.strictEqual(cli[1], srv[1],
+    "costList กับ parseCosts_ ต้องใช้กฎเดียวกันเป๊ะ ๆ — คนละกฎเมื่อไหร่ " +
+    "ยอดที่หน้าจอบวกให้ดูจะไม่ใช่ยอดที่ถูกเขียนลงชีต");
+}

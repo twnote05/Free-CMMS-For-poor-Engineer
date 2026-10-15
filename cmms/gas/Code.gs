@@ -44,7 +44,8 @@ var HEADERS = [
   'ผู้ตรวจรับงาน', 'วันที่ตรวจรับ', 'ผลการตรวจรับ', 'สาเหตุที่ส่งกลับแก้ไข',
   'จำนวนครั้งที่ส่งกลับ', 'ประเภท', 'รูป',
   'ผู้รับซ่อมภายนอก', 'กำหนดรับคืน', 'เหตุผลที่ยกเลิก',
-  'เครื่องหยุดเดิน', 'รหัสสาเหตุ', 'อะไหล่ที่ใช้'   // ต่อท้ายเสมอ — รัน upgradeSheet() เพื่อเติมให้ชีตที่มีอยู่แล้ว
+  'เครื่องหยุดเดิน', 'รหัสสาเหตุ', 'อะไหล่ที่ใช้',
+  'รายการค่าใช้จ่าย'   // ต่อท้ายเสมอ — รัน upgradeSheet() เพื่อเติมให้ชีตที่มีอยู่แล้ว
 ];
 
 var AUDIT_HEADERS = ['เวลา', 'ผู้ใช้', 'การกระทำ', 'หมายเลขแจ้งซ่อม', 'ฟิลด์', 'ค่าเดิม', 'ค่าใหม่'];
@@ -95,6 +96,7 @@ var FIELD_MAP = {
   action_needed: 'ระบุความต้องการ',
   cost: 'ค่าใช้จ่าย',
   parts: 'อะไหล่ที่ใช้',
+  cost_items: 'รายการค่าใช้จ่าย',
   pr_no: 'เลขที่ PR',
   status_legacy: 'สถานะ',
   status: 'สถานะ (ละเอียด)',
@@ -1511,7 +1513,7 @@ function updateTicketInternal_(ticketId, changes, ctx) {
        ก็ย้อนไปติ๊ก "ไม่หยุด" ให้ใบเก่าได้เรื่อย ๆ */
     if (changes && ctx.rank !== undefined && ctx.rank < RANK.LEAD && getVal('completed_at') &&
         (changes.parts !== undefined || changes.cost !== undefined ||
-         changes.machine_down !== undefined)) {
+         changes.cost_items !== undefined || changes.machine_down !== undefined)) {
       throw new Error('ใบนี้ซ่อมจบแล้ว การแก้อะไหล่ ค่าใช้จ่าย หรือสถานะเครื่องหยุดย้อนหลัง ต้องให้หัวหน้างานขึ้นไปเป็นคนแก้');
     }
 
@@ -1541,6 +1543,15 @@ function updateTicketInternal_(ticketId, changes, ctx) {
         !work.completed_at && !getVal('completed_at')) {
       work.completed_at = new Date();
     }
+
+    /* ยอดรวมค่าใช้จ่ายคิดที่ server เหตุผลเดียวกับนาทีซ่อม — ใบที่มีรายการย่อยอยู่
+       แล้วยอดรวมไม่เท่าผลบวก คือเลขที่ไม่มีใครกล้าใช้ในที่ประชุม
+
+       อ่านรายการจากแถวเดิมด้วยถ้าครั้งนี้ไม่ได้ส่งมา — ช่างกดเปลี่ยนสถานะบนใบที่มีรายการอยู่
+       หน้าจอจะส่ง cost เก่ามาด้วยทุกครั้ง ถ้าไม่ทับก็จะกลายเป็นยอดเก่าก่อนแก้รายการ */
+    var costText = work.cost_items !== undefined ? work.cost_items : getVal('cost_items');
+    var costItems = parseCosts_(costText);
+    if (costItems.length) work.cost = costsSum_(costItems);
 
     // นาทีที่ใช้ซ่อมต้องคิดที่ server เท่านั้น ไม่งั้น MTTR ปลอมได้จากหน้าเว็บ
     var startEff = toDate_(work.started_at !== undefined ? work.started_at : getVal('started_at'));
@@ -1651,6 +1662,53 @@ var LEAD_ONLY_FIELDS = ['priority', 'due_at', 'assignee', 'pr_no', 'cancel_reaso
    ถ้าช่างกรอกไม่ได้ ก็ไม่มีรหัสให้คลังตัดสต๊อกมาตั้งแต่ต้นทาง — หน้าจอเป็นคนกำหนดว่า
    ใบที่ปิดแล้วเหลือเฉพาะหัวหน้าที่แก้ได้ ระดับเดียวกับช่อง "การซ่อม" และ "ค่าใช้จ่าย" */
 var PARTS_MAX = 30;                       // หนึ่งงานซ่อมใช้เกินนี้ แปลว่ากรอกผิดช่อง
+
+/* ═══ ค่าใช้จ่ายแยกเป็นรายการ ═══
+   ช่องอะไหล่ด้านบนบังคับรหัส SKU เพราะคลังเอาไปตัดสต๊อก แต่งานซ่อมจำนวนมาก
+   ไม่ได้เบิกของจากคลังเลย — ซื้อของจากซัพมาใส่ตรง ๆ หรือจ่ายแค่ค่าบริการร้านนอก
+   ของพวกนี้ไม่มีรหัสให้กรอก ช่างจึงพิมพ์ราคาลงช่องรายละเอียดอาการเสียแทน
+   ("ใบมีดตัดตรง 1 ใบ 1260บาท ใบโปรไฟล์ 1 ใบ 6840บาท") แล้วยอดก็หาไม่เจอจากรายงานไหน
+
+   เก็บเป็นข้อความหลายบรรทัดในคอลัมน์เดียวแบบเดียวกับอะไหล่ ด้วยเหตุผลเดียวกัน —
+   ทุกรายงานในระบบนี้อ่าน "หนึ่งแถว = หนึ่งใบ" แยกชีตเมื่อไหร่แปลว่าต้อง join ทุกครั้งที่อ่านใบ
+
+   แยกจากช่องอะไหล่โดยตั้งใจ ไม่ได้เอามารวมเป็นตารางเดียวแล้วใส่ราคาต่อแถว
+   เพราะแผ่น "อะไหล่ตัดสต๊อก" ที่ส่งให้คลังต้องมีแต่รหัสที่คลังมีจริง
+   ค่าบริการลับคมหลุดเข้าไปในนั้นเมื่อไหร่ คลังจะตัดสต๊อกรหัสที่ไม่มีอยู่จริง
+
+   ใช้ "=" คั่น ไม่ใช่ " x " แบบอะไหล่ — คำอธิบายเป็นข้อความอิสระที่มีทั้งช่องว่าง
+   ตัวเลข และตัว x ปนอยู่เต็มไปหมด ("Oil seal 60*90*12") ตัวคั่นต้องไม่ใช่อะไรที่โผล่ในนั้นได้ */
+var COSTS_MAX = 20;
+
+function parseCosts_(text) {
+  var out = [];
+  String(text == null ? '' : text).split(/[\r\n]+/).forEach(function (ln) {
+    var s = ln.trim();
+    if (!s) return;
+    /* รับเครื่องหมายจุลภาคในตัวเลขด้วย เพราะคนคัดลอกยอดมาจากใบเสนอราคา ("6,840")
+       แล้วถ้าไม่รับ จะเด้ง error ใส่หน้าคนที่กรอกถูกตามที่เห็นในเอกสารทุกประการ */
+    var m = s.match(/^(.*\S)\s*=\s*([0-9][0-9,]*(?:\.[0-9]+)?)$/);
+    if (!m) {
+      throw new Error('บรรทัด "' + s + '" ผิดรูปแบบ — ต้องเป็น "คำอธิบาย = จำนวนเงิน"');
+    }
+    var note = m[1].trim().replace(/\s+/g, ' ');
+    var amount = Number(m[2].replace(/,/g, ''));
+    if (!isFinite(amount) || amount < 0) throw new Error('จำนวนเงินของ "' + note + '" ไม่ถูกต้อง');
+    if (amount >= 1e9) throw new Error('จำนวนเงินของ "' + note + '" ไม่สมเหตุสมผล (' + m[2] + ')');
+    out.push({ note: note, amount: amount });
+  });
+  if (out.length > COSTS_MAX) throw new Error('ใส่รายการค่าใช้จ่ายได้ไม่เกิน ' + COSTS_MAX + ' รายการต่อใบ');
+  return out;
+}
+
+/** เขียนกลับเป็นรูปแบบเดียวเสมอ — เหตุผลเดียวกับ partsText_ */
+function costsText_(items) {
+  return items.map(function (c) { return c.note + ' = ' + c.amount; }).join('\n');
+}
+
+function costsSum_(items) {
+  return items.reduce(function (a, c) { return a + c.amount; }, 0);
+}
 
 function parseParts_(text) {
   var out = [], seen = {};
@@ -1767,6 +1825,11 @@ function apiUpdateTicket(token, ticketId, changes) {
      ค่าว่างผ่านได้ เพราะต้องลบรายการที่ใส่ผิดออกทั้งหมดได้ */
   if (changes && changes.parts !== undefined) {
     changes.parts = partsText_(parseParts_(changes.parts));
+  }
+  /* ตรวจที่นี่เพื่อให้คนกรอกเห็น error ทันทีว่าบรรทัดไหนผิด
+     ส่วนการบวกยอดทำใน updateTicketInternal_ ซึ่งทุกปากทางผ่านจุดเดียวกัน */
+  if (changes && changes.cost_items !== undefined) {
+    changes.cost_items = costsText_(parseCosts_(changes.cost_items));
   }
 
   var backdating = Object.keys(changes || {}).some(function (k) {

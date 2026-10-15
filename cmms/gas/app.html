@@ -1196,7 +1196,12 @@ function techAction(id, next) {
   /* ส่งค่าว่างไปด้วยโดยตั้งใจ — เลือกผิดแล้วต้องแก้กลับเป็น "ยังไม่ทราบ" ได้
      เช็คว่ามีช่องอยู่บนจอไหม ไม่ใช่เช็คว่ามีค่าไหม แบบเดียวกับช่องผู้รับซ่อมภายนอก */
   if ($("#mCause")) changes.cause_code = $("#mCause").value;
-  if (cost !== undefined && cost !== "") changes.cost = Number(cost) || 0;
+  /* ใบที่มีรายการค่าใช้จ่ายย่อยอยู่ ยอดรวมเป็นของ server — ช่องนี้ถูกตั้งเป็นอ่านอย่างเดียว
+     อยู่แล้ว แต่ไม่ส่งไปเลยดีกว่า ไม่งั้นทุกครั้งที่กดเปลี่ยนสถานะจะมีแถว Audit
+     "แก้ค่าใช้จ่าย" โผล่มาทั้งที่ไม่มีใครแก้อะไร */
+  if (cost !== undefined && cost !== "" && !costList(t.cost_items).length) {
+    changes.cost = Number(cost) || 0;
+  }
   if (min && Number(min) > 0) changes.repair_minutes = Number(min);   // กรอกเองถือว่าทับค่าคำนวณ
 
   /* ส่งค่าว่างไปด้วยโดยตั้งใจ — ลบชื่อร้านทิ้งแล้วต้องลบจริง ไม่ใช่ค้างของเก่าไว้
@@ -1428,6 +1433,48 @@ function partList(text) {
   }).filter(Boolean);
 }
 
+/* กฎเดียวกับ parseCosts_ ที่ server เป๊ะ ๆ — สองฝั่งอ่านไม่ตรงกันเมื่อไหร่
+   ยอดที่หน้าจอบวกให้ดูจะไม่ใช่ยอดที่ถูกเขียนลงชีต ซึ่งแย่กว่าไม่โชว์ยอดเลย
+   บรรทัดที่อ่านไม่ออกคืนทั้งบรรทัดเป็นคำอธิบาย ไม่ทิ้ง — ของเก่าที่รูปแบบเพี้ยน
+   ต้องยังเห็นบนจอเพื่อให้คนแก้ได้ ไม่ใช่หายไปเงียบ ๆ ตอนเปิดใบ */
+function costList(text) {
+  return String(text || "").split(/[\r\n]+/).map((ln) => {
+    const s = ln.trim();
+    if (!s) return null;
+    const m = s.match(/^(.*\S)\s*=\s*([0-9][0-9,]*(?:\.[0-9]+)?)$/);
+    return m ? { note: m[1].replace(/\s+/g, " "), amount: m[2].replace(/,/g, "") }
+             : { note: s, amount: "" };
+  }).filter(Boolean);
+}
+
+const costRow = (c) => `<div class="flex flex-wrap gap-2" data-cost-row>
+  <input class="inp !w-auto grow min-w-0" data-cost-note autocomplete="off"
+         style="flex:1 1 11rem" value="${esc(c?.note || "")}" aria-label="รายการค่าใช้จ่าย"
+         placeholder="เช่น ค่าบริการลับคมใบมีด 6 ใบ">
+  <input class="inp num" data-cost-amt type="number" min="0" step="any" style="width:7rem"
+         value="${esc(c?.amount || "")}" placeholder="บาท" aria-label="จำนวนเงิน">
+  <button type="button" class="chip" data-cost="del" aria-label="ลบรายการนี้"
+          style="min-width:2.75rem;min-height:2.75rem">✕</button>
+</div>`;
+
+/** ยอดรวมที่โชว์ระหว่างพิมพ์ — ตัวจริงที่ถูกเก็บคือยอดที่ server บวกเอง */
+function paintCostSum() {
+  const box = $("#mCostSum");
+  if (!box) return;
+  const rows = $$("#mCosts [data-cost-row]")
+    .map((r) => Number(r.querySelector("[data-cost-amt]").value) || 0);
+  const sum = rows.reduce((a, b) => a + b, 0);
+  box.textContent = rows.length ? `รวม ${money(sum)} บาท จาก ${nf(rows.length)} รายการ` : "";
+  /* มีรายการย่อยเมื่อไหร่ ช่องยอดรวมห้ามพิมพ์เอง — server บวกทับอยู่แล้ว
+     ปล่อยให้พิมพ์ได้ทั้งที่ค่าถูกทับ คือกับดักที่คนหาสาเหตุไม่เจอ */
+  [$("#mCost"), $("#mCostBack")].forEach((el) => {
+    if (!el) return;
+    el.readOnly = rows.length > 0;
+    el.classList.toggle("opacity-60", rows.length > 0);
+    if (rows.length) el.value = sum;
+  });
+}
+
 /* flex-wrap + ขอฐานกว้าง 11rem ให้ช่องรหัส — บนจอ 360px แถวนี้เหลือ 288px
    หักช่องจำนวนกับปุ่มลบแล้วช่องรหัสเหลือราว 146px ซึ่งโชว์รหัสจริงได้ไม่ถึงสิบตัว
    ช่างพิมพ์รหัสที่ตัวเองมองไม่เห็นหัว ตรวจทานก่อนบันทึกไม่ได้ — ให้มันตกบรรทัดแทน
@@ -1473,6 +1520,15 @@ function openModal(id) {
       ${row("ผู้แจ้ง", `${t.reporter || "-"}${t.department ? " (" + t.department + ")" : ""}`)}
       ${row("วันที่แจ้ง", fmtDT(t.created_at))}
       ${row("ค่าใช้จ่าย", Number(t.cost) ? money(t.cost) + " บาท" : "-")}
+      ${/* ยอดก้อนเดียวตอบไม่ได้ว่าจ่ายอะไรไป ซึ่งเป็นคำถามแรกที่บัญชีถามกลับมาเสมอ
+            แตกให้เห็นตรงนี้เลย ไม่ต้องกดเข้าไปดูในแผงแก้ไขซึ่งคนทั่วไปไม่มีสิทธิ์เปิด */ ""}
+      ${costList(t.cost_items).length ? `<div class="sm:col-span-2">
+        <dt class="text-xs text-slate-500">รายการค่าใช้จ่าย</dt>
+        <dd class="text-sm mt-1"><ul class="space-y-0.5">${costList(t.cost_items).map((c) =>
+          `<li class="flex justify-between gap-3 border-b border-dashed border-slate-100 pb-0.5">
+             <span>${esc(c.note)}</span>
+             <span class="num whitespace-nowrap">${c.amount === "" ? "-" : money(c.amount)}</span></li>`
+          ).join("")}</ul></dd></div>` : ""}
       ${/* ขึ้นบรรทัดจริงตามที่เก็บไว้ — ไม่ใช้ row() เพราะ dd ธรรมดายุบบรรทัดเป็นช่องว่าง
             กลายเป็นอะไหล่ 5 รายการต่อกันเป็นพืดอ่านไม่ออก */ ""}
       ${t.parts ? `<div class="sm:col-span-2">
@@ -1647,6 +1703,18 @@ function openModal(id) {
           ใบที่ปิดแล้วมาแก้ยอดได้ที่นี่ที่เดียว — บิลร้านนอกมาทีหลัง หรือตอนปิดยอดสิ้นเดือน
           แล้วพบว่ากรอกตกไป · บันทึกพร้อมอะไหล่ด้วยปุ่มเดียวกัน</p>
       </div>` : ""}
+      ${/* ค่าใช้จ่ายที่ไม่ได้เบิกของจากคลัง — ซื้อจากซัพมาใส่ตรง ๆ หรือจ่ายแค่ค่าบริการ
+            แยกจากตารางอะไหล่ เพราะแผ่น "อะไหล่ตัดสต๊อก" ที่ส่งให้คลังต้องมีแต่รหัสที่คลังมีจริง */ ""}
+      <div class="border-t border-dashed border-slate-200 pt-3">
+        <h4 class="font-semibold text-xs mb-1">💰 รายการค่าใช้จ่าย (ไม่ต้องมีรหัสอะไหล่)</h4>
+        <p class="text-[11px] text-slate-400 mb-2">
+          ของที่ซื้อจากซัพ ค่าบริการร้านนอก ค่าขนส่ง — ใส่ได้เลยโดยไม่ต้องมีรหัสในคลัง
+          · ใส่แล้วระบบบวกเป็นยอด "ค่าใช้จ่าย" ของใบนี้ให้เอง</p>
+        <div id="mCosts" class="space-y-2">${
+          (costList(t.cost_items).length ? costList(t.cost_items) : [null]).map(costRow).join("")}</div>
+        <p id="mCostSum" class="text-[11px] text-slate-500 mt-2 font-semibold"></p>
+        <button type="button" class="chip mt-2" data-cost="add">+ เพิ่มรายการค่าใช้จ่าย</button>
+      </div>
       ${t.status === STATUS.DONE ? downSelect("mDownBack", t) : ""}
       <div class="flex gap-2 flex-wrap">
         <button type="button" class="chip" data-part="add">+ เพิ่มอีกรายการ</button>
@@ -1733,6 +1801,10 @@ function openModal(id) {
   $("#mBody").innerHTML = html;
   paintAssignNote();
   paintPartCodes();        // รายการรหัสอะไหล่ที่เคยใช้ ไว้ให้เลือกแทนการสะกดเอง
+  paintCostSum();          // ยอดรวมตั้งต้น + ล็อกช่องยอดรวมถ้าใบนี้มีรายการย่อยอยู่แล้ว
+  $("#mBody").addEventListener("input", (e) => {
+    if (e.target.matches("[data-cost-amt]")) paintCostSum();
+  });
   $("#mBody").onclick = (e) => {
     const p = e.target.closest("button[data-part]");
     if (p) {
@@ -1748,6 +1820,24 @@ function openModal(id) {
         row?.remove();
         (next?.querySelector("[data-part-code]") || $('[data-part="add"]'))?.focus();
       }
+      paintCostSum();
+      return;
+    }
+    /* แถวค่าใช้จ่ายใช้ท่าเดียวกับแถวอะไหล่เป๊ะ ๆ ต่างกันแค่ชื่อ data-* —
+       ยุบรวมเป็นตัวเดียวแล้วส่งชื่อ attribute เข้าไป จะได้โค้ดที่สั้นลงสามบรรทัด
+       แลกกับการอ่านยากขึ้นทั้งสองที่ ไม่คุ้ม */
+    const c = e.target.closest("button[data-cost]");
+    if (c) {
+      if (c.dataset.cost === "add") {
+        $("#mCosts").insertAdjacentHTML("beforeend", costRow(null));
+        $("#mCosts").lastElementChild?.querySelector("[data-cost-note]")?.focus();
+      } else {
+        const row = c.closest("[data-cost-row]");
+        const next = row?.nextElementSibling || row?.previousElementSibling;
+        row?.remove();
+        (next?.querySelector("[data-cost-note]") || $('[data-cost="add"]'))?.focus();
+      }
+      paintCostSum();
       return;
     }
     const b = e.target.closest("button[data-act]");
@@ -2254,13 +2344,27 @@ function saveParts(id) {
     const qty = r.querySelector("[data-part-qty]").value.trim();
     return code ? `${code} x ${qty || 1}` : "";
   }).filter(Boolean);
-  const changes = { parts: lines.join("\n") };
+  const costs = $$("#mCosts [data-cost-row]").map((r) => {
+    const note = r.querySelector("[data-cost-note]").value.trim();
+    const amt = r.querySelector("[data-cost-amt]").value.trim();
+    /* ไม่มีจำนวนเงินก็ยังส่งไป ให้ server เป็นคนบอกว่าบรรทัดไหนผิดรูปแบบ
+       ตัดทิ้งเงียบ ๆ ที่หน้าจอ แปลว่าคนกดบันทึกแล้วรายการหายไปโดยไม่รู้ตัว */
+    return note ? `${note} = ${amt || 0}` : "";
+  }).filter(Boolean);
+  const changes = { parts: lines.join("\n"), cost_items: costs.join("\n") };
   /* ช่องค่าใช้จ่ายตัวนี้มีเฉพาะใบที่ปิดแล้ว — เช็คว่ามีช่องอยู่บนจอไหม ไม่ใช่เช็คว่ามีค่าไหม
      แบบเดียวกับช่องผู้รับซ่อมภายนอก เพราะแก้ยอดกลับเป็น 0 ก็ต้องทำได้ */
-  if ($("#mCostBack")) changes.cost = Number($("#mCostBack").value) || 0;
+  /* มีรายการย่อย = server บวกยอดเอง ส่ง cost ไปด้วยก็ถูกทับอยู่ดี
+     ไม่ส่งเลยจะได้ไม่ไปโผล่ใน Audit เป็นการแก้ที่ไม่มีใครสั่ง */
+  if ($("#mCostBack") && !costs.length) changes.cost = Number($("#mCostBack").value) || 0;
   if ($("#mDownBack")) changes.machine_down = $("#mDownBack").value;
   updateTicket(id, changes,
-    lines.length ? `บันทึกอะไหล่ ${lines.length} รายการของใบ ${id} แล้ว` : `บันทึกใบ ${id} แล้ว`);
+    [lines.length ? `อะไหล่ ${lines.length} รายการ` : "",
+     costs.length ? `ค่าใช้จ่าย ${costs.length} รายการ` : ""].filter(Boolean).join(" · ")
+      ? `บันทึก${[lines.length ? `อะไหล่ ${lines.length} รายการ` : "",
+                  costs.length ? `ค่าใช้จ่าย ${costs.length} รายการ` : ""]
+                 .filter(Boolean).join(" · ")} ของใบ ${id} แล้ว`
+      : `บันทึกใบ ${id} แล้ว`);
 }
 
 /** ลงเวลาย้อนหลัง — server คิด repair_minutes ใหม่ให้เอง ไม่ต้องส่งนาทีไปด้วย */
@@ -4746,7 +4850,8 @@ const SHEET1_HEADERS = ["ลำดับ", "เวลาแจ้ง", "วั�
   "เริ่มซ่อม", "เวลาซ่อมจบ", "ผู้เข้าซ่อม", "การซ่อม", "ใช้เวลา",
   "ผู้ตรวจรับงาน", "วันที่ตรวจรับ", "ผลการตรวจรับ", "สาเหตุที่ส่งกลับแก้ไข", "รูป",
   "ผู้รับซ่อมภายนอก", "กำหนดรับคืน",   // ฝ่ายจัดซื้อขอดูว่าของอยู่ที่ร้านไหน ค้างมากี่วัน
-  "อะไหล่ที่ใช้"];                      // รหัส SKU ที่ช่างกรอก — คลังเอาไปกระทบยอดตัดสต๊อก ERP
+  "อะไหล่ที่ใช้",                       // รหัส SKU ที่ช่างกรอก — คลังเอาไปกระทบยอดตัดสต๊อก ERP
+  "รายการค่าใช้จ่าย"];                  // ของซื้อจากซัพ · ค่าบริการร้านนอก — ไม่มีรหัสในคลัง
 
 /** วันที่แบบ Excel อ่านออก (ไม่ใช่ ISO string) */
 const xlDate = (iso) => (iso ? new Date(iso) : "");
@@ -4785,6 +4890,9 @@ function sheet1Rows(list) {
     /* คั่นด้วย , ไม่ใช่ขึ้นบรรทัดใหม่ — ช่องที่มีบรรทัดในตัวทำให้ VLOOKUP กับการ copy
        ไปวางใน ERP เพี้ยน แผ่น "อะไหล่ตัดสต๊อก" ข้างล่างคือตัวที่เอาไปนำเข้าจริง */
     String(t.parts || "").split(/[\r\n]+/).map((s) => s.trim()).filter(Boolean).join(", "),
+    /* เหตุผลเดียวกับช่องอะไหล่ — ช่องที่มีบรรทัดในตัวทำให้ copy ไปวางใน ERP เพี้ยน
+       บัญชีเอาคอลัมน์นี้ไปดูว่ายอดในช่อง "ค่าใช้จ่าย" ประกอบด้วยอะไรบ้าง */
+    String(t.cost_items || "").split(/[\r\n]+/).map((s) => s.trim()).filter(Boolean).join(" · "),
   ]);
 }
 

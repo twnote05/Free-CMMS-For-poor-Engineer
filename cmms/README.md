@@ -32,6 +32,7 @@ Those constraints rule out almost everything. What survives:
 | **Machine parameters** | Compares recorded readings against tolerances · engineer approval step · generates one Google Form per machine from the register · reads the limits sheet in either shape, one row per reading point or one row per machine with a column per point |
 | **KPIs** | PM completion read straight off the PM schedule, nothing to re-type · MTTR · %breakdown · repeat failures · weighted per-technician scoring (weights are editable in a sheet) · %breakdown counts only tickets where the reporter said the machine actually stopped — a blade sent out for sharpening while a spare keeps the line running is excluded, and the drill-down lists what was left out |
 | **Machine board** | One card per machine: running / stopped-by-fault / stopped-for-PM, with the daily check and parameter buttons on the card · a technician assigned to a station sees only that station's machines by default |
+| **Costs** | Itemised: stocked spares go in as SKU codes, supplier-bought parts and outside service fees go in as cost lines with no code required · the total is summed server-side |
 | **Excel export** | Whole year, one month, or a single Monday-to-Sunday week · raw rows plus a stock-deduction sheet with one row per SKU and a line key, so re-exporting an overlapping range cannot double-deduct |
 | **Also** | Dark mode · Thai/English · QR codes for machines · event timeline · in-app notifications · audit log |
 
