@@ -3534,3 +3534,32 @@ console.log("OK — ผ่านทั้งหมด");
     "costList กับ parseCosts_ ต้องใช้กฎเดียวกันเป๊ะ ๆ — คนละกฎเมื่อไหร่ " +
     "ยอดที่หน้าจอบวกให้ดูจะไม่ใช่ยอดที่ถูกเขียนลงชีต");
 }
+
+/* ═══ สองข้อที่เจอตอนลองกดเพิ่ม/ลบจริงบนหน้าทดสอบที่ประกอบจากโค้ดจริง ═══ */
+{
+  const app = fs.readFileSync("gas/app.html", "utf8");
+  const src = fs.readFileSync("gas/Code.gs", "utf8");
+
+  /* ช่องเงินที่เว้นว่างไว้เคยกลายเป็น "ค่าแรง = 0" แล้วบันทึกผ่านฉลุย
+     คอมเมนต์ข้างบนมันเขียนไว้เองว่าให้ server เป็นคนตรวจ แต่ Number(amt) || 0
+     แปลงค่าว่างเป็นศูนย์ไปก่อนแล้ว server จึงไม่มีอะไรให้ทัก */
+  const rows = app.match(/function costRowsText\(\)[\s\S]*?\n\}/);
+  assert.ok(rows, "หา costRowsText ไม่เจอ");
+  assert.ok(!/Number\(amt\)\s*\|\|\s*0/.test(rows[0]),
+    "ห้ามแปลงช่องเงินว่างเป็น 0 — ต้องส่งดิบไปให้ parseCosts_ ตีกลับว่าบรรทัดไหนยังไม่ได้ใส่เงิน");
+  assert.ok(/\$\{note\} = \$\{amt\}/.test(rows[0]), "ต้องส่งเลขดิบตามที่กรอก");
+
+  const gas = {};
+  vm.runInNewContext(src, gas);
+  assert.throws(() => gas.parseCosts_("ค่าแรง = "), /ผิดรูปแบบ/,
+    "บรรทัดที่มีคำอธิบายแต่ไม่มีจำนวนเงิน ต้องถูกตีกลับ");
+
+  /* ลบรายการย่อยออกหมดแล้วยอดรวมค้างยอดเดิมไว้ = ตัวเลขที่ไม่ได้อ้างอิงอะไรอีกแล้ว
+     แต่ใบที่ไม่เคยมีรายการย่อยเลย ยอดก้อนเดียวของมันยังเป็นของจริง ห้ามล้าง */
+  const upd = src.slice(src.indexOf("function updateTicketInternal_"));
+  const branch = upd.slice(upd.indexOf("else if (work.cost_items !== undefined"));
+  assert.ok(branch.startsWith("else if (work.cost_items !== undefined && String(getVal('cost_items')"),
+    "เงื่อนไขต้องเช็คทั้งค่าที่ส่งมาและค่าเดิมในแถว");
+  assert.ok(branch.slice(0, 600).includes("work.cost = 0"),
+    "ลบรายการย่อยออกหมดต้องล้างยอดเป็น 0 เฉพาะใบที่เคยมีรายการย่อยเท่านั้น");
+}

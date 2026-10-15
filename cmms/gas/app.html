@@ -1457,15 +1457,18 @@ function costRowsText() {
   return $$("#mCosts [data-cost-row]").map((r) => {
     const note = r.querySelector("[data-cost-note]").value.trim();
     const amt = r.querySelector("[data-cost-amt]").value.trim();
-    /* ไม่มีจำนวนเงินก็ยังส่งไป ให้ server เป็นคนบอกว่าบรรทัดไหนผิดรูปแบบ
-       ตัดทิ้งเงียบ ๆ ที่หน้าจอ แปลว่าคนกดบันทึกแล้วรายการหายไปโดยไม่รู้ตัว */
-    return note ? `${note} = ${Number(amt) || 0}` : "";
+    /* ส่งเลขดิบไปตามที่กรอก ไม่แปลงเป็น 0 — ช่องเงินที่เว้นว่างไว้ต้องเด้ง error
+       จาก parseCosts_ ว่าบรรทัดไหนยังไม่ได้ใส่เงิน ไม่ใช่ถูกบันทึกเป็นศูนย์เงียบ ๆ
+       แล้วใบนั้นแบกรายการ "ค่าแรง = 0" ติดไปตลอดโดยไม่มีใครรู้ว่าตกหล่น
+
+       แถวที่ไม่ได้พิมพ์อะไรเลยตัดทิ้งได้ — มันคือแถวว่างที่ระบบใส่ไว้ให้ ไม่ใช่ของที่คนกรอก */
+    return note ? `${note} = ${amt}` : "";
   }).filter(Boolean).join("\n");
 }
 
 /** รูปแบบเดียวกันแต่มาจากค่าที่เก็บไว้แล้ว — เอาไว้เทียบกับของบนจอ */
 const costSaved = (t) => costList(t.cost_items)
-  .map((c) => `${c.note} = ${Number(c.amount) || 0}`).join("\n");
+  .map((c) => `${c.note} = ${c.amount}`).join("\n");
 
 /** อะไหล่ที่อยู่บนจอตอนนี้ รูปแบบเดียวกับที่เก็บในชีต */
 const partRowsText = () => $$("#mParts [data-part-row]").map((r) => {
@@ -1501,7 +1504,16 @@ function paintCostSum() {
   const rows = $$("#mCosts [data-cost-row]")
     .map((r) => Number(r.querySelector("[data-cost-amt]").value) || 0);
   const sum = rows.reduce((a, b) => a + b, 0);
-  box.textContent = rows.length ? `รวม ${money(sum)} บาท จาก ${nf(rows.length)} รายการ` : "";
+  /* แถวที่พิมพ์คำอธิบายไว้แล้วแต่ยังไม่ได้ใส่เงิน — server จะตีกลับตอนกดบันทึกอยู่แล้ว
+     แต่บอกตั้งแต่ตอนนี้ดีกว่า คนจะได้ไม่ต้องกดบันทึกก่อนถึงจะรู้ว่าตกช่องไหน */
+  const blank = $$("#mCosts [data-cost-row]").filter((r) =>
+    r.querySelector("[data-cost-note]").value.trim() &&
+    !r.querySelector("[data-cost-amt]").value.trim()).length;
+  box.textContent = rows.length
+    ? `รวม ${money(sum)} บาท จาก ${nf(rows.length)} รายการ` +
+      (blank ? ` · ยังไม่ได้ใส่จำนวนเงิน ${nf(blank)} รายการ` : "")
+    : "";
+  box.classList.toggle("text-red-600", blank > 0);
   /* มีรายการย่อยเมื่อไหร่ ช่องยอดรวมห้ามพิมพ์เอง — server บวกทับอยู่แล้ว
      ปล่อยให้พิมพ์ได้ทั้งที่ค่าถูกทับ คือกับดักที่คนหาสาเหตุไม่เจอ */
   /* ช่องยอดก้อนเดียวของใบเก่า — พอเริ่มใส่รายการย่อย ยอดกลายเป็นผลบวก
@@ -1853,7 +1865,7 @@ function openModal(id) {
   paintPartCodes();        // รายการรหัสอะไหล่ที่เคยใช้ ไว้ให้เลือกแทนการสะกดเอง
   paintCostSum();          // ยอดรวมตั้งต้น + ล็อกช่องยอดรวมถ้าใบนี้มีรายการย่อยอยู่แล้ว
   $("#mBody").addEventListener("input", (e) => {
-    if (e.target.matches("[data-cost-amt]")) paintCostSum();
+    if (e.target.matches("[data-cost-amt], [data-cost-note]")) paintCostSum();
   });
   $("#mBody").onclick = (e) => {
     const p = e.target.closest("button[data-part]");

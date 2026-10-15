@@ -1551,7 +1551,16 @@ function updateTicketInternal_(ticketId, changes, ctx) {
        หน้าจอจะส่ง cost เก่ามาด้วยทุกครั้ง ถ้าไม่ทับก็จะกลายเป็นยอดเก่าก่อนแก้รายการ */
     var costText = work.cost_items !== undefined ? work.cost_items : getVal('cost_items');
     var costItems = parseCosts_(costText);
-    if (costItems.length) work.cost = costsSum_(costItems);
+    if (costItems.length) {
+      work.cost = costsSum_(costItems);
+    } else if (work.cost_items !== undefined && String(getVal('cost_items') || '').trim()) {
+      /* ลบรายการย่อยออกหมด = ยอดรวมไม่ได้อ้างอิงอะไรอีกแล้ว ต้องเป็นศูนย์
+         ค้างยอดเก่าไว้ คือใบที่มียอดค่าใช้จ่ายลอยอยู่โดยไม่มีอะไรรองรับสักบาท
+
+         เช็ค getVal ด้วย — ใบที่ไม่เคยมีรายการย่อยเลย ยอดก้อนเดียวของมันยังเป็นของจริง
+         ห้ามล้างทิ้งเพราะหน้าจอส่ง cost_items ว่างมาด้วยทุกครั้งที่กดบันทึก */
+      work.cost = 0;
+    }
 
     // นาทีที่ใช้ซ่อมต้องคิดที่ server เท่านั้น ไม่งั้น MTTR ปลอมได้จากหน้าเว็บ
     var startEff = toDate_(work.started_at !== undefined ? work.started_at : getVal('started_at'));
