@@ -1130,17 +1130,11 @@
 
       <div class="panel p-4">
         <h3 class="panel-title">ภาระงานรายคน</h3>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm"><thead><tr>
-            <th class="th">ช่าง</th><th class="th num">งานค้าง</th>
-            <th class="th">สัดส่วนตามสถานะ</th>
-            <th class="th num">วิกฤต/ด่วน</th><th class="th num">เลยกำหนด</th>
-            <th class="th num">ปิดในช่วงที่เลือก</th><th class="th num">MTTR</th>
-          </tr></thead><tbody id="wlBody"></tbody></table>
-        </div>
-        <p class="text-[11px] text-slate-400 mt-2">
-          นับทุกคนที่มีชื่อในช่อง "ผู้รับผิดชอบ" รวมชื่อที่ไม่อยู่ในชีต Users แล้ว (ผู้รับเหมา/คนที่ลาออก) ·
-          ใบที่มอบหมายหลายคนนับให้ทุกคน ผลรวมจึงมากกว่าจำนวนใบจริงได้</p>
+        <div id="wlCards" class="grid sm:grid-cols-2 xl:grid-cols-3 gap-3 mt-3"></div>
+        <p class="text-[11px] text-slate-400 mt-3">
+          กดที่ตัวเลขบนการ์ดเพื่อดูใบที่ประกอบเป็นตัวเลขนั้น ·
+          นับทุกคนในชีต Users และทุกชื่อที่อยู่ในช่อง "ผู้รับผิดชอบ" รวมชื่อที่ไม่อยู่ในชีตแล้ว
+          (ผู้รับเหมา/คนที่ลาออก) · ใบที่มอบหมายหลายคนนับให้ทุกคน ผลรวมจึงมากกว่าจำนวนใบจริงได้</p>
       </div>
     </div>
 

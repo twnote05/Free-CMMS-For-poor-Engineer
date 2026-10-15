@@ -3512,6 +3512,11 @@ function workloadRows(p) {
     name: n, open: 0, urgent: 0, late: 0, closed: 0, mins: [], byStatus: {},
   });
 
+  /* ตั้งต้นด้วยทุกคนในชีต Users ก่อน — คนที่ยังไม่เคยถูกมอบหมายงานเลยต้องมีการ์ด
+     ของตัวเองที่เขียนว่าศูนย์ ไม่ใช่หายไปจากหน้าจอเหมือนไม่มีตัวตนในระบบ
+     หัวหน้าที่เปิดหน้านี้เพื่อหาคนว่างรับงาน ต้องเห็นคนว่างเป็นอันดับแรก */
+  TEAM.forEach((u) => { if (u && u.name) touch(u.name); });
+
   // งานค้าง = ดูจากทั้งระบบ ไม่ใช่เฉพาะช่วงที่เลือก
   live(tickets).filter((t) => t.status !== STATUS.DONE).forEach((t) => {
     nameList(t.assignee).forEach((n) => {
@@ -3958,26 +3963,64 @@ function panelWorkload(p) {
 
   // แถบสัดส่วนยาวเท่ากับคนที่ถือเยอะสุด เทียบกันด้วยตาได้ทันทีว่าใครหนักกว่าใคร
   const maxOpen = Math.max(1, ...all.map((r) => r.open));
-  $("#wlBody").innerHTML = rows.length ? rows.map((r) => `<tr>
-    <td class="td font-medium" data-label="ช่าง">${esc(r.name)}</td>
-    <td class="td num font-bold" data-label="งานค้าง"
-        style="color:${r.open ? "var(--brand)" : "#94a3b8"}">${nf(r.open)}</td>
-    <td class="td" data-label="สัดส่วนตามสถานะ">
-      <div class="wl-bar" style="width:${Math.round((r.open / maxOpen) * 100)}%">${
-        LIVE_STATUSES.filter((st) => st !== STATUS.DONE).map((st) => {
-          const n = r.byStatus[st] || 0;
-          if (!n) return "";
-          return `<i style="flex:${n};background:${STATUS_META[st].chart}"
-                     title="${esc(st)} ${n}"></i>`;
-        }).join("")}</div></td>
-    <td class="td num" data-label="วิกฤต/ด่วน">${r.urgent
-      ? `<b style="color:#dc2626">${nf(r.urgent)}</b>` : "-"}</td>
-    <td class="td num" data-label="เลยกำหนด">${r.late
-      ? `<b style="color:#dc2626">${nf(r.late)}</b>` : "-"}</td>
-    <td class="td num text-slate-600" data-label="ปิดในช่วงที่เลือก">${nf(r.closed)}</td>
-    <td class="td num text-slate-600" data-label="MTTR">${r.mttr === null ? "-" : fmtDuration(r.mttr)}</td>
-  </tr>`).join("")
-    : `<tr><td colspan="7" class="empty">— ยังไม่มีงานที่มอบหมายให้ใคร —</td></tr>`;
+  /* สถานีประจำจากชีต Users — ชื่อคนอย่างเดียวบอกไม่ได้ว่าเขาดูแลสายไหน
+     หัวหน้าที่จะจ่ายงานต้องรู้ว่าคนว่างคนนี้อยู่สายเดียวกับเครื่องที่เสียไหม */
+  const stationOf = (n) => (TEAM.find((u) => u.name === n) || {}).station || "";
+
+  $("#wlCards").innerHTML = rows.length ? rows.map((r) => `<div class="wl-card${
+      r.open ? "" : " wl-card-idle"}">
+    <div class="wl-card-head">
+      <b class="wl-card-name">${esc(r.name)}</b>
+      ${stationOf(r.name)
+        ? `<span class="wl-chip">${esc(stationOf(r.name))}</span>`
+        : `<span class="wl-chip wl-chip-out" title="${esc(tt("ไม่อยู่ในชีต Users แล้ว", "not in the Users sheet"))}">${
+            esc(tt("นอกทีม", "outside"))}</span>`}
+    </div>
+
+    ${/* ตัวเลขใหญ่กดได้ — เปิดรายการใบที่ค้างอยู่ของคนนี้ ไม่ขึ้นกับช่วงเวลาด้านบน
+          คนที่ไม่มีงานค้างไม่ต้องกดได้ เพราะกดไปก็เจอตารางเปล่า */ ""}
+    <div class="wl-card-open${r.open ? " ts-cell" : ""}"
+         ${r.open ? `data-ts="${esc(r.name)}" data-tsm="open"
+         title="${esc(tt("กดดูใบที่ค้างอยู่", "see the open tickets"))}"` : ""}>
+      <span class="wl-num" style="color:${r.open ? "var(--brand)" : "#94a3b8"}">${nf(r.open)}</span>
+      <span class="wl-unit">${esc(tt("ใบที่ค้างอยู่", "open"))}</span>
+    </div>
+
+    ${/* ไม่มีงานค้างก็ไม่มีแถบ — แถบเปล่าเต็มความกว้างอ่านเหมือนแถบที่ยังไม่ขยับ
+          ไม่ใช่ "ไม่มีอะไรให้แสดง" ซึ่งคนละความหมายกันคนละเรื่อง */ ""}
+    ${!r.open ? "" : `<div class="wl-bar" style="width:${Math.round((r.open / maxOpen) * 100)}%">${
+      LIVE_STATUSES.filter((st) => st !== STATUS.DONE).map((st) => {
+        const n = r.byStatus[st] || 0;
+        if (!n) return "";
+        return `<i style="flex:${n};background:${STATUS_META[st].chart}"
+                   title="${esc(st)} ${n}"></i>`;
+      }).join("")}</div>`}
+
+    ${/* ป้ายเตือนขึ้นเฉพาะตอนมีจริง — ป้ายที่ขึ้นทุกใบว่า "0" คือป้ายที่คนเลิกอ่าน */ ""}
+    <div class="wl-flags">
+      ${r.urgent ? `<span class="wl-flag wl-flag-bad">${esc(tt("วิกฤต/ด่วน", "urgent"))} ${nf(r.urgent)}</span>` : ""}
+      ${r.late ? `<span class="wl-flag wl-flag-bad">${esc(tt("เลยกำหนด", "overdue"))} ${nf(r.late)}</span>` : ""}
+      ${!r.urgent && !r.late && r.open
+        ? `<span class="wl-flag wl-flag-ok">${esc(tt("ยังอยู่ในกำหนด", "on schedule"))}</span>` : ""}
+      ${!r.open ? `<span class="wl-flag">${esc(tt("ว่างรับงานได้", "free to take work"))}</span>` : ""}
+    </div>
+
+    <div class="wl-card-foot">
+      <div class="${r.closed ? "ts-cell" : ""}"
+           ${r.closed ? `data-ts="${esc(r.name)}" data-tsm="closed"
+           title="${esc(tt("กดดูใบที่ปิดไปแล้ว", "see the closed tickets"))}"` : ""}>
+        <span class="wl-foot-k">${esc(tt("ปิดในช่วงที่เลือก", "closed this period"))}</span>
+        <b class="wl-foot-v">${nf(r.closed)}</b>
+      </div>
+      <div>
+        <span class="wl-foot-k">${esc(tt("เวลาที่ลงมือเฉลี่ย", "avg hands-on"))}</span>
+        <b class="wl-foot-v">${r.mttr === null ? "-" : fmtDuration(r.mttr)}</b>
+      </div>
+    </div>
+  </div>`).join("")
+    : `<p class="empty sm:col-span-2 xl:col-span-3">— ${esc(
+        tt("ยังไม่มีช่างในชีต Users และยังไม่มีใบไหนถูกมอบหมาย",
+           "no one in the Users sheet yet, and nothing assigned"))} —</p>`;
 }
 
 

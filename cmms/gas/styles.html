@@ -642,6 +642,48 @@ tr.row-critical td:first-child { box-shadow: inset var(--bw-4) 0 0 #dc2626; }
 }
 .wl-bar i { display: block; }
 
+
+/* ══════════════ การ์ดภาระงานช่าง ══════════════
+   หนึ่งการ์ด = หนึ่งคน · ตัวเลขที่กดได้มีเส้นประใต้ตัว (.ts-cell) เหมือนทุกที่ในระบบ
+   คนที่ไม่มีงานค้างไม่ได้ถูกซ่อน แต่ทำให้จางลง — หัวหน้าที่หาคนว่างรับงานต้องเห็นเขา */
+.wl-card {
+  display: flex; flex-direction: column; gap: .625rem;
+  background: var(--panel); border: var(--bw) solid var(--line);
+  border-radius: var(--r-lg); padding: 1rem 1.125rem;
+}
+.wl-card-idle { background: var(--panel2); border-style: dashed; }
+.wl-card-head { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.wl-card-name { font-size: .9375rem; font-weight: 700; }
+.wl-chip {
+  font-size: 10.5px; font-weight: 700; color: #0369a1;
+  background: #e0f2fe; border: 1px solid #bae6fd;
+  border-radius: 9999px; padding: .1rem .5rem; white-space: nowrap;
+}
+.wl-chip-out { color: #92400e; background: #fffbeb; border-color: #fde68a; }
+.wl-card-open { display: flex; align-items: baseline; gap: .4rem; border-radius: .375rem; }
+.wl-num { font-size: 1.75rem; font-weight: 800; line-height: 1; }
+.wl-unit { font-size: .75rem; color: var(--muted); }
+.wl-flags { display: flex; flex-wrap: wrap; gap: .375rem; min-height: 1.25rem; }
+.wl-flag {
+  font-size: 10.5px; font-weight: 700; color: var(--muted);
+  background: var(--panel2); border: 1px solid var(--line);
+  border-radius: .3rem; padding: .1rem .4rem; white-space: nowrap;
+}
+.wl-flag-bad { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
+.wl-flag-ok  { color: #166534; background: #f0fdf4; border-color: #bbf7d0; }
+.wl-card-foot {
+  display: flex; gap: 1rem; padding-top: .625rem;
+  border-top: 1px dashed var(--line);
+}
+.wl-card-foot > div { flex: 1; display: flex; flex-direction: column; gap: .125rem; border-radius: .375rem; }
+.wl-foot-k { font-size: 10.5px; color: var(--muted); }
+.wl-foot-v { font-size: .8125rem; }
+
+[data-theme="dark"] .wl-chip { color: #7dd3fc; background: rgba(2,132,199,.14); border-color: #0c4a6e; }
+[data-theme="dark"] .wl-chip-out { color: #fcd34d; background: rgba(217,119,6,.14); border-color: #78350f; }
+[data-theme="dark"] .wl-flag-bad { color: #fca5a5; background: rgba(239,68,68,.12); border-color: #7f1d1d; }
+[data-theme="dark"] .wl-flag-ok  { color: #86efac; background: rgba(34,197,94,.1);  border-color: #14532d; }
+
 /* ══════════════ กระดิ่งแจ้งเตือน ══════════════ */
 .bell-btn {
   position: relative; font-size: 1.125rem; line-height: 1;
