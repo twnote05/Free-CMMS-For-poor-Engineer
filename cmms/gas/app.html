@@ -1156,13 +1156,12 @@ async function updateTicket(id, changes, msg, opts = {}) {
   refresh();
 }
 
-/* ช่องเดียวกันนี้ขึ้นสองที่ — แผงช่าง (ใบที่ยังเปิด) กับแผงอะไหล่ (ใบที่ปิดแล้ว)
-   id คนละตัวเหมือน mCost / mCostBack ไม่งั้นได้ id ซ้ำในหน้าเดียวกันเวลาขึ้นพร้อมกัน */
 /* ช่องนี้มีอยู่แล้วตอนเปิดใบ (ฟอร์มแจ้งซ่อมบังคับเลือก) แต่ไม่เคยมีที่ให้แก้ทีหลังเลย
    ของจริงคนแจ้งไม่รู้ตอนนั้นว่าต้องส่งใบมีดไปลับคม — รู้ตอนช่างไปดูแล้ว
    ค่าเดิมจึงค้างเป็น "หยุดเดิน" ทั้งที่เครื่องเดินด้วยใบสำรองมาตลอดทั้งสัปดาห์
 
-   id คนละตัวเหมือน mCost / mCostBack เพราะสองแผงขึ้นพร้อมกันได้ ห้าม id ซ้ำ
+   ขึ้นสองที่ — แผงช่าง (ใบที่ยังเปิด) กับแผงอะไหล่ (ใบที่ปิดแล้ว) id จึงคนละตัว
+   เพราะสองแผงขึ้นพร้อมกันได้ ห้าม id ซ้ำในหน้าเดียวกัน
    ไม่มีตัวเลือก "ยังไม่ระบุ" ให้ใบที่มีค่าอยู่แล้ว — ล้างค่าทิ้งไม่ได้แก้ปัญหาอะไร
    มีแต่ทำให้ใบนั้นกลับไปกำกวม และปลดกฎกันปลดเครื่องก่อนเวลาไปด้วยโดยไม่ตั้งใจ */
 function downSelect(id, t) {
@@ -1188,7 +1187,6 @@ function techAction(id, next) {
   const changes = { status: next };
   const tech = $$("#mTech .chip.active").map((c) => c.dataset.tech).join(", ");
   const act  = $("#mAction")?.value.trim();
-  const cost = $("#mCost")?.value;
   const min  = $("#mMin")?.value;
 
   if (tech) changes.technician = tech;
@@ -1196,12 +1194,6 @@ function techAction(id, next) {
   /* ส่งค่าว่างไปด้วยโดยตั้งใจ — เลือกผิดแล้วต้องแก้กลับเป็น "ยังไม่ทราบ" ได้
      เช็คว่ามีช่องอยู่บนจอไหม ไม่ใช่เช็คว่ามีค่าไหม แบบเดียวกับช่องผู้รับซ่อมภายนอก */
   if ($("#mCause")) changes.cause_code = $("#mCause").value;
-  /* ใบที่มีรายการค่าใช้จ่ายย่อยอยู่ ยอดรวมเป็นของ server — ช่องนี้ถูกตั้งเป็นอ่านอย่างเดียว
-     อยู่แล้ว แต่ไม่ส่งไปเลยดีกว่า ไม่งั้นทุกครั้งที่กดเปลี่ยนสถานะจะมีแถว Audit
-     "แก้ค่าใช้จ่าย" โผล่มาทั้งที่ไม่มีใครแก้อะไร */
-  if (cost !== undefined && cost !== "" && !costList(t.cost_items).length) {
-    changes.cost = Number(cost) || 0;
-  }
   if (min && Number(min) > 0) changes.repair_minutes = Number(min);   // กรอกเองถือว่าทับค่าคำนวณ
 
   /* ส่งค่าว่างไปด้วยโดยตั้งใจ — ลบชื่อร้านทิ้งแล้วต้องลบจริง ไม่ใช่ค้างของเก่าไว้
@@ -1212,6 +1204,8 @@ function techAction(id, next) {
 
   /* ส่งของออกไปแล้วไม่รู้ว่าอยู่ที่ไหน = ของหาย ช่องนี้จึงบังคับเฉพาะตอนกดส่งออก
      ไม่บังคับตอนอื่น เพราะงานส่วนใหญ่ซ่อมเองในโรงงาน */
+  if (warnUnsavedParts(t, "สำหรับช่างซ่อมบำรุง")) return;
+
   if (next === STATUS.OUT && !changes.vendor) {
     toast("กรุณาระบุผู้รับซ่อมภายนอก — ไม่งั้นไม่มีใครรู้ว่าของอยู่ที่ไหน", false);
     return;
@@ -1457,6 +1451,49 @@ const costRow = (c) => `<div class="flex flex-wrap gap-2" data-cost-row>
           style="min-width:2.75rem;min-height:2.75rem">✕</button>
 </div>`;
 
+/** รายการค่าใช้จ่ายที่อยู่บนจอตอนนี้ เป็นข้อความรูปแบบเดียวกับที่เก็บในชีต
+    ใช้ทั้งตอนกดบันทึก และตอนเทียบว่ามีของกรอกค้างไว้ยังไม่ได้บันทึก */
+function costRowsText() {
+  return $$("#mCosts [data-cost-row]").map((r) => {
+    const note = r.querySelector("[data-cost-note]").value.trim();
+    const amt = r.querySelector("[data-cost-amt]").value.trim();
+    /* ไม่มีจำนวนเงินก็ยังส่งไป ให้ server เป็นคนบอกว่าบรรทัดไหนผิดรูปแบบ
+       ตัดทิ้งเงียบ ๆ ที่หน้าจอ แปลว่าคนกดบันทึกแล้วรายการหายไปโดยไม่รู้ตัว */
+    return note ? `${note} = ${Number(amt) || 0}` : "";
+  }).filter(Boolean).join("\n");
+}
+
+/** รูปแบบเดียวกันแต่มาจากค่าที่เก็บไว้แล้ว — เอาไว้เทียบกับของบนจอ */
+const costSaved = (t) => costList(t.cost_items)
+  .map((c) => `${c.note} = ${Number(c.amount) || 0}`).join("\n");
+
+/** อะไหล่ที่อยู่บนจอตอนนี้ รูปแบบเดียวกับที่เก็บในชีต */
+const partRowsText = () => $$("#mParts [data-part-row]").map((r) => {
+  const code = r.querySelector("[data-part-code]").value.trim();
+  const qty = r.querySelector("[data-part-qty]").value.trim();
+  return code ? `${code} x ${qty || 1}` : "";
+}).filter(Boolean).join("\n");
+
+const partsSaved = (t) => partList(t.parts)
+  .map((x) => `${x.code} x ${x.qty || 1}`).join("\n");
+
+/* หน้าต่างใบแจ้งซ่อมมีปุ่มบันทึกสามตัว แต่ละตัวบันทึกคนละหัวข้อ
+   คนที่เพิ่งกรอกอะไหล่หรือค่าใช้จ่ายเสร็จ มักกดปุ่มที่อยู่ใกล้ตาที่สุด แล้วปิดหน้าต่าง
+   ไปโดยคิดว่าบันทึกครบแล้ว — ของที่กรอกไว้หายโดยไม่มีอะไรบอกสักคำ
+
+   เลือกเตือนแล้วหยุดไว้ก่อน แทนที่จะแอบบันทึกให้เลย เพราะปุ่มที่เขียนว่าทำอย่างหนึ่ง
+   แล้วไปทำอีกสองอย่างด้วย คือที่มาของ "ทำไมอะไหล่เปลี่ยนเอง" ที่ไล่หาสาเหตุไม่เจอ */
+function warnUnsavedParts(t, what) {
+  const dirty = [
+    $("#mParts") && partRowsText() !== partsSaved(t) ? "อะไหล่" : "",
+    $("#mCosts") && costRowsText() !== costSaved(t) ? "รายการค่าใช้จ่าย" : "",
+  ].filter(Boolean);
+  if (!dirty.length) return false;
+  toast(`${dirty.join("และ")}ยังไม่ได้บันทึก — ปุ่มนี้บันทึกเฉพาะหัวข้อ "${what}" ` +
+        'กดปุ่ม "บันทึกอะไหล่และค่าใช้จ่าย" ของหัวข้อนั้นก่อน', false);
+  return true;
+}
+
 /** ยอดรวมที่โชว์ระหว่างพิมพ์ — ตัวจริงที่ถูกเก็บคือยอดที่ server บวกเอง */
 function paintCostSum() {
   const box = $("#mCostSum");
@@ -1467,12 +1504,14 @@ function paintCostSum() {
   box.textContent = rows.length ? `รวม ${money(sum)} บาท จาก ${nf(rows.length)} รายการ` : "";
   /* มีรายการย่อยเมื่อไหร่ ช่องยอดรวมห้ามพิมพ์เอง — server บวกทับอยู่แล้ว
      ปล่อยให้พิมพ์ได้ทั้งที่ค่าถูกทับ คือกับดักที่คนหาสาเหตุไม่เจอ */
-  [$("#mCost"), $("#mCostBack")].forEach((el) => {
-    if (!el) return;
-    el.readOnly = rows.length > 0;
-    el.classList.toggle("opacity-60", rows.length > 0);
-    if (rows.length) el.value = sum;
-  });
+  /* ช่องยอดก้อนเดียวของใบเก่า — พอเริ่มใส่รายการย่อย ยอดกลายเป็นผลบวก
+     ต้องล็อกทันทีให้เห็นกับตา ไม่ใช่ปล่อยให้พิมพ์ต่อแล้วค่าถูกทับตอนกดบันทึก */
+  const back = $("#mCostBack");
+  if (back) {
+    back.readOnly = rows.length > 0;
+    back.classList.toggle("opacity-60", rows.length > 0);
+    if (rows.length) back.value = sum;
+  }
 }
 
 /* flex-wrap + ขอฐานกว้าง 11rem ให้ช่องรหัส — บนจอ 360px แถวนี้เหลือ 288px
@@ -1592,9 +1631,11 @@ function openModal(id) {
         <p class="text-[11px] text-slate-400 mt-1">
           ใช้ทำ Pareto ว่าทั้งโรงงานเสียเพราะอะไรบ่อยที่สุด — ช่องนี้คือสิ่งเดียวที่ทำให้ระบบ
           ตอบได้มากกว่า "เครื่องไหนเสียบ่อย"</p></div>
+      ${/* ช่อง "ค่าใช้จ่าย" ยอดก้อนเดียวเคยอยู่ตรงนี้ — เอาออกแล้ว
+            ยอดก้อนเดียวตอบไม่ได้ว่าจ่ายค่าอะไร ซึ่งเป็นคำถามแรกที่บัญชีถามกลับมา
+            และมีสองที่ให้กรอกยอดเดียวกันแปลว่าจะมีวันที่สองที่ไม่ตรงกัน
+            ทุกอย่างไปลงที่ "รายการค่าใช้จ่าย" ด้านล่าง แล้วระบบบวกยอดให้เอง */ ""}
       <div class="grid sm:grid-cols-2 gap-3">
-        <div><label class="lbl" for="mCost">ค่าใช้จ่าย (บาท)</label>
-          <input id="mCost" type="number" min="0" step="1" value="${Number(t.cost) || 0}" class="inp num"></div>
         <div><label class="lbl" for="mMin">ใช้เวลา (นาที)</label>
           <input id="mMin" type="number" min="0" step="1" value="${Number(t.repair_minutes) || ""}" class="inp num" placeholder="เว้นว่างให้ระบบคิดให้">
           <p class="text-[11px] text-slate-400 mt-1">${t.started_at
@@ -1690,41 +1731,50 @@ function openModal(id) {
   if (isUnlocked() && !isDead(t) && (isLead() || t.status !== STATUS.DONE)) {
     const prs = partList(t.parts);
     html += `<div class="border-t border-slate-100 pt-4 space-y-3">
-      <h3 class="font-bold text-sm">🔩 อะไหล่${t.status === STATUS.DONE ? "และค่าใช้จ่าย" : "ที่ใช้"}</h3>
-      <div id="mParts" class="space-y-2">${(prs.length ? prs : [null]).map(partRow).join("")}</div>
-      ${/* ช่อง "ค่าใช้จ่าย" ตัวจริงอยู่ในแผงของช่าง ซึ่งขึ้นเฉพาะตอนงานยังไม่ปิด
-            ใบที่ปิดไปแล้วจึงไม่มีทางแก้ยอดเลยสักทาง ทั้งที่บิลผู้รับเหมามาทีหลังเป็นเรื่องปกติ
-            ใส่ที่นี่เฉพาะตอนใบปิดแล้ว — ถ้าใส่ตลอดจะได้ id ซ้ำกับ #mCost ของแผงช่าง */ ""}
-      ${t.status === STATUS.DONE ? `<div>
-        <label class="lbl" for="mCostBack">ค่าใช้จ่าย (บาท)</label>
-        <input id="mCostBack" type="number" min="0" step="1" class="inp num"
-               value="${Number(t.cost) || 0}">
-        <p class="text-[11px] text-slate-400 mt-1">
-          ใบที่ปิดแล้วมาแก้ยอดได้ที่นี่ที่เดียว — บิลร้านนอกมาทีหลัง หรือตอนปิดยอดสิ้นเดือน
-          แล้วพบว่ากรอกตกไป · บันทึกพร้อมอะไหล่ด้วยปุ่มเดียวกัน</p>
-      </div>` : ""}
+      <h3 class="font-bold text-sm">🔩 อะไหล่และค่าใช้จ่าย</h3>
+
+      <div>
+        <h4 class="font-semibold text-xs mb-1">อะไหล่ที่เบิกจากคลัง</h4>
+        <p class="text-[11px] text-slate-400 mb-2">
+          เฉพาะของที่มีรหัสในคลัง — คลังเอารหัสพวกนี้ไปตัดสต๊อก
+          และไปขึ้นในกล่อง "อุปกรณ์และอะไหล่" ของ FM-MT-04</p>
+        <div id="mParts" class="space-y-2">${(prs.length ? prs : [null]).map(partRow).join("")}</div>
+        <button type="button" class="chip mt-2" data-part="add">+ เพิ่มอีกรหัส</button>
+      </div>
+
       ${/* ค่าใช้จ่ายที่ไม่ได้เบิกของจากคลัง — ซื้อจากซัพมาใส่ตรง ๆ หรือจ่ายแค่ค่าบริการ
             แยกจากตารางอะไหล่ เพราะแผ่น "อะไหล่ตัดสต๊อก" ที่ส่งให้คลังต้องมีแต่รหัสที่คลังมีจริง */ ""}
       <div class="border-t border-dashed border-slate-200 pt-3">
         <h4 class="font-semibold text-xs mb-1">💰 รายการค่าใช้จ่าย (ไม่ต้องมีรหัสอะไหล่)</h4>
         <p class="text-[11px] text-slate-400 mb-2">
           ของที่ซื้อจากซัพ ค่าบริการร้านนอก ค่าขนส่ง — ใส่ได้เลยโดยไม่ต้องมีรหัสในคลัง
-          · ใส่แล้วระบบบวกเป็นยอด "ค่าใช้จ่าย" ของใบนี้ให้เอง</p>
+          · ยอด "ค่าใช้จ่าย" ของใบนี้คือผลบวกของรายการตรงนี้ ระบบบวกให้เอง</p>
         <div id="mCosts" class="space-y-2">${
           (costList(t.cost_items).length ? costList(t.cost_items) : [null]).map(costRow).join("")}</div>
         <p id="mCostSum" class="text-[11px] text-slate-500 mt-2 font-semibold"></p>
         <button type="button" class="chip mt-2" data-cost="add">+ เพิ่มรายการค่าใช้จ่าย</button>
       </div>
+
+      ${/* ใบเก่าที่ลงยอดก้อนเดียวไว้ตั้งแต่ก่อนมีรายการย่อย ต้องยังแก้ยอดนั้นได้
+            ขึ้นเฉพาะตอนที่ยังไม่มีรายการย่อย — มีเมื่อไหร่ยอดเป็นผลบวก แก้ตรงนี้ไม่ได้แล้ว */ ""}
+      ${!costList(t.cost_items).length && Number(t.cost) ? `<div>
+        <label class="lbl" for="mCostBack">ยอดเดิมที่ลงไว้เป็นก้อนเดียว (บาท)</label>
+        <input id="mCostBack" type="number" min="0" step="1" class="inp num"
+               value="${Number(t.cost) || 0}">
+        <p class="text-[11px] text-slate-400 mt-1">
+          ใบนี้ลงยอดไว้ก่อนที่ระบบจะแยกรายการได้ · แก้ตัวเลขตรงนี้ได้เลย
+          หรือใส่เป็นรายการย่อยด้านบนแทน แล้วช่องนี้จะหายไปเอง</p>
+      </div>` : ""}
+
       ${t.status === STATUS.DONE ? downSelect("mDownBack", t) : ""}
       <div class="flex gap-2 flex-wrap">
-        <button type="button" class="chip" data-part="add">+ เพิ่มอีกรายการ</button>
-        <button class="btn" style="background:#0f766e" data-act="parts">
-          ${t.status === STATUS.DONE ? "บันทึกอะไหล่และค่าใช้จ่าย" : "บันทึกอะไหล่"}</button>
+        <button class="btn" style="background:#0f766e" data-act="parts">บันทึกอะไหล่และค่าใช้จ่าย</button>
       </div>
       <p class="text-[11px] text-slate-400">
-        ใส่ได้หลายรหัสต่อหนึ่งใบ · ${isLead()
-          ? "ใบที่ปิดไปแล้วก็ยังมาเติมย้อนหลังได้" : "ใบที่ปิดแล้วต้องให้หัวหน้างานเป็นคนแก้"} ทุกครั้งลงชีต Audit
-        ว่าใครแก้ จากอะไรเป็นอะไร · รหัสที่กรอกจะไปอยู่ในกล่อง "อุปกรณ์และอะไหล่" ของ FM-MT-04</p>
+        ปุ่มนี้บันทึกเฉพาะสองหัวข้อข้างบน — ลำดับความสำคัญกับผู้รับผิดชอบใช้ปุ่ม
+        "บันทึกการจัดการ" ของมันเอง · ${isLead()
+          ? "ใบที่ปิดไปแล้วก็ยังมาเติมย้อนหลังได้" : "ใบที่ปิดแล้วต้องให้หัวหน้างานเป็นคนแก้"}
+        ทุกครั้งลงชีต Audit ว่าใครแก้ จากอะไรเป็นอะไร</p>
     </div>`;
   }
 
@@ -2332,6 +2382,8 @@ function savePlan(id) {
   if (dueRaw) changes.due_at = new Date(dueRaw).toISOString();
   else if (priority === t.priority) changes.due_at = t.due_at || "";
 
+  if (warnUnsavedParts(t, "การจัดการงาน")) return;
+
   updateTicket(id, changes, `บันทึกการจัดการงาน ${id} แล้ว`);
 }
 
@@ -2339,19 +2391,11 @@ function savePlan(id) {
     เพราะ "ลบรายการที่ 2 ออก" บอกเป็นการแก้รายช่องไม่ได้ ต้องส่งรายการที่เหลือไปทั้งก้อน
     แถวที่ไม่ได้ใส่รหัสถือว่าแถวเปล่า ไม่ใช่ error — กด "เพิ่มอีกรายการ" แล้วไม่ได้ใช้เกิดขึ้นทุกวัน */
 function saveParts(id) {
-  const lines = $$("#mParts [data-part-row]").map((r) => {
-    const code = r.querySelector("[data-part-code]").value.trim();
-    const qty = r.querySelector("[data-part-qty]").value.trim();
-    return code ? `${code} x ${qty || 1}` : "";
-  }).filter(Boolean);
-  const costs = $$("#mCosts [data-cost-row]").map((r) => {
-    const note = r.querySelector("[data-cost-note]").value.trim();
-    const amt = r.querySelector("[data-cost-amt]").value.trim();
-    /* ไม่มีจำนวนเงินก็ยังส่งไป ให้ server เป็นคนบอกว่าบรรทัดไหนผิดรูปแบบ
-       ตัดทิ้งเงียบ ๆ ที่หน้าจอ แปลว่าคนกดบันทึกแล้วรายการหายไปโดยไม่รู้ตัว */
-    return note ? `${note} = ${amt || 0}` : "";
-  }).filter(Boolean);
-  const changes = { parts: lines.join("\n"), cost_items: costs.join("\n") };
+  const partText = partRowsText();
+  const lines = partText ? partText.split("\n") : [];
+  const costText = costRowsText();
+  const costs = costText ? costText.split("\n") : [];
+  const changes = { parts: partText, cost_items: costText };
   /* ช่องค่าใช้จ่ายตัวนี้มีเฉพาะใบที่ปิดแล้ว — เช็คว่ามีช่องอยู่บนจอไหม ไม่ใช่เช็คว่ามีค่าไหม
      แบบเดียวกับช่องผู้รับซ่อมภายนอก เพราะแก้ยอดกลับเป็น 0 ก็ต้องทำได้ */
   /* มีรายการย่อย = server บวกยอดเอง ส่ง cost ไปด้วยก็ถูกทับอยู่ดี
