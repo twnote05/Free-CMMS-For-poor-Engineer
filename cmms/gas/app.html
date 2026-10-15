@@ -980,6 +980,10 @@ function applyLock() {
   // ช่างที่ล็อกอินแล้วไม่ต้องเห็นปุ่มล็อกอินซ้ำในหน้าที่ยังเข้าไม่ได้ ให้เห็นเหตุผลอย่างเดียวพอ
   $("#lockLoginBtn").classList.toggle("hidden", on);
   $("#lockBadge").classList.toggle("hidden", !lead);
+  /* ภาระงานของคนอื่นเป็นเรื่องของหัวหน้า ไม่ใช่ของเพื่อนร่วมทีม
+     ซ่อนปุ่มอย่างเดียวไม่ใช่การกันสิทธิ์ — showTab เด้งกลับซ้ำอีกชั้น และหน้านี้
+     ยืม #tab-report ซึ่งถูกกันด้วย lead อยู่แล้วทั้งก้อน */
+  $("#navWorkload")?.classList.toggle("hidden", !lead);
   /* เมนูที่ไม่มีประโยชน์กับคนที่ยังไม่ล็อกอิน ให้หายไปเลยดีกว่าโชว์แล้วกดไม่ได้
      คนนอกที่เข้ามาแจ้งซ่อมจะเหลือแค่ 2 เมนูที่เขาใช้จริง — ติดตามสถานะ กับ แจ้งซ่อมใหม่ */
   $$(".needs-login").forEach((el) => el.classList.toggle("hidden", !on));
@@ -1564,6 +1568,8 @@ function openModal(id) {
 
   const due = dueInfo(t);
   let html = `
+    <div class="msec msec-read">
+    <h3>📄 รายละเอียดใบแจ้งซ่อม<span class="msec-tag">ดูอย่างเดียว</span></h3>
     <dl class="grid sm:grid-cols-2 gap-3">
       ${row("เครื่องจักร", t.machine_name)}
       ${t.machine_down ? row("สภาพเครื่องตอนแจ้ง",
@@ -1595,11 +1601,11 @@ function openModal(id) {
       <span class="${due.cls}">${esc(due.text)}</span>
       ${t.assignee ? `<span class="text-slate-500">· ผู้รับผิดชอบ ${esc(t.assignee)}</span>` : ""}
     </div>
-    <dl class="space-y-3 border-t border-slate-100 pt-4">
+    <dl class="space-y-3 border-t border-slate-200 pt-3 mt-3">
       ${row("รายละเอียดอาการ", symptom(t))}
       ${t.description && t.cause ? row("สาเหตุ", t.cause) : ""}
       ${row("ความต้องการ", t.action_needed)}
-    </dl>`;
+    </dl></div>`;
 
   if (t.image_url) {
     html += `<a href="${esc(t.image_url)}" target="_blank" rel="noopener"
@@ -1615,8 +1621,8 @@ function openModal(id) {
 
   /* ช่างซ่อมบำรุง — ต้องล็อกอินเพราะ apiUpdateTicket บังคับ token แล้ว */
   if (t.status === STATUS.WAIT || t.status === STATUS.REPAIR || t.status === STATUS.OUT) {
-    html += isUnlocked() ? `<div class="border-t border-slate-100 pt-4 space-y-3">
-      <h3 class="font-bold text-sm">🔧 สำหรับช่างซ่อมบำรุง</h3>
+    html += isUnlocked() ? `<div class="msec msec-tech space-y-3">
+      <h3>🔧 สำหรับช่างซ่อมบำรุง<span class="msec-tag">กรอกข้อมูล</span></h3>
       <!-- เคยเป็นช่องพิมพ์อิสระ ชื่อคนเดียวกันจึงกระจายเป็นหลายแบบ ("ชล" / "ช่างชล" / "ชล+ตั้ม")
            จนสถิติรายคนเชื่อไม่ได้ — ปัญหาเดียวกับชื่อเครื่องจักรที่เคยแตก 117 แบบ
            งานที่ส่งออกไปข้างนอกมีช่อง "ผู้รับซ่อมภายนอก" อยู่แล้ว จึงไม่ต้องเปิดให้พิมพ์ชื่อร้านตรงนี้ -->
@@ -1672,14 +1678,14 @@ function openModal(id) {
         <button class="btn" style="background:#0284c7" data-act="tech" data-next="${esc(STATUS.VERIFY)}">
           ✓ ซ่อมเสร็จ — ส่งให้ฝ่ายผลิตตรวจสอบ</button>
       </div></div>`
-    : `<div class="border-t border-slate-100 pt-4 text-sm text-slate-500">
+    : `<div class="msec msec-read text-sm text-slate-500">
         🔒 ต้องเข้าสู่ระบบก่อนจึงจะบันทึกผลการซ่อมได้</div>`;
   }
 
   /* ISO Verification Sign-off — เปิดให้ฝ่ายผลิตทำได้โดยไม่ต้องล็อกอิน */
   if (t.status === STATUS.VERIFY) {
-    html += `<div class="border-t border-slate-100 pt-4 space-y-3 bg-sky-50 -mx-5 -mb-5 px-5 py-4">
-      <h3 class="font-bold text-sm">🔍 การตรวจรับงานตามมาตรฐาน ISO</h3>
+    html += `<div class="msec msec-tech space-y-3">
+      <h3>🔍 การตรวจรับงานตามมาตรฐาน ISO<span class="msec-tag">กรอกข้อมูล</span></h3>
       <div><label class="lbl" for="mVerifier">ชื่อผู้ตรวจรับงาน <b class="req">*</b></label>
         <input id="mVerifier" class="inp" placeholder="ชื่อ-นามสกุล ผู้ตรวจรับ"></div>
       <div id="mStarsWrap">
@@ -1716,11 +1722,11 @@ function openModal(id) {
 
   /* ⏱ ลงเวลาย้อนหลัง — ขึ้นทั้งใบที่ยังเปิดและใบที่ปิดไปแล้ว เพราะกรณีที่ต้องแก้จริง ๆ
      ส่วนใหญ่รู้ตัวตอนมาปิดยอดสิ้นเดือน ซึ่งใบปิดไปนานแล้ว
-     วางก่อนกล่องเขียว "ซ่อมเสร็จสมบูรณ์" เพราะกล่องนั้นมี -mb-5 ไว้ชิดขอบล่างของ modal
+     วางก่อนกล่องเขียว "ซ่อมเสร็จสมบูรณ์" ซึ่งเป็นผลลัพธ์ที่จบแล้ว ควรอยู่ท้ายสุด
      ปุ่มนี้ไม่ใช่การกันสิทธิ์ — apiUpdateTicket ตรวจ LEAD ซ้ำเองที่ server */
   if (isLead() && !isDead(t)) {
-    html += `<div class="border-t border-slate-100 pt-4 space-y-3">
-      <h3 class="font-bold text-sm">⏱ ลงเวลาย้อนหลัง</h3>
+    html += `<div class="msec msec-time space-y-3">
+      <h3>⏱ ลงเวลาย้อนหลัง<span class="msec-tag">กรอกข้อมูล</span></h3>
       <div class="grid sm:grid-cols-2 gap-3">
         <div><label class="lbl" for="mStart">เวลาเริ่มซ่อมจริง</label>
           <input id="mStart" type="datetime-local" class="inp" value="${dtLocal(t.started_at)}"></div>
@@ -1742,8 +1748,8 @@ function openModal(id) {
      ปุ่มนี้ไม่ใช่การกันสิทธิ์ — 'parts' อยู่ใน LEAD_ONLY_FIELDS, server ตรวจ LEAD ซ้ำเอง */
   if (isUnlocked() && !isDead(t) && (isLead() || t.status !== STATUS.DONE)) {
     const prs = partList(t.parts);
-    html += `<div class="border-t border-slate-100 pt-4 space-y-3">
-      <h3 class="font-bold text-sm">🔩 อะไหล่และค่าใช้จ่าย</h3>
+    html += `<div class="msec msec-parts space-y-3">
+      <h3>🔩 อะไหล่และค่าใช้จ่าย<span class="msec-tag">กรอกข้อมูล</span></h3>
 
       <div>
         <h4 class="font-semibold text-xs mb-1">อะไหล่ที่เบิกจากคลัง</h4>
@@ -1791,8 +1797,8 @@ function openModal(id) {
   }
 
   if (t.status === STATUS.DONE) {
-    html += `<div class="border-t border-slate-100 pt-4 bg-green-50 -mx-5 -mb-5 px-5 py-4 text-sm">
-      <b class="text-green-800">✅ ซ่อมเสร็จสมบูรณ์</b>
+    html += `<div class="msec msec-done text-sm">
+      <h3>✅ ซ่อมเสร็จสมบูรณ์<span class="msec-tag">ดูอย่างเดียว</span></h3>
       <dl class="grid sm:grid-cols-2 gap-3 mt-2">
         ${row("ผู้เข้าซ่อม", t.technician)}
         ${row("การซ่อม", t.repair_action)}
@@ -1808,8 +1814,8 @@ function openModal(id) {
   // เดิมเช็คแค่ isUnlocked() ช่างจึงเห็นแผงนี้ กรอกเสร็จแล้วค่อยโดน server ปฏิเสธ
   if (isLead() && t.status !== STATUS.DONE) {
     const localDue = dtLocal(t.due_at);
-    html += `<div class="border-t border-slate-100 pt-4 space-y-3">
-      <h3 class="font-bold text-sm">📋 การจัดการงาน</h3>
+    html += `<div class="msec msec-plan space-y-3">
+      <h3>📋 การจัดการงาน<span class="msec-tag">กรอกข้อมูล</span></h3>
       <div class="grid sm:grid-cols-3 gap-3">
         <div><label class="lbl" for="mPri">ลำดับความสำคัญ</label>
           <select id="mPri" class="inp">${PRIORITIES.map((x) =>
@@ -1846,8 +1852,8 @@ function openModal(id) {
   /* ใบที่ยกเลิกไปแล้ว — ไม่ต้องมีแผงจัดการงานให้กรอก เหลือแค่เหตุผลกับปุ่มกู้คืน
      วางไว้นอก if ข้างบนเพราะแผงนั้นตัดใบที่ปิดแล้วทิ้งไป และใบที่ยกเลิกก็ถือว่าปิดเหมือนกัน */
   if (isDead(t)) {
-    html += `<div class="border-t border-slate-100 pt-4 bg-slate-50 -mx-5 -mb-5 px-5 py-4 text-sm">
-      <b class="text-slate-600">🗑 ใบนี้ถูกยกเลิกแล้ว</b>
+    html += `<div class="msec msec-danger text-sm">
+      <h3>🗑 ใบนี้ถูกยกเลิกแล้ว<span class="msec-tag">ดูอย่างเดียว</span></h3>
       <p class="mt-1">${esc(t.cancel_reason) || "— ไม่ได้ระบุเหตุผล —"}</p>
       ${isLead() ? `<button class="btn mt-3" style="background:#0284c7" data-act="restore">↩ กู้คืนใบนี้</button>`
                  : `<p class="text-xs text-slate-400 mt-2">กู้คืนได้เฉพาะหัวหน้างาน</p>`}
@@ -2570,6 +2576,17 @@ function render() {
   const pill = $("#navCountOpen");
   pill.textContent = open;
   pill.classList.toggle("zero", open === 0);
+
+  /* ตัวเลขบนเมนูภาระงานช่าง — นับใบที่ยังไม่ปิดและมอบหมายให้ใครแล้ว
+     ใบที่ยังไม่มอบหมายไม่ใช่ภาระของใคร มันคือคิวที่หัวหน้ายังไม่ได้จ่าย
+     ซึ่งหน้านั้นมีการ์ดของตัวเองนับไว้ให้อยู่แล้ว */
+  const wl = $("#navWlOpen");
+  if (wl) {
+    const assigned = tickets.filter((t) =>
+      t.status !== STATUS.DONE && !isDead(t) && nameList(t.assignee).length).length;
+    wl.textContent = assigned;
+    wl.classList.toggle("zero", assigned === 0);
+  }
 
   renderMine();
   renderDashboard();
@@ -7346,32 +7363,37 @@ const PAGE = {
   create: ["แจ้งซ่อมใหม่", "กรอกใบแจ้งซ่อมและแนบรูปถ่าย"],
   report: ["Dashboard Summary", "จำนวน · ค่าใช้จ่าย · ซ่อมซ้ำ · Heatmap · Ranking · ภาระงานช่าง"],
   kpi:    ["KPI", "ตัวชี้วัดของแผนก และของแต่ละตำแหน่ง · กดดูที่มาของทุกตัวเลขได้"],
+  workload: ["ภาระงานช่าง", "ใครถืองานอยู่กี่ใบ · ค้างสถานะไหน · เลยกำหนดกี่ใบ — กดชื่อเพื่อดูใบของคนนั้น"],
 };
 
 /* ต้องตรงกับคลาส needs-login ใน index.html — กันคนพิมพ์เรียกตรงๆ ตอนเมนูถูกซ่อน */
-const NEED_LOGIN = ["mine", "param", "check", "report", "qr", "pm", "kpi", "mlog"];
+const NEED_LOGIN = ["mine", "param", "check", "report", "qr", "pm", "kpi", "mlog", "workload"];
 let currentTab = "list";
 
 /* เมนู "KPI" กับ "Dashboard Summary" ใช้ panel เดียวกัน (#tab-report) ต่างกันแค่โชว์อะไรบ้าง
    ไม่ก๊อป DOM ออกมาเป็นอีกหน้า เพราะตัวเลือกช่วงเวลา/ปุ่ม Export/โมดอลรายละเอียด
    จะกลายเป็น id ซ้ำกันทั้งชุด ซึ่งเป็นคลาสของบั๊กที่โปรเจคนี้โดนมาแล้ว ($() คืนตัวแรกเสมอ) */
-const panelOf = (name) => (name === "kpi" ? "report" : name);
+/* เมนูที่ยืมหน้า Dashboard มาโชว์แท็บย่อยเดียว แล้วซ่อนแถบแท็บย่อยทิ้ง
+   ค่าคือชื่อแท็บย่อยที่จะถูกล็อกไว้ ไม่ใช่แค่ true/false จะได้ไม่ต้องมีตัวแปรต่อเมนู */
+const SOLO_SUB = { kpi: "kpi", workload: "workload" };
+const panelOf = (name) => (SOLO_SUB[name] ? "report" : name);
 let kpiOnly = false;
 
 function showTab(name) {
   // กดเมนูนี้ตอนยังไม่ล็อกอินก็ยังไม่รู้ว่า "ฉัน" คือใคร ชวนล็อกอินก่อน
   if (NEED_LOGIN.includes(name) && !ME) { openLogin(); name = "list"; }
   currentTab = name;
+  const solo = SOLO_SUB[name] || "";
   kpiOnly = name === "kpi";
   $$(".tab-panel").forEach((el) => el.classList.toggle("hidden", el.id !== "tab-" + panelOf(name)));
   $("#tab-report").dataset.active = panelOf(name) === "report" ? "1" : "0";
-  // เข้าทางเมนู KPI ให้ซ่อนแถบแท็บย่อย และบังคับอยู่ที่ KPI เสมอ
-  $("#subTabs").hidden = kpiOnly;
+  // เข้าทางเมนูที่มีแท็บย่อยเดียว ให้ซ่อนแถบแท็บย่อย และบังคับอยู่ที่แท็บนั้นเสมอ
+  $("#subTabs").hidden = !!solo;
   /* ซ่อนแถบเลือก KPI ตรงนี้ด้วย ไม่ใช่รอให้ paintKpiPick ทำ —
      กลับไปหน้า Dashboard เต็มแล้ว panelKpi ไม่ถูกเรียก แถบจึงค้างอยู่บนหน้าอื่น */
   $("#kpiPickBar").hidden = !kpiOnly;
   if (!kpiOnly) { $("#kpiInline").hidden = true; $("#rolePanel").hidden = true; }
-  if (kpiOnly) subTab = "kpi";
+  if (solo) subTab = solo;
   $$(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   const [title, sub] = PAGE[name] || ["", ""];
   $("#pageTitle").textContent = title;
@@ -7386,7 +7408,9 @@ function showTab(name) {
   if (name === "qr") renderQr();
   if (panelOf(name) === "report") {
     if (!isLead()) return;
-    if (!kpiOnly && subTab === "kpi") subTab = "overview";   // กลับมาหน้า Dashboard เต็ม
+    // เผื่อมีคนเรียก showTab("workload") ตรง ๆ ตอนยังไม่ใช่หัวหน้า
+    // กลับมาหน้า Dashboard เต็ม — แท็บที่มีเมนูของตัวเองแล้วต้องไม่ค้างอยู่ตรงนี้
+    if (!solo && SOLO_SUB[subTab]) subTab = "overview";
     showSubTab(subTab);
   }
 }
@@ -7632,10 +7656,9 @@ const SUB_TABS = [
   ["repeat",   "🔁 รายการซ่อมซ้ำ"],
   ["heat",     "🔥 Heatmap"],
   ["rank",     "🏆 Machine Ranking"],
-  ["workload", "🧑‍🔧 ภาระงานช่าง"],
   ["improve",  "🔬 วิเคราะห์เพื่อปรับปรุง"],
   ["feedback", "💬 ความคิดเห็น"],
-  /* ไม่มี KPI ในแถบนี้แล้ว — เมนู KPI แยกออกมาเป็นหน้าของตัวเองแล้ว
+  /* ไม่มี KPI กับ ภาระงานช่าง ในแถบนี้แล้ว — ทั้งคู่แยกออกมาเป็นเมนูของตัวเองแล้ว
      ซ้ำสองที่ทำให้แถบยาวจนล้นขอบจอ และคนกดเข้าได้สองทางโดยไม่รู้ว่าต่างกันตรงไหน
      พาเนล #sub-kpi ยังอยู่ — เมนู KPI ใช้มันผ่าน showTab("kpi") */
 ];

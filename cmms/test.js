@@ -2406,8 +2406,32 @@ function paramGas() {
   assert.ok(subs, "หา SUB_TABS ไม่เจอ");
   assert.ok(!/\["kpi"/.test(subs[1]), "Dashboard Summary ต้องไม่มีแท็บย่อย KPI ซ้ำกับเมนู KPI");
   assert.ok(idx.includes('id="sub-kpi"'), "พาเนล #sub-kpi ต้องยังอยู่ — เมนู KPI ใช้มัน");
-  assert.ok(/if \(!kpiOnly && subTab === "kpi"\) subTab = "overview"/.test(app),
-    "กลับมา Dashboard ต้องรีเซ็ตแท็บย่อย ไม่งั้นค้างที่พาเนล KPI โดยไม่มีปุ่มไหน active");
+  assert.ok(/if \(!solo && SOLO_SUB\[subTab\]\) subTab = "overview"/.test(app),
+    "กลับมา Dashboard ต้องรีเซ็ตแท็บย่อย ไม่งั้นค้างที่พาเนลของเมนูอื่นโดยไม่มีปุ่มไหน active");
+
+  /* ═══ ภาระงานช่าง — เมนูของตัวเอง เฉพาะหัวหน้างานขึ้นไป ═══
+     ใช้ท่าเดียวกับ KPI เป๊ะ ๆ ทั้งคู่ยืม #tab-report มาโชว์แท็บย่อยเดียว
+     ถ้าวันหนึ่งมีเมนูที่สามมาใช้ท่านี้ ต้องเพิ่มใน SOLO_SUB ที่เดียว */
+  assert.ok(idx.includes('data-tab="workload"'), "ต้องมีปุ่มเมนูภาระงานช่าง");
+  assert.ok(app.includes('workload: ["ภาระงานช่าง"'), "ต้องมีชื่อหน้าของเมนูภาระงานช่าง");
+  assert.ok(/NEED_LOGIN = \[[^\]]*"workload"/.test(app), "หน้าภาระงานช่างต้องบังคับล็อกอิน");
+  assert.ok(!/\["workload"/.test(subs[1]),
+    "Dashboard Summary ต้องไม่มีแท็บย่อยภาระงานช่างซ้ำกับเมนูใหม่");
+  assert.ok(idx.includes('id="sub-workload"'), "พาเนล #sub-workload ต้องยังอยู่ — เมนูใหม่ใช้มัน");
+
+  const solo = app.match(/const SOLO_SUB = \{([^}]*)\}/);
+  assert.ok(solo, "หา SOLO_SUB ไม่เจอ");
+  assert.ok(/kpi:\s*"kpi"/.test(solo[1]) && /workload:\s*"workload"/.test(solo[1]),
+    "ทั้ง KPI และภาระงานช่างต้องอยู่ใน SOLO_SUB");
+  assert.ok(/panelOf = \(name\) => \(SOLO_SUB\[name\] \? "report" : name\)/.test(app),
+    "ทั้งสองเมนูต้องชี้กลับไปที่ #tab-report ไม่ใช่ก๊อป DOM ออกมาเป็นอีกหน้า");
+
+  /* หัวหน้าเท่านั้น — ซ่อนปุ่มไม่ใช่การกันสิทธิ์ แต่ชั้นจริงคือ #tab-report
+     ที่ applyLock ซ่อนทั้งก้อนเมื่อไม่ใช่ lead และ showTab ที่ return ก่อนวาด */
+  assert.ok(/\$\("#navWorkload"\)\?\.classList\.toggle\("hidden", !lead\)/.test(app),
+    "เมนูภาระงานช่างต้องขึ้นเฉพาะหัวหน้างานขึ้นไป");
+  assert.ok(/if \(panelOf\(name\) === "report"\) \{\s*\n\s*if \(!isLead\(\)\) return;/.test(app),
+    "showTab ต้องกันซ้ำอีกชั้น ไม่ใช่เชื่อว่าปุ่มถูกซ่อนไปแล้ว");
 
   /* ทุกคีย์ในรายการ "ดูทีละตัว" ต้องเป็นคีย์ที่ kpiDrill รู้จักจริง
      ไม่งั้นเลือกแล้วหน้าเงียบ ไม่มีอะไรขึ้น และไม่มี error ให้เห็นด้วย */
@@ -3562,4 +3586,110 @@ console.log("OK — ผ่านทั้งหมด");
     "เงื่อนไขต้องเช็คทั้งค่าที่ส่งมาและค่าเดิมในแถว");
   assert.ok(branch.slice(0, 600).includes("work.cost = 0"),
     "ลบรายการย่อยออกหมดต้องล้างยอดเป็น 0 เฉพาะใบที่เคยมีรายการย่อยเท่านั้น");
+}
+
+
+/* ═══ เช็คชีตของเครื่องจักรรอง — ปั๊มลม และห้องอินเวอร์เตอร์โซล่าเซลล์ ═══
+   หัวคอลัมน์ข้างล่างคัดมาจากไฟล์คำตอบจริง ไม่ได้แต่งขึ้น
+   ฟอร์มสองใบนี้ไม่เข้าแม่พิมพ์ "หนึ่งแถว = หนึ่งเครื่อง" ที่ฟอร์มสายผลิตใช้ */
+{
+  const gas = {};
+  vm.runInNewContext(fs.readFileSync("gas/Code.gs", "utf8"), gas);
+  /* dayKey_ เรียกของสองตัวนี้ของ Apps Script — ใส่ตัวแทนให้พอทำงานในเทสต์ */
+  gas.Session = { getScriptTimeZone: () => "Asia/Bangkok" };
+  gas.Utilities = { formatDate: (d) =>
+    [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"),
+     String(d.getDate()).padStart(2, "0")].join("-") };
+  const { checkMeta_, checkMapMachine_, checkItemHead_ } = gas;
+
+  /* ── ปั๊มลม: ชื่อคอลัมน์คือ "เครื่องที่เข้าตรวจสอบ" ไม่ใช่ "เครื่องจักร" ── */
+  const airHead = ["ประทับเวลา", "คำถามไม่ระบุชื่อ", "วันที่ตรวจสอบ", "กะการทำงาน",
+    "ช่างซ่อมบำรุง", "เครื่องที่เข้าตรวจสอบ",
+    "รายการตรวจสอบ ปั๊มลม 40 แรง ROTORCOMP [ระดับน้ำมันปกติ]",
+    "สถานะเครื่องจักรอุปกรณ์"];
+  const am = checkMeta_(airHead);
+  assert.strictEqual(am.machine, 5, '"เครื่องที่เข้าตรวจสอบ" ต้องถูกอ่านเป็นคอลัมน์ชื่อเครื่อง');
+  assert.strictEqual(am.by, 4, '"ช่างซ่อมบำรุง" คือคนตรวจของฟอร์มเครื่องจักรรอง');
+  assert.strictEqual(am.status, 7);
+
+  /* ── ห้องอินเวอร์เตอร์: ไม่มีคอลัมน์ชื่อเครื่องเลย ──
+     ของเดิมไปคว้า "สถานะเครื่องจักรอุปกรณ์" มาเป็นชื่อเครื่อง เพราะมีคำว่า
+     "เครื่องจักร" อยู่ข้างใน แล้วหน้าจอขึ้นว่าเครื่องชื่อ "ปกติ" กับ "ผิดปกติ" */
+  const invHead = ["ประทับเวลา", "คำถามไม่ระบุชื่อ", "วันที่ตรวจสอบ", "กะการทำงาน",
+    "ตู้ควบคุมระบบ [ไฟสถานะปกติ]", "ช่างซ่อมบำรุง", "สถานะเครื่องจักรอุปกรณ์"];
+  const im = checkMeta_(invHead);
+  assert.strictEqual(im.machine, -1,
+    'คอลัมน์ "สถานะเครื่องจักรอุปกรณ์" ไม่ใช่ชื่อเครื่อง ห้ามถูกจับมาเป็นชื่อเครื่อง');
+  assert.strictEqual(im.status, 6, "แต่ยังต้องถูกอ่านเป็นคอลัมน์สถานะตามเดิม");
+  assert.strictEqual(im.by, 5);
+
+  /* ── ฟอร์มสายผลิตเดิมต้องไม่เปลี่ยนพฤติกรรม ── */
+  const extHead = ["ประทับเวลา", "หากพบความผิดปกติให้เพิ่มรูป", "วันที่ผลิต", "เครื่องจักร",
+    "ชุดหัวดาย [อุณหภูมิปกติ]", "สถานะเครื่องจักร", "ผู้ตรวจ"];
+  const em = checkMeta_(extHead);
+  assert.strictEqual(em.machine, 3, 'ฟอร์มที่มีคอลัมน์ "เครื่องจักร" จริง ต้องยังอ่านได้เหมือนเดิม');
+  assert.strictEqual(em.status, 5);
+  assert.strictEqual(em.by, 6);
+
+  /* ── กฎจับคู่หมวดกับเครื่อง ── */
+  const rules = [
+    { group: "40 แรง", machine: "ปั๊มลม ROTORCOMP 40HP" },
+    { group: "60 แรง", machine: "ปั๊มลม AirHorse 60HP" },
+    { group: "100 แรง", machine: "ปั๊มลม JAGUAR 100HP" },
+  ];
+  assert.strictEqual(checkMapMachine_(rules, "รายการตรวจสอบ ปั๊มลม 40 แรง ROTORCOMP"),
+    "ปั๊มลม ROTORCOMP 40HP");
+  assert.strictEqual(checkMapMachine_(rules, "รายการตรวจสอบ ปั๊มลม 100 แรง JAGUAR ZLS100-2iC 100 HP"),
+    "ปั๊มลม JAGUAR 100HP");
+  assert.strictEqual(checkMapMachine_(rules, "รายการตรวจสอบ Air Dryer"), "",
+    "หมวดที่ยังไม่ได้จับคู่ ต้องไม่ถูกยัดไปรวมกับเครื่องตัวใดตัวหนึ่ง");
+
+  /* เว้นหัวข้อหมวดว่าง = ทั้งชีตเป็นเครื่องตัวนั้น — เคสห้องอินเวอร์เตอร์ */
+  const wide = [{ group: "", machine: "ห้องอินเวอร์เตอร์โซล่าเซลล์" }];
+  assert.strictEqual(checkMapMachine_(wide, "ตู้ Data Log ระบบโซล่าเซลล์"),
+    "ห้องอินเวอร์เตอร์โซล่าเซลล์");
+  assert.strictEqual(checkMapMachine_(wide, "อะไรก็ได้"), "ห้องอินเวอร์เตอร์โซล่าเซลล์");
+
+  /* หมวดที่ระบุไว้ต้องชนะกฎทั้งชีตเสมอ ไม่ว่าจะเรียงลำดับไหนในชีตตั้งค่า */
+  const mixed = [{ group: "", machine: "ทั้งห้อง" }, { group: "Power Quality", machine: "มิเตอร์" }];
+  assert.strictEqual(checkMapMachine_(mixed, "Power Quality Meter"), "มิเตอร์");
+  assert.strictEqual(checkMapMachine_(mixed, "ตู้ควบคุมระบบ"), "ทั้งห้อง");
+
+  /* ── แตกหนึ่งแถวเป็นหลายเครื่อง — เรียก checkFormRows_ จริง โดยสลับตัวอ่านชีต ── */
+  gas.checkMachineMap_ = () => ({ "Air pump": rules });
+  const head = ["ประทับเวลา", "ช่างซ่อมบำรุง",
+    "รายการตรวจสอบ ปั๊มลม 40 แรง ROTORCOMP [ระดับน้ำมันปกติ]",
+    "รายการตรวจสอบ ปั๊มลม 40 แรง ROTORCOMP [ไม่มีเสียงผิดปกติ]",
+    "รายการตรวจสอบ ปั๊มลม 60 แรง AirHorse [ระดับน้ำมันปกติ]",
+    "รายการตรวจสอบ ปั๊มลม 100 แรง JAGUAR [ระดับน้ำมันปกติ]",
+    "รายการตรวจสอบ Air Dryer [ไส้กรองสะอาด]"];
+  const when = new Date(2026, 9, 15, 8, 30);
+  gas.checkFormSheets_ = () => [{
+    sh: { getName: () => "Air pump", getDataRange: () => ({ getValues: () => [head,
+      // ช่างตรวจปั๊ม 40 กับ 100 ส่วน 60 ไม่ได้แตะ · Air Dryer ยังไม่ได้จับคู่
+      [when, "ช่างกัส", "ปกติ", "ไม่ปกติ", "", "ปกติ", "ปกติ"]] }) },
+    head: head, meta: checkMeta_(head), rules: rules,
+  }];
+
+  const rows = gas.checkFormRows_("2026-10-15", "2026-10-15");
+  assert.strictEqual(rows.length, 2, "ใบเดียวต้องแตกเป็นสองรายการ — ปั๊มที่ไม่ได้ตรวจต้องไม่โผล่");
+  const byName = {};
+  rows.forEach((r) => { byName[r["เครื่องจักร"]] = r; });
+  assert.ok(byName["ปั๊มลม ROTORCOMP 40HP"] && byName["ปั๊มลม JAGUAR 100HP"]);
+  assert.ok(!byName["ปั๊มลม AirHorse 60HP"], "ปั๊มที่ช่างไม่ได้กรอกต้องไม่ถูกนับเป็นใบตรวจ");
+
+  const r40 = byName["ปั๊มลม ROTORCOMP 40HP"];
+  assert.strictEqual(r40.__done, 2);
+  assert.strictEqual(r40.__bad, 1, "ข้อที่ตกของปั๊ม 40 ต้องไม่ไปนับรวมกับปั๊มตัวอื่น");
+  assert.strictEqual(r40["ผลการตรวจ"], "ผิดปกติ");
+  assert.strictEqual(r40["ผู้ตรวจ"], "ช่างกัส");
+
+  const r100 = byName["ปั๊มลม JAGUAR 100HP"];
+  assert.strictEqual(r100.__done, 1);
+  assert.strictEqual(r100.__bad, 0, "ปั๊มที่ปกติ ต้องไม่ติดสถานะผิดปกติของตัวอื่น");
+  assert.strictEqual(r100["ผลการตรวจ"], "ปกติ");
+
+  // Air Dryer ยังไม่ได้จับคู่กับเครื่องไหน ต้องไม่ไปโผล่ในกองของใคร
+  const all = rows.reduce((a, r) => a + r.__done, 0);
+  assert.strictEqual(all, 3, "ข้อของหมวดที่ยังไม่ได้จับคู่ ต้องไม่ถูกนับให้เครื่องใดเลย");
 }

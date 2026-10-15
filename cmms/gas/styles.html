@@ -506,6 +506,68 @@ tr.row-dead:hover { opacity: 1; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ─────────── PRINT ─────────── */
+
+/* ═══ ส่วนของหน้าต่างใบแจ้งซ่อม — แยก "ดู" ออกจาก "กรอก" ด้วยสี ═══
+   ใบหนึ่งยาวหลายจอและปนสองเรื่องนี้สลับกันไปมา ถ้าทุกส่วนหน้าตาเหมือนกันหมด
+   คนจะกรอกผิดช่องและกดปุ่มบันทึกผิดตัว ซึ่งเกิดขึ้นจริงมาแล้ว
+
+   สีไม่ได้เลือกมั่ว — ใช้ชุดเดียวกับป้ายสถานะ (.badge-*) ที่คนในโรงงานคุ้นอยู่แล้ว
+   ฟ้า = งานช่าง · เขียวน้ำทะเล = เวลา · เหลือง = ของและเงิน · ม่วง = งานบริหาร
+   ไม่พึ่งสีอย่างเดียว — ทุกหัวข้อมีป้ายข้อความกำกับว่าดูหรือกรอก เผื่อคนตาบอดสี */
+.msec { border-radius: 10px; padding: 14px 16px; margin-top: 14px;
+        border: 1px solid #e2e8f0; border-left-width: 4px; }
+.msec > h3 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+             font-weight: 700; font-size: 13px; margin-bottom: 10px; }
+/* ป้ายบอกหน้าที่ของส่วนนั้น ไม่ใช่ของตกแต่ง — คนตาบอดสีอ่านอันนี้แทนสี */
+.msec-tag { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 99px;
+            background: rgba(255,255,255,.75); border: 1px solid currentColor; }
+
+/* ดูอย่างเดียว — ไม่มีพื้นสี ไม่มีขอบซ้ายหนา จะได้ไม่แย่งสายตากับส่วนที่ต้องกรอก */
+.msec-read { background: #fff; border-left-color: #cbd5e1; }
+.msec-read > h3 { color: #475569; }
+
+/* กรอกข้อมูล — มีพื้นสีอ่อนและขอบซ้ายหนา เห็นปุ๊บรู้ว่าต้องลงมือ */
+.msec-tech  { background: #f0f9ff; border-color: #bae6fd; border-left-color: #0284c7; }
+.msec-tech  > h3 { color: #075985; }
+.msec-time  { background: #f0fdfa; border-color: #99f6e4; border-left-color: #0f766e; }
+.msec-time  > h3 { color: #115e59; }
+.msec-parts { background: #fffbeb; border-color: #fde68a; border-left-color: #d97706; }
+.msec-parts > h3 { color: #92400e; }
+.msec-plan  { background: #faf5ff; border-color: #e9d5ff; border-left-color: #7c3aed; }
+.msec-plan  > h3 { color: #5b21b6; }
+.msec-danger { background: #fef2f2; border-color: #fecaca; border-left-color: #dc2626; }
+.msec-danger > h3 { color: #991b1b; }
+/* ผลลัพธ์ที่จบแล้ว — เขียวแบบเดียวกับป้าย "ซ่อมเสร็จสมบูรณ์" */
+.msec-done  { background: #f0fdf4; border-color: #bbf7d0; border-left-color: #16a34a; }
+.msec-done  > h3 { color: #166534; }
+
+/* หัวข้อย่อยในส่วนเดียวกัน (อะไหล่ / รายการค่าใช้จ่าย) */
+.msec h4 { font-weight: 600; font-size: 12px; margin-bottom: 4px; }
+
+@media (max-width: 767px) {
+  .msec { padding: 12px; margin-top: 12px; }
+}
+
+/* โหมดมืด — สีเดิมแต่โปร่ง ไม่ใช่กล่องขาวลอยบนพื้นดำ
+   ตัวอักษรหัวข้อต้องสว่างขึ้น ไม่งั้นน้ำเงินเข้มบนพื้นเข้มอ่านไม่ออก */
+[data-theme="dark"] .msec { border-color: #334155; }
+[data-theme="dark"] .msec-tag { background: rgba(0,0,0,.25); }
+[data-theme="dark"] .msec-read  { background: rgba(148,163,184,.06); border-left-color: #64748b; }
+[data-theme="dark"] .msec-read  > h3 { color: #cbd5e1; }
+[data-theme="dark"] .msec-tech  { background: rgba(2,132,199,.12);  border-color: #0c4a6e; }
+[data-theme="dark"] .msec-tech  > h3 { color: #7dd3fc; }
+[data-theme="dark"] .msec-time  { background: rgba(15,118,110,.12); border-color: #115e59; }
+[data-theme="dark"] .msec-time  > h3 { color: #5eead4; }
+[data-theme="dark"] .msec-parts { background: rgba(217,119,6,.12);  border-color: #78350f; }
+[data-theme="dark"] .msec-parts > h3 { color: #fcd34d; }
+[data-theme="dark"] .msec-plan  { background: rgba(124,58,237,.12); border-color: #4c1d95; }
+[data-theme="dark"] .msec-plan  > h3 { color: #c4b5fd; }
+[data-theme="dark"] .msec-danger { background: rgba(220,38,38,.12); border-color: #7f1d1d; }
+[data-theme="dark"] .msec-danger > h3 { color: #fca5a5; }
+[data-theme="dark"] .msec-done  { background: rgba(22,163,74,.12);  border-color: #14532d; }
+[data-theme="dark"] .msec-done  > h3 { color: #86efac; }
+
+
 @media print {
   .sidebar, #scrim, .app-header, #filterBar, .subtabs, #toast,
   .no-print { display: none !important; }

@@ -34,6 +34,7 @@ var SHEET_USERS    = 'Users';           // ชื่อ/คอลัมน์ต
 var SHEET_CHECK    = 'Daily Check';     // ชีตคำตอบของ Google Form เช็คชีตประจำวัน
 var SHEET_AUDIT    = 'Audit';           // บันทึกการแก้ไขย้อนหลัง
 var SHEET_HOLIDAY  = 'วันหยุด';         // วันหยุดของโรงงาน — ไม่ใช่วันหยุดราชการเสมอไป
+var SHEET_CHECKMAP = 'เช็คชีต-เครื่องจักร';   // ชีตคำตอบใบไหน = เครื่องอะไรในทะเบียน
 
 /* หัวคอลัมน์ Sheet1 — เรียงให้ตรงกับไฟล์ แจ้งซ่อม.xlsx เดิม */
 var HEADERS = [
@@ -665,6 +666,19 @@ function setup() {
 
   /* ถ้ายังไม่ได้ผูก Google Form ชีตนี้จะว่าง — พอผูกแล้ว Form จะเขียนหัวคอลัมน์ทับให้เอง */
   ensure_(SHEET_CHECK, ['ประทับเวลา', 'เครื่องจักร', 'ผู้ตรวจ', 'ผลการตรวจ', 'หมายเหตุ']);
+
+  /* ฟอร์มของเครื่องจักรรองไม่เข้าแม่พิมพ์ "หนึ่งแถว = หนึ่งเครื่อง" ที่ฟอร์มสายผลิตใช้
+     ปั๊มลมกรอกใบเดียวครอบสามตัว ส่วนห้องอินเวอร์เตอร์ทั้งใบคืออุปกรณ์ตัวเดียว
+     ไม่มีช่องให้เลือกเครื่องเลย — สองอย่างนี้โค้ดเดาเองไม่ได้ ต้องให้คนบอก
+
+     เว้น "หัวข้อหมวด" ว่าง = ทั้งชีตเป็นเครื่องตัวนั้น · ใส่ไว้ = เฉพาะหมวดที่ชื่อมีคำนี้
+     เทียบแบบ "มีคำนี้อยู่ข้างใน" ไม่ใช่ตรงเป๊ะ จะได้ไม่พังตอนมีคนไปแก้หัวข้อในฟอร์ม */
+  ensure_(SHEET_CHECKMAP,
+    ['ชีตคำตอบ', 'หัวข้อหมวด (เว้นว่าง = ทั้งชีต)', 'ชื่อเครื่องในทะเบียน'],
+    [['Invertor room', '', ''],
+     ['Air pump', '40 แรง', ''],
+     ['Air pump', '60 แรง', ''],
+     ['Air pump', '100 แรง', '']]);
 
   /* คอลัมน์เรียงตรงกับ Auth.gs ของโปรเจคระบบ Stock อะไหล่ (US = EMAIL,NAME,ROLE,ACTIVE,PIN,SALT,FAILED,LOCKED,PHOTO)
      ตอนนี้ใช้แค่ 4 คอลัมน์แรกทำ dropdown ผู้รับผิดชอบ — พอยก Auth.gs มาจะล็อกอินได้ทันทีโดยไม่ต้องย้ายข้อมูล
@@ -5387,8 +5401,10 @@ function checkSS_() {
 
 var CHECK_META = {
   ts:      ['ประทับเวลา', 'timestamp'],
-  machine: ['เครื่องจักร', 'machine'],
-  by:      ['ผู้ตรวจ', 'ผู้บันทึก', 'ชื่อผู้ตรวจ', 'อีเมล', 'email', 'ที่อยู่อีเมล'],
+  /* "เครื่องที่เข้าตรวจสอบ" คือชื่อที่ฟอร์มปั๊มลมใช้ ส่วนฟอร์มสายผลิตใช้ "เครื่องจักร" */
+  machine: ['เครื่องจักร', 'เครื่องที่เข้าตรวจสอบ', 'machine'],
+  /* ฟอร์มเครื่องจักรรองเรียกคนตรวจว่า "ช่างซ่อมบำรุง" ไม่ใช่ "ผู้ตรวจ" */
+  by:      ['ผู้ตรวจ', 'ผู้บันทึก', 'ชื่อผู้ตรวจ', 'ช่างซ่อมบำรุง', 'อีเมล', 'email', 'ที่อยู่อีเมล'],
   shift:   ['กะทำงาน', 'กะ', 'shift'],
   day:     ['วันที่ผลิต', 'วันที่'],
   photo:   ['เพิ่มรูป', 'รูป', 'หลักฐาน'],
@@ -5404,6 +5420,10 @@ function checkMeta_(head) {
     m[k] = -1;
     for (var i = 0; i < low.length; i++) {
       if (low[i].indexOf('[') > -1) continue;
+      /* "สถานะเครื่องจักรอุปกรณ์" มีคำว่า "เครื่องจักร" อยู่ข้างใน ฟอร์มที่ไม่มีคอลัมน์
+         ชื่อเครื่องจริงจึงเคยไปคว้าคอลัมน์สถานะมาเป็นชื่อเครื่อง แล้วหน้าจอขึ้นว่า
+         เครื่องชื่อ "ปกติ" กับ "ผิดปกติ" — ไม่มีอะไรฟ้องเพราะมันก็อ่านได้ปกติทุกอย่าง */
+      if (k === 'machine' && low[i].indexOf('สถานะ') > -1) continue;
       for (var j = 0; j < CHECK_META[k].length; j++) {
         if (low[i].indexOf(CHECK_META[k][j].toLowerCase()) > -1) { m[k] = i; return; }
       }
@@ -5431,14 +5451,49 @@ function checkAnswer_(v) {
   return 'note';                       // ตัวเลข/ข้อความ เช่น น้ำหนักสีของ UV
 }
 
+/* ชีตคำตอบใบไหนเป็นเครื่องอะไร — คืน { 'ชื่อชีต': [{group, machine}] }
+   แถวที่ยังไม่ได้ใส่ชื่อเครื่องถูกข้าม ตั้งค่าไม่ครบจึงเท่ากับยังไม่ได้ตั้ง
+   ไม่ใช่กลายเป็นเครื่องชื่อว่างที่ไปโผล่ในรายงาน */
+function checkMachineMap_() {
+  var out = {};
+  try {
+    readSheet_(SHEET_CHECKMAP).forEach(function (r) {
+      var sheet = String(r['ชีตคำตอบ'] || '').trim();
+      var machine = String(r['ชื่อเครื่องในทะเบียน'] || '').trim();
+      if (!sheet || !machine) return;
+      var group = String(r['หัวข้อหมวด (เว้นว่าง = ทั้งชีต)'] || '').trim();
+      (out[sheet] || (out[sheet] = [])).push({ group: group, machine: machine });
+    });
+  } catch (e) {
+    /* ยังไม่ได้รัน setup = ยังไม่มีชีตนี้ ให้ทำงานแบบเดิมต่อไป ไม่ใช่ล้มทั้งหน้า */
+  }
+  return out;
+}
+
+/** หมวดนี้เป็นของเครื่องไหน — หมวดที่ระบุไว้ชนะกฎทั้งชีตเสมอ */
+function checkMapMachine_(rules, group) {
+  var g = String(group || '').toLowerCase();
+  var wide = '';
+  for (var i = 0; i < rules.length; i++) {
+    if (!rules[i].group) { if (!wide) wide = rules[i].machine; continue; }
+    if (g.indexOf(rules[i].group.toLowerCase()) > -1) return rules[i].machine;
+  }
+  return wide;
+}
+
 /** ชีตคำตอบทุกใบ — ต้องมีทั้งคอลัมน์เครื่องจักรและเวลา ไม่งั้นไม่ใช่ชีตคำตอบ */
 function checkFormSheets_() {
-  var out = [];
+  var out = [], map = checkMachineMap_();
   checkSS_().getSheets().forEach(function (sh) {
     if (sh.getLastRow() < 2 || sh.getLastColumn() < 3) return;
     var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
     var m = checkMeta_(head);
-    if (m.machine > -1 && m.ts > -1) out.push({ sh: sh, head: head, meta: m });
+    /* ห้องอินเวอร์เตอร์ไม่มีคอลัมน์ชื่อเครื่องเลยสักคอลัมน์ ทั้งใบคืออุปกรณ์ตัวเดียว
+       ชีตแบบนี้ผ่านได้ถ้ามีกฎในชีตตั้งค่า — กฎนั่นแหละคือชื่อเครื่องของมัน */
+    var rules = map[sh.getName()] || [];
+    if (m.ts > -1 && (m.machine > -1 || rules.length)) {
+      out.push({ sh: sh, head: head, meta: m, rules: rules });
+    }
   });
   return out;
 }
@@ -5457,32 +5512,47 @@ function checkFormRows_(fromKey, toKey) {
       var key = dayKey_(ts);
       if (key < fromKey || key > toKey) return;
 
-      var items = [], bad = 0, done = 0;
+      /* ฟอร์มปั๊มลมกรอกใบเดียวครอบสามตัว ข้อตรวจของแต่ละตัวอยู่คนละหมวด
+         จึงแยกข้อออกเป็นกองตามเครื่องก่อน แล้วค่อยสร้างรายการละหนึ่งเครื่อง
+         ไม่มีกฎในชีตตั้งค่า = ทุกข้อไปกองเดียว ซึ่งคือพฤติกรรมเดิมทุกประการ */
+      var byMachine = {}, order = [];
+      var colMachine = m.machine > -1 ? String(r[m.machine] || '').trim() : '';
       head.forEach(function (h, i) {
         var def = checkItemHead_(h);
         if (!def) return;
         var a = checkAnswer_(r[i]);
         if (!a) return;                 // ข้อที่ไม่ใช่ของเครื่องนี้
-        done++;
-        if (a === 'bad') bad++;
-        items.push({ group: def.group, label: def.label, value: String(r[i]).trim(), state: a });
+        var name = x.rules.length ? checkMapMachine_(x.rules, def.group) : colMachine;
+        /* หมวดที่ยังไม่ได้จับคู่กับเครื่องไหนเลย ทิ้งไว้ก่อน ดีกว่าเอาไปรวมกับเครื่องอื่น
+           แล้วคะแนนของเครื่องนั้นเพี้ยนโดยไม่มีใครรู้ว่าของใครปนเข้ามา */
+        if (x.rules.length && !name) return;
+        if (!byMachine[name]) { byMachine[name] = { items: [], bad: 0, done: 0 }; order.push(name); }
+        var g = byMachine[name];
+        g.done++;
+        if (a === 'bad') g.bad++;
+        g.items.push({ group: def.group, label: def.label, value: String(r[i]).trim(), state: a });
       });
 
       var status = m.status > -1 ? String(r[m.status] || '').trim() : '';
-      var o = {
-        'ประทับเวลา': ts,
-        'เครื่องจักร': m.machine > -1 ? String(r[m.machine] || '').trim() : '',
-        /* ยังไม่มีคอลัมน์ผู้ตรวจในฟอร์ม — ปล่อยว่างไว้ ไม่เดา
-           วันที่ฟอร์มเพิ่มคำถามนี้ โค้ดตรงนี้รับได้ทันทีโดยไม่ต้องแก้ */
-        'ผู้ตรวจ': m.by > -1 ? String(r[m.by] || '').trim() : '',
-        'ผลการตรวจ': bad ? 'ผิดปกติ' : (status || 'ปกติ'),
-        'หมายเหตุ': status,
-        __ts: ts, __sheet: x.sh.getName(), __row: idx + 2,
-        __bad: bad, __done: done, __items: items,
-        __shift: m.shift > -1 ? String(r[m.shift] || '').trim() : '',
-        __photo: m.photo > -1 ? String(r[m.photo] || '').trim() : ''
-      };
-      out.push(o);
+      order.forEach(function (name) {
+        var g = byMachine[name];
+        /* ช่างกรอกเฉพาะปั๊มที่เข้าตรวจจริง ตัวที่ไม่ได้แตะเลยต้องไม่โผล่เป็น
+           "ตรวจแล้ว 0 ข้อ" ซึ่งจะไปนับเป็นใบตรวจของวันนั้นทั้งที่ไม่มีใครไปดู */
+        if (!g.done) return;
+        out.push({
+          'ประทับเวลา': ts,
+          'เครื่องจักร': name,
+          /* ยังไม่มีคอลัมน์ผู้ตรวจในฟอร์ม — ปล่อยว่างไว้ ไม่เดา
+             วันที่ฟอร์มเพิ่มคำถามนี้ โค้ดตรงนี้รับได้ทันทีโดยไม่ต้องแก้ */
+          'ผู้ตรวจ': m.by > -1 ? String(r[m.by] || '').trim() : '',
+          'ผลการตรวจ': g.bad ? 'ผิดปกติ' : (status || 'ปกติ'),
+          'หมายเหตุ': status,
+          __ts: ts, __sheet: x.sh.getName(), __row: idx + 2,
+          __bad: g.bad, __done: g.done, __items: g.items,
+          __shift: m.shift > -1 ? String(r[m.shift] || '').trim() : '',
+          __photo: m.photo > -1 ? String(r[m.photo] || '').trim() : ''
+        });
+      });
     });
   });
 
