@@ -115,6 +115,7 @@ node test.js
 | [docs/SETUP.th.md](docs/SETUP.th.md) | ติดตั้งทีละขั้น |
 | [docs/RUNBOOK.th.md](docs/RUNBOOK.th.md) | deploy · ย้อนเวอร์ชัน · รีเซ็ต PIN · อาการเสียที่เจอบ่อย |
 | [docs/SHEETS.th.md](docs/SHEETS.th.md) | ชีตและคอลัมน์ทั้งหมด |
+| [docs/PLANT.th.md](docs/PLANT.th.md) | ผังโรงงาน — วางเครื่องให้ตรงโรงงานคุณ (ไม่บังคับ) |
 
 ## เลี้ยงเบียร์
 

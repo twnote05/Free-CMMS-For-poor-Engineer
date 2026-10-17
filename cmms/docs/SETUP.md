@@ -177,4 +177,6 @@ Then open the `/exec` link, log in as one `LEAD` account, and take a single work
 
 ## Next
 
+[PLANT](PLANT.md) — the plant board (optional): lay your machines out and see every machine's status on one page.
+
 [RUNBOOK](RUNBOOK.md) — deploying the next version, rolling back a bad deploy, resetting a PIN, and the failure modes you will actually hit.

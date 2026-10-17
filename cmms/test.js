@@ -434,7 +434,7 @@ assert.strictEqual(xl[3][SHEET1_HEADERS.indexOf("เวลาซ่อมจบ"
   const idx = fs.readFileSync("gas/index.html", "utf8");
   const tags = idx.match(/<\?[\s\S]*?\?>/g) || [];
   const allowed = ['<?!= include("tw") ?>', '<?!= include("styles") ?>',
-                   '<?= prefillMachine ?>', '<?!= include("app") ?>'];
+                   '<?= prefillMachine ?>', '<?= plantUrl ?>', '<?= systemName ?>', '<?!= include("app") ?>'];
   /* tw ต้องมา "หลัง" styles — ตัว CDN เดิมฉีด <style> เข้ามาทีหลังเสมอ ทั้งไฟล์เขียนบนสมมติฐานนั้น
      เคยสลับมาไว้ข้างหน้าแล้วพังทันที: .hidden กับ .tab-btn specificity เท่ากัน ลำดับเป็นตัวตัดสิน
      .tab-btn{display:flex} ชนะ เมนูที่ต้องซ่อนตอนไม่ล็อกอินโผล่หมด จุดแดงกระดิ่งค้างติด */
@@ -446,6 +446,34 @@ assert.strictEqual(xl[3][SHEET1_HEADERS.indexOf("เวลาซ่อมจบ"
     assert.ok(!/;\s*\?>$/.test(t),
       "scriptlet ต้องเป็น expression ล้วน ห้ามมี ; ปิดท้าย: " + t);
   });
+}
+
+// ผังโรงงาน: เอนจิน (plant.html) กับข้อมูลผัง (plant_layout.html) แยกไฟล์กัน
+// โรงงานอื่นแก้แต่ไฟล์ข้อมูล — ตรวจให้ว่าแก้แล้วยังสอดคล้องกันเอง ก่อนจะกด deploy แล้วหน้าผังพัง
+{
+  const pl = fs.readFileSync("gas/plant.html", "utf8");
+  assert.deepStrictEqual(pl.match(/<\?[\s\S]*?\?>/g), ['<?!= include("plant_layout") ?>'],
+    "plant.html ต้องมี scriptlet เดียวคือ include ไฟล์ข้อมูลผัง");
+
+  const lay = fs.readFileSync("gas/plant_layout.html", "utf8");
+  const L = new Function(lay + "\nreturn { BLD_W, BLD_H, WALLS, LAYOUT, ROOMS, STORES, ZONEBOX, YARDS, STAGES };")();
+  assert.ok(L.BLD_W > 0 && L.BLD_H > 0, "BLD_W/BLD_H ต้องเป็นเมตรที่มากกว่าศูนย์");
+  const finite = (...v) => v.every((n) => typeof n === "number" && isFinite(n));
+  L.WALLS.forEach((w) => assert.ok(w.length === 4 && finite(...w), "WALLS ต้องเป็น [x1,y1,x2,y2]: " + w));
+
+  const ids = L.LAYOUT.map((m) => m.id), names = L.LAYOUT.map((m) => m.n);
+  assert.strictEqual(new Set(ids).size, ids.length, "id เครื่องในผังซ้ำกัน");
+  assert.strictEqual(new Set(names).size, names.length, "ชื่อเครื่องในผังซ้ำกัน — ทะเบียนหนึ่งแถวจับคู่ได้ตำแหน่งเดียว");
+  L.LAYOUT.forEach((m) => {
+    assert.ok(m.id && m.n && m.k && finite(m.x, m.y), "เครื่องในผังต้องมี id n k x y: " + JSON.stringify(m));
+  });
+  L.STAGES.forEach((st) => {
+    st.ids.forEach((i) => assert.ok(ids.includes(i), "ขั้นตอน " + st.id + " อ้างเครื่องที่ไม่มีในผัง: " + i));
+    assert.ok(st.at.length === 2 && finite(...st.at), "ขั้นตอน " + st.id + " ต้องมีจุด at [x,y]");
+  });
+  [L.ROOMS, L.STORES, L.ZONEBOX, L.YARDS].forEach((arr) =>
+    arr.forEach((r) => assert.ok(r.t && finite(r.x0, r.y0, r.x1, r.y1) && r.x1 > r.x0 && r.y1 > r.y0,
+      "กรอบต้องมี t และ x0<x1 y0<y1: " + JSON.stringify(r))));
 }
 
 // Code.gs: รันทั้งไฟล์ในกล่องเปล่า ได้ตรวจ syntax ไปในตัว แล้วทดสอบ legacyEnd_
@@ -3190,12 +3218,12 @@ console.log("OK — ผ่านทั้งหมด");
   gas.verify_ = (t) => t === "good";
 
   const full = { machines: [{ name: "EXT 1" }], team: [{ name: "\u0e0a\u0e48\u0e32\u0e07\u0e0a\u0e25", role: "TECH" }],
-                 companyName: "BRT" };
+                 companyName: "ACME" };
 
   const anon = gas.configForViewer_(full, "");
   assert.strictEqual(J(anon.team), J([]), "ไม่มี token = ไม่ได้รายชื่อพนักงาน");
   assert.strictEqual(anon.machines.length, 1, "ทะเบียนเครื่องต้องยังมี — ฝ่ายผลิตแจ้งซ่อมโดยไม่ล็อกอิน");
-  assert.strictEqual(anon.companyName, "BRT");
+  assert.strictEqual(anon.companyName, "ACME");
   assert.strictEqual(gas.configForViewer_(full, "good").team.length, 1, "ล็อกอินแล้วเห็นครบ");
 
   // ตัดสำเนา ไม่ใช่ตัดของจริงในแคช
@@ -3559,6 +3587,7 @@ console.log("OK — ผ่านทั้งหมด");
     "ยอดที่หน้าจอบวกให้ดูจะไม่ใช่ยอดที่ถูกเขียนลงชีต");
 }
 
+
 /* ═══ สองข้อที่เจอตอนลองกดเพิ่ม/ลบจริงบนหน้าทดสอบที่ประกอบจากโค้ดจริง ═══ */
 {
   const app = fs.readFileSync("gas/app.html", "utf8");
@@ -3692,4 +3721,385 @@ console.log("OK — ผ่านทั้งหมด");
   // Air Dryer ยังไม่ได้จับคู่กับเครื่องไหน ต้องไม่ไปโผล่ในกองของใคร
   const all = rows.reduce((a, r) => a + r.__done, 0);
   assert.strictEqual(all, 3, "ข้อของหมวดที่ยังไม่ได้จับคู่ ต้องไม่ถูกนับให้เครื่องใดเลย");
+
+// ฟอร์มสองรุ่นอยู่ชีตเดียวกัน หัวตารางซ้ำ — แถวของรุ่นใหม่ต้องไม่หลุดเป็นเครื่อง/ผู้ตรวจว่าง
+// (ถ้าหลุด KPI รายคนจะต่ำกว่าความจริงโดยไม่มีอะไรฟ้อง และเอาไปประเมินคนไม่ได้)
+{
+  const { checkMeta_, checkCell_ } = gas;
+  const head = ["ประทับเวลา", "เครื่องจักร", "ผู้ตรวจ", "กะทำงาน (Shift)", "Station 1 [Blower ปกติ]",   // รุ่นเก่า
+                "เครื่องจักร", "ช่างเทคนิค", "กะการทำงาน", "Station 1 [Blower ปกติ]"];                 // รุ่นใหม่ ชื่อหัวซ้ำ
+  const m = checkMeta_(head);
+  assert.deepStrictEqual(Array.from(m.all.machine), [1, 5], "ต้องเห็นคอลัมน์เครื่องทั้งสองรุ่น");
+  assert.deepStrictEqual(Array.from(m.all.by), [2, 6], "ต้องเห็นคอลัมน์ผู้ตรวจทั้งสองรุ่น รวม 'ช่างเทคนิค'");
+  assert.deepStrictEqual(Array.from(m.all.shift), [3, 7]);
+  assert.strictEqual(m.machine, 1, "m[k] ยังคืนตัวแรก — โค้ดเดิมที่ใช้ตัดสินว่าเป็นฟอร์มเช็คไม่เปลี่ยน");
+
+  assert.strictEqual(checkCell_(["t", "A", "", "", "", "", "", "", ""], m, "machine"), "A");
+  assert.strictEqual(checkCell_(["t", "", "", "", "", "B", "ช่างบี", "กะดึก", ""], m, "machine"), "B");
+  assert.strictEqual(checkCell_(["t", "", "", "", "", "", "", "", ""], m, "machine"), "", "ว่างทุกช่อง = ว่าง ไม่ใช่ undefined");
+  assert.strictEqual(checkCell_([], { machine: -1, all: { machine: [] } }, "machine"), "");
+
+  const when = new Date(2026, 9, 15, 8, 0);
+  gas.checkMachineMap_ = () => ({});
+  gas.checkFormSheets_ = () => [{
+    sh: { getName: () => "UV", getDataRange: () => ({ getValues: () => [head,
+      [when, "UV #1", "ช่างเอ", "กะเช้า", "ปกติ", "", "", "", ""],          // รุ่นเก่า
+      [when, "", "", "", "", "UV #2", "ช่างบี", "กะดึก", "ไม่ปกติ"]] }) },  // รุ่นใหม่ ช่องรุ่นเก่าว่างทั้งแถว
+    head: head, meta: m, rules: [],
+  }];
+  const rows = gas.checkFormRows_("2026-10-15", "2026-10-15");
+  assert.strictEqual(rows.length, 2);
+  const by = {}; rows.forEach((r) => { by[r["เครื่องจักร"]] = r; });
+  assert.ok(by["UV #1"] && by["UV #2"], "แถวรุ่นใหม่ต้องได้ชื่อเครื่องจากคอลัมน์ที่สอง: " + Object.keys(by));
+  assert.strictEqual(by["UV #1"]["ผู้ตรวจ"], "ช่างเอ");
+  assert.strictEqual(by["UV #2"]["ผู้ตรวจ"], "ช่างบี", "ผู้ตรวจรุ่นใหม่อยู่คอลัมน์ 'ช่างเทคนิค'");
+  assert.strictEqual(by["UV #2"].__shift, "กะดึก");
+  assert.strictEqual(by["UV #2"].__bad, 1);
+}
+
+// กะทำงาน: เช้า 07:30-19:30 · ดึก 19:30-07:30 ข้ามเที่ยงคืน วันของกะดึกคือวันที่กะ "เริ่ม"
+{
+  const saved = gas.cfg_;
+  gas.cfg_ = (k, d) => d;                                // ค่ามาตรฐาน
+  const at = (h, mi, day = 15) => gas.shiftInfo_(new Date(2026, 9, day, h, mi));
+  const t1 = at(7, 29);
+  assert.strictEqual(t1.key, "ดึก"); assert.strictEqual(t1.day, "2026-10-14", "07:29 ยังเป็นกะดึกที่เริ่มเมื่อวาน");
+  assert.strictEqual(t1.since, 719);                      // 19:30 -> 07:29 = 11 ชม. 59 นาที
+  const t2 = at(7, 30);
+  assert.strictEqual(t2.key, "เช้า"); assert.strictEqual(t2.since, 0); assert.strictEqual(t2.day, "2026-10-15");
+  assert.strictEqual(at(8, 0).since, 30, "08:00 = เลยเริ่มกะเช้า 30 นาทีพอดี");
+  assert.strictEqual(at(19, 29).key, "เช้า");
+  const t3 = at(19, 30);
+  assert.strictEqual(t3.key, "ดึก"); assert.strictEqual(t3.since, 0); assert.strictEqual(t3.day, "2026-10-15");
+  assert.strictEqual(at(20, 0).since, 30, "20:00 = เลยเริ่มกะดึก 30 นาทีพอดี");
+  const t4 = at(0, 10);
+  assert.strictEqual(t4.key, "ดึก"); assert.strictEqual(t4.day, "2026-10-14", "หลังเที่ยงคืนเป็นของกะที่เริ่มวันก่อน");
+  assert.strictEqual(t4.since, 280);
+
+  // ตั้งค่าในชีต: เปลี่ยนเวลาเริ่มกะได้ · ตั้งสลับกัน/อ่านไม่ออก = ใช้ค่ามาตรฐาน ไม่คำนวณมั่ว
+  gas.cfg_ = (k, d) => ({ "เวลาเริ่มกะเช้า": "08:00", "เวลาเริ่มกะดึก": "20:00" }[k] || d);
+  assert.strictEqual(at(8, 0).since, 0); assert.strictEqual(at(8, 0).key, "เช้า");
+  gas.cfg_ = (k, d) => ({ "เวลาเริ่มกะเช้า": "20:00", "เวลาเริ่มกะดึก": "08:00" }[k] || d);
+  assert.strictEqual(at(7, 30).key, "เช้า", "ตั้งสลับกัน -> กลับไปค่ามาตรฐาน");
+  gas.cfg_ = (k, d) => ({ "เวลาเริ่มกะเช้า": "เจ็ดครึ่ง" }[k] || d);
+  assert.strictEqual(at(7, 30).key, "เช้า", "อ่านไม่ออก -> ค่ามาตรฐาน");
+  assert.strictEqual(gas.clockMin_("07:30", -1), 450); assert.strictEqual(gas.clockMin_("7.30", -1), 450);
+  assert.strictEqual(gas.clockMin_("25:00", -1), -1); assert.strictEqual(gas.clockMin_(null, 9), 9);
+  gas.cfg_ = saved;
+}
+
+// apiCheckScore ต้องบอกจำนวนแถวที่ไม่รู้ว่าใครตรวจ ไม่ใช่ทิ้งเงียบ ๆ
+{
+  const keep = { requireAuth_: gas.requireAuth_, cfg_: gas.cfg_, readCheckRange_: gas.readCheckRange_,
+                 canonTech_: gas.canonTech_, canonical_: gas.canonical_ };
+  gas.requireAuth_ = () => ({ role: "LEAD" });
+  gas.cfg_ = (k, d) => d;
+  gas.canonTech_ = (v) => String(v || "").trim();
+  gas.canonical_ = (v) => String(v || "").trim();
+  const ts = new Date(2026, 9, 15, 8, 0);
+  gas.readCheckRange_ = () => [
+    { "ผู้ตรวจ": "ช่างเอ", "ผลการตรวจ": "ปกติ", "เครื่องจักร": "UV #1", __ts: ts },
+    { "ผู้ตรวจ": "",       "ผลการตรวจ": "ปกติ", "เครื่องจักร": "UV #2", __ts: ts },
+    { "ผู้ตรวจ": "  ",     "ผลการตรวจ": "ผิดปกติ", "เครื่องจักร": "UV #3", __ts: ts },
+  ];
+  const res = gas.apiCheckScore("tok", "2026-10-15", "2026-10-15");
+  assert.strictEqual(res.rows, 3);
+  assert.strictEqual(res.unattributed, 2, "สองแถวไม่มีชื่อผู้ตรวจ ต้องถูกนับ ไม่ใช่หายเงียบ");
+  assert.strictEqual(res.people.length, 1);
+  assert.strictEqual(res.people[0].checks, 1);
+  Object.assign(gas, keep);
+}
+
+// ═══ แผนภาพอะไหล่ ═══
+// จุดบนรูปพิมพ์มือในชีต — ค่าเพี้ยนชิ้นเดียวต้องไม่ทำให้ทั้งหน้าพัง และห้ามหลุดไปวางนอกรูป
+{
+  const sp = (s) => JSON.parse(JSON.stringify(gas.parseSpots_(s)));   // ข้ามขอบ vm: prototype ของ array ต่างกัน deepStrictEqual จะไม่ผ่าน
+  assert.deepStrictEqual(sp("10,20,3,2"), [[10, 20, 3, 2]]);
+  assert.deepStrictEqual(sp("10,20,3,2;50.5, 60 ,4,2"), [[10, 20, 3, 2], [50.5, 60, 4, 2]], "หลายจุด + ช่องว่างรอบเลข");
+  assert.deepStrictEqual(sp(""), []);
+  assert.deepStrictEqual(sp(null), []);
+  assert.deepStrictEqual(sp("abc;1,2,3"), [], "ไม่ครบสี่ค่า/ไม่ใช่ตัวเลข = ทิ้ง");
+  assert.deepStrictEqual(sp("10,20,3,2;x,y,z,w;40,40,5,5"), [[10, 20, 3, 2], [40, 40, 5, 5]], "ชิ้นเสียไม่ลากชิ้นดีไปด้วย");
+  assert.deepStrictEqual(sp("-1,20,3,2"), [], "ติดลบ = นอกรูป");
+  assert.deepStrictEqual(sp("99,20,5,2"), [], "ล้นขอบขวา");
+  assert.deepStrictEqual(sp("10,20,0,2"), [], "กว้าง 0 = กดไม่ได้");
+
+  const SAVE = { partsRead_: gas.partsRead_, requireAuth_: gas.requireAuth_, rowsToObjects_: gas.rowsToObjects_,
+                 partImage_: gas.partImage_ };
+  const D = [{ "รหัสแผนภาพ": "P1", "ชื่อแผนภาพ": "ปั๊ม", "เครื่องจักร": "UV #1", "ไฟล์รูป": "x", "ใช้งาน": "ใช่" },
+             { "รหัสแผนภาพ": "OLD", "ชื่อแผนภาพ": "เลิกใช้", "ใช้งาน": "ไม่" }];
+  const P = [
+    { "รหัสแผนภาพ": "P1", "เลขที่": "6",    "ชื่อ (อังกฤษ)": "Diaphragm", "ชื่อไทย": "ไดอะแฟรม", "ตำแหน่งบนรูป": "10,20,3,2;bad", "รหัส Stock": "S-1" },
+    { "รหัสแผนภาพ": "P1", "เลขที่": "15-1", "ชื่อ (อังกฤษ)": "Air Chamber", "ชื่อไทย": "" },
+    { "รหัสแผนภาพ": "P1", "เลขที่": "",     "ชื่อ (อังกฤษ)": "แถวไม่มีเลข" },
+    { "รหัสแผนภาพ": "P2", "เลขที่": "9",    "ชื่อ (อังกฤษ)": "ของแผนภาพอื่น" },
+  ];
+  gas.partsRead_ = (n) => (n === gas.SHEET_PARTDIAG ? D : P);
+  gas.requireAuth_ = () => ({ role: "TECH" });
+  gas.partImage_ = () => "data:image/png;base64,AAAA";
+  gas.rowsToObjects_ = () => [
+    { part_ref: "P1#6 · ไดอะแฟรม (Diaphragm)", status: "รอซ่อม", created_at: "2026-10-01T08:00:00" },
+    { part_ref: "P1#6 · ไดอะแฟรม (Diaphragm)", status: "ซ่อมเสร็จสมบูรณ์", created_at: "2026-10-10T08:00:00" },
+    { part_ref: "P1#6 · ไดอะแฟรม (Diaphragm)", status: gas.STATUS_CANCEL, created_at: "2026-10-12T08:00:00" },   // ยกเลิก ไม่นับ
+    { part_ref: "P2#6 · ของแผนภาพอื่น", status: "รอซ่อม", created_at: "2026-10-13T08:00:00" },                  // รหัสแผนภาพอื่น ไม่นับ
+    { part_ref: "", status: "รอซ่อม", created_at: "2026-10-14T08:00:00" },
+  ];
+
+  const list = gas.apiPartDiagrams("tok");
+  assert.strictEqual(list.length, 1, "แผนภาพที่ปิดใช้งานต้องไม่ขึ้น");
+  assert.strictEqual(list[0].id, "P1"); assert.strictEqual(list[0].parts, 2, "แถวที่ไม่มีเลขที่ไม่นับ");
+
+  const d = gas.apiPartDiagram("tok", "P1");
+  assert.strictEqual(d.parts.length, 2, "แถวไม่มีเลข/ของแผนภาพอื่นต้องไม่เข้ามา");
+  const six = d.parts.find((p) => p.ref === "6");
+  assert.strictEqual(six.fails, 2, "นับเฉพาะใบของแผนภาพนี้ที่ไม่ยกเลิก");
+  assert.strictEqual(six.last, "2026-10-10T08:00:00");
+  assert.strictEqual(six.spots.length, 1, "จุดเสียหนึ่งจุดไม่ทำให้ชิ้นนี้หายทั้งชิ้น");
+  assert.strictEqual(d.parts.find((p) => p.ref === "15-1").fails, 0);
+  assert.strictEqual(d.image, "data:image/png;base64,AAAA");
+  assert.throws(() => gas.apiPartDiagram("tok", "OLD"), /ไม่พบแผนภาพ/, "ปิดใช้งานแล้วเปิดตรง ๆ ด้วยรหัสก็ไม่ได้");
+  assert.throws(() => gas.apiPartDiagram("tok", "ไม่มี"), /ไม่พบแผนภาพ/);
+
+  // รูปพัง -> ยังได้ตารางชิ้นส่วน พร้อมข้อความบอกสาเหตุ
+  gas.partImage_ = () => { throw new Error("เปิดไฟล์รูปไม่ได้"); };
+  const d2 = gas.apiPartDiagram("tok", "P1");
+  assert.ok(!d2.image && /เปิดไฟล์รูปไม่ได้/.test(d2.imageError) && d2.parts.length === 2);
+
+  // แผนภาพแบบรายการล้วน: ไม่ใส่ไฟล์รูปโดยตั้งใจ ต้องไม่ถูกมองว่าเปิดรูปไม่ได้
+  gas.partImage_ = () => { throw new Error("ไม่ควรถูกเรียก"); };
+  D.push({ "รหัสแผนภาพ": "LIST", "ชื่อแผนภาพ": "รายการล้วน", "ไฟล์รูป": "", "ใช้งาน": "ใช่" });
+  P.push({ "รหัสแผนภาพ": "LIST", "เลขที่": "1", "ชื่อ (อังกฤษ)": "Fan" });
+  const dl = gas.apiPartDiagram("tok", "LIST");
+  assert.ok(!dl.image && !dl.imageError && dl.parts.length === 1, "รายการล้วนต้องไม่มี imageError");
+  assert.ok(/noimg/.test(fs.readFileSync("gas/app.html", "utf8")) && /!d\.image && !d\.imageError/.test(fs.readFileSync("gas/app.html", "utf8")),
+    "หน้าเว็บต้องซ่อนช่องรูปเมื่อเป็นรายการล้วน แต่ต้องโชว์เมื่อมีรูปที่เปิดไม่ได้");
+
+  // ค่าที่เก็บลงใบแจ้งซ่อม: ตรวจกับชีต สร้างเอง ไม่เชื่อข้อความจากหน้าเว็บ
+  assert.strictEqual(gas.partRefStamp_("P1#6"), "P1#6 · ไดอะแฟรม (Diaphragm)");
+  assert.strictEqual(gas.partRefStamp_("P1#15-1"), "P1#15-1 · Air Chamber", "ไม่มีชื่อไทย -> ใช้ชื่ออังกฤษ ไม่ใช่ว่าง");
+  assert.strictEqual(gas.partRefStamp_("P1#999"), "", "เลขที่ไม่มีในชีต = ไม่เก็บ");
+  assert.strictEqual(gas.partRefStamp_("NOPE#6"), "");
+  assert.strictEqual(gas.partRefStamp_("P1#6 · ใส่ชื่อปลอมมาเอง"), "", "ต่อท้ายมาเองก็ไม่ผ่าน");
+  assert.strictEqual(gas.partRefStamp_(""), ""); assert.strictEqual(gas.partRefStamp_(undefined), "");
+  assert.strictEqual(gas.partRefStamp_("#6"), "");
+  gas.partsRead_ = () => { throw new Error("ไม่พบชีต"); };
+  assert.strictEqual(gas.partRefStamp_("P1#6"), "", "ชีตหาย = ไม่เก็บ แต่ใบแจ้งซ่อมต้องไม่พังไปด้วย");
+
+  Object.assign(gas, SAVE);
+
+  const code = fs.readFileSync("gas/Code.gs", "utf8");
+  const app = fs.readFileSync("gas/app.html", "utf8");
+  const idx = fs.readFileSync("gas/index.html", "utf8");
+  assert.ok(/apiPartDiagrams\(token\)\s*\{\s*requireAuth_\(token\)/.test(code), "รายการแผนภาพต้องขอ token");
+  assert.ok(/apiPartDiagram\(token, id\)\s*\{\s*requireAuth_\(token\)/.test(code), "รูปจากคู่มือผู้ผลิตต้องขอ token");
+  assert.ok(/gsAuth\("apiPartDiagrams"/.test(app) && /gsAuth\("apiPartDiagram"/.test(app));
+  assert.ok(/NEED_LOGIN = \[[^\]]*"parts"/.test(app), "หน้าแผนภาพอะไหล่ต้องบังคับล็อกอิน");
+  assert.ok(/<button[^>]*needs-login[^>]*data-tab="parts"/.test(idx), "เมนูต้องซ่อนตอนยังไม่ล็อกอิน");
+  assert.ok(/part_ref:\s*partRefStamp_\(payload\.part_ref\)/.test(code), "ใบใหม่ต้องเก็บค่าที่ผ่านการตรวจแล้ว ไม่ใช่ค่าดิบ");
+  assert.ok(gas.HEADERS.includes("ชิ้นส่วนที่เสีย") && gas.FIELD_MAP.part_ref === "ชิ้นส่วนที่เสีย");
+  assert.strictEqual(gas.HEADERS[gas.HEADERS.length - 1], "ชิ้นส่วนที่เสีย", "คอลัมน์ใหม่ต้องต่อท้ายเสมอ — แทรกกลางทำให้ชีตเดิมเลื่อน");
+  assert.ok(!gas.PUBLIC_FIELDS.includes("part_ref"), "หน้าติดตามสาธารณะไม่ต้องรู้ชิ้นส่วน");
+  assert.ok(/partSheet_\(SHEET_PARTS, PARTS_HEAD\)/.test(code.slice(code.indexOf("function upgradeSheet"))), "upgradeSheet ต้องสร้างสองชีตนี้ให้");
+  assert.ok(app.includes('id="partsReport"') && app.includes("part_ref:       pendingPart"), "ปุ่มแจ้งซ่อมต้องส่งชิ้นส่วนไปกับใบ");
+  assert.ok(app.includes("setPendingPart(\"\")") && idx.includes('id="partChipX"'), "ต้องล้างชิ้นส่วนได้ และล้างหลังส่งใบสำเร็จ");
+}
+
+// ═══ รูปสภาพปกติของชิ้นส่วน ═══
+// เป็นข้อมูลหลักที่ทุกคนเห็น: ดูได้ทุกคนที่ล็อกอิน แต่เปลี่ยนได้เฉพาะหัวหน้างานขึ้นไป และทุกครั้งต้องมีรอยใน Audit
+{
+  const keep = ["partsRead_", "requireAuth_", "partImage_", "sheet_", "writeAudit_", "LockService", "DriveApp", "Utilities",
+                "SpreadsheetApp", "rowsToObjects_"].reduce((o, k) => (o[k] = gas[k], o), {});
+  const head = ["รหัสแผนภาพ", "เลขที่", "ชื่อ (อังกฤษ)", "รูปปกติ"];
+  const rows = [["P1", "6", "Diaphragm", "https://drive.google.com/file/d/ABC/view"], ["P1", "7", "Ball", ""]];
+  gas.partsRead_ = (n) => (n === gas.SHEET_PARTS ? rows.map((r) => Object.fromEntries(head.map((h, i) => [h, r[i]])))
+                                                   : [{ "รหัสแผนภาพ": "P1", "ไฟล์รูป": "https://drive.google.com/file/d/" + "D".repeat(30) + "/view" }]);
+  gas.rowsToObjects_ = () => [];
+  let roleAsked = null;
+  gas.requireAuth_ = (t, role) => { roleAsked = role || null; return { name: "หัวหน้า", role: "LEAD" }; };
+
+  // ── ดึงรูป ──
+  gas.partImage_ = (raw, max) => { assert.strictEqual(max, gas.PART_PHOTO_MAX, "รูปชิ้นส่วนต้องใช้เพดานของรูปชิ้นส่วน ไม่ใช่ของรูปแผนภาพ"); return "data:image/jpeg;base64,QUJD"; };
+  assert.strictEqual(gas.apiPartPhoto("t", "P1", "6").photo, "data:image/jpeg;base64,QUJD");
+  assert.strictEqual(roleAsked, null, "ช่างทั่วไปดูรูปได้ แค่ต้องล็อกอิน");
+  assert.strictEqual(gas.apiPartPhoto("t", "P1", "7").photo, "", "ไม่มีรูป = ว่าง ไม่ใช่ error");
+  assert.strictEqual(gas.apiPartPhoto("t", "P1", "999").photo, "");
+  gas.partImage_ = () => { throw new Error("เปิดไฟล์รูปไม่ได้"); };
+  const bad = gas.apiPartPhoto("t", "P1", "6");
+  assert.ok(bad.photo === "" && /เปิดไฟล์รูปไม่ได้/.test(bad.error), "รูปพังต้องบอกสาเหตุ ไม่ล้มทั้งการ์ด");
+  assert.strictEqual(gas.apiPartDiagram("t", "P1").parts.find((p) => p.ref === "6").photo, true);
+  assert.strictEqual(gas.apiPartDiagram("t", "P1").parts.find((p) => p.ref === "7").photo, false);
+  assert.ok(!("รูปปกติ" in gas.apiPartDiagram("t", "P1").parts[0]) && !JSON.stringify(gas.apiPartDiagram("t", "P1")).includes("drive.google"),
+    "รายการแผนภาพต้องไม่พกลิงก์/รูปไปด้วย");
+
+  // ── เปลี่ยนรูป ──
+  const cell = []; const audit = []; const made = [];
+  gas.sheet_ = () => ({ getDataRange: () => ({ getValues: () => [head.slice()].concat(rows.map((r) => r.slice())) }),
+                        getRange: (r, c) => ({ setValue: (v) => cell.push([r, c, v]) }) });
+  gas.LockService = { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) };
+  gas.SpreadsheetApp = { flush() {} };
+  gas.Utilities = { base64Decode: (s) => Buffer.from(s, "base64"), newBlob: (b, t, n) => ({ b, t, n }) };
+  gas.DriveApp = { getFileById: () => ({ getParents: () => ({ next: () => ({ createFile: (bl) => { made.push(bl); return { getUrl: () => "https://drive.google.com/file/d/NEW/view" }; } }) }) }) };
+  gas.writeAudit_ = (...a) => audit.push(a);
+  const ok = "data:image/jpeg;base64,QUJD";
+
+  assert.strictEqual(gas.apiSetPartPhoto("t", "P1", "7", ok).ok, true);
+  assert.strictEqual(roleAsked, "LEAD", "เปลี่ยนรูปต้องเรียก requireAuth_ ด้วยสิทธิ์หัวหน้างาน");
+  assert.deepStrictEqual(cell, [[3, 4, "https://drive.google.com/file/d/NEW/view"]], "ต้องลงเซลล์ของชิ้นนั้น (แถว 3 คอลัมน์ 4) ไม่ใช่ชิ้นอื่น");
+  assert.strictEqual(made.length, 1); assert.ok(/^part-P1-7-\d+\.jpg$/.test(made[0].n), made[0].n);
+  assert.strictEqual(audit.length, 1); assert.strictEqual(audit[0][1], "P1#7");
+  assert.strictEqual(audit[0][2][0].oldValue, "", "Audit ต้องเก็บค่าเดิมไว้");
+  gas.apiSetPartPhoto("t", "P1", "6", ok);
+  assert.strictEqual(audit[1][2][0].oldValue, "https://drive.google.com/file/d/ABC/view", "รูปเดิมต้องไม่หายจาก Audit");
+
+  assert.throws(() => gas.apiSetPartPhoto("t", "P1", "7", "data:text/html;base64,QUJD"), /PNG/, "ไม่ใช่รูป");
+  assert.throws(() => gas.apiSetPartPhoto("t", "P1", "7", "javascript:alert(1)"), /PNG/);
+  assert.throws(() => gas.apiSetPartPhoto("t", "P1", "7", ""), /PNG/);
+  assert.throws(() => gas.apiSetPartPhoto("t", "P1", "7", "data:image/png;base64," + "A".repeat(1500000)), /ใหญ่เกิน/, "รูปใหญ่เกินเพดาน");
+  assert.throws(() => gas.apiSetPartPhoto("t", "P1", "NOPE", ok), /ไม่พบชิ้นส่วน/);
+  assert.throws(() => gas.apiSetPartPhoto("t", "ZZ", "6", ok), /ไม่พบชิ้นส่วน/);
+  assert.strictEqual(made.length, 2, "ที่ปฏิเสธแล้วต้องไม่มีไฟล์ถูกสร้างค้างใน Drive");
+  gas.requireAuth_ = (t, role) => { if (role === "LEAD") throw new Error("ไม่มีสิทธิ์"); return {}; };
+  assert.throws(() => gas.apiSetPartPhoto("t", "P1", "7", ok), /ไม่มีสิทธิ์/, "ช่างทั่วไปเปลี่ยนรูปไม่ได้");
+  assert.strictEqual(made.length, 2);
+  head.pop();                                                            // ชีตเก่ายังไม่มีคอลัมน์ รูปปกติ
+  gas.requireAuth_ = () => ({ name: "x" });
+  assert.throws(() => gas.apiSetPartPhoto("t", "P1", "7", ok), /upgradeSheet/, "ต้องบอกให้รัน upgradeSheet ไม่ใช่เขียนผิดคอลัมน์");
+  Object.assign(gas, keep);
+
+  const code = fs.readFileSync("gas/Code.gs", "utf8"), app = fs.readFileSync("gas/app.html", "utf8");
+  assert.ok(/apiPartPhoto\(token, id, ref\)\s*\{\s*requireAuth_\(token\)/.test(code));
+  assert.ok(/apiSetPartPhoto\(token, id, ref, dataUri\)\s*\{\s*var u = requireAuth_\(token, 'LEAD'\)/.test(code), "เปลี่ยนรูปต้องจำกัดหัวหน้างาน");
+  assert.ok(/gsAuth\("apiPartPhoto"/.test(app) && /gsAuth\("apiSetPartPhoto"/.test(app));
+  assert.ok(gas.PARTS_HEAD.includes("รูปปกติ") && gas.PARTS_HEAD[gas.PARTS_HEAD.length - 1] === "รูปปกติ", "คอลัมน์ใหม่ต้องต่อท้าย");
+  assert.ok(/const add = \(label\) => lead \?/.test(app), "ปุ่มเพิ่ม/เปลี่ยนรูปต้องโชว์เฉพาะหัวหน้างาน (ซ่อนปุ่ม ไม่ใช่การคุมสิทธิ์ — ตัวคุมจริงอยู่ที่ server)");
+}
+
+// ═══ ห้องสมุดคู่มือ ═══
+{
+  const SAVE = { partsRead_: gas.partsRead_, requireAuth_: gas.requireAuth_, canonical_: gas.canonical_ };
+  const B = [
+    { "รหัสคู่มือ": "MOT", "ชื่อคู่มือ": "มอเตอร์", "หมวด": "ไฟฟ้า", "จำนวนหน้า": "170", "ไฟล์ (Drive)": "https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz012345/view", "ใช้งาน": "ใช่" },
+    { "รหัสคู่มือ": "OLD", "ชื่อคู่มือ": "เลิกใช้", "ใช้งาน": "ไม่" },
+    { "รหัสคู่มือ": "", "ชื่อคู่มือ": "ไม่มีรหัส", "ใช้งาน": "ใช่" },
+  ];
+  const L = [
+    { "รหัสคู่มือ": "MOT", "หน้า": "43", "หัวข้อ": "โครงสร้าง", "แผนภาพ": "VEM-MOTOR" },
+    { "รหัสคู่มือ": "OLD", "หน้า": "1", "หัวข้อ": "ของเล่มที่ปิด", "แผนภาพ": "VEM-MOTOR" },
+    { "รหัสคู่มือ": "ไม่มีเล่ม", "หน้า": "1", "หัวข้อ": "ไม่มีเล่ม" },
+  ];
+  gas.partsRead_ = (n) => (n === gas.SHEET_MANUAL ? B : L);
+  gas.requireAuth_ = (t) => { if (!t) throw new Error("ต้องเข้าสู่ระบบ"); return {}; };
+  assert.throws(() => gas.apiManuals(""), /เข้าสู่ระบบ/, "ห้องสมุดต้องล็อกอินก่อน");
+  const r = gas.apiManuals("tok");
+  assert.strictEqual(r.books.length, 1, "เล่มที่ปิดใช้งาน/ไม่มีรหัสต้องไม่ขึ้น");
+  assert.strictEqual(r.books[0].fileId, "1AbCdEfGhIjKlMnOpQrStUvWxYz012345", "ดึงรหัสไฟล์จากลิงก์ Drive");
+  assert.strictEqual(r.books[0].pages, 170);
+  assert.strictEqual(r.links.length, 1, "แถวผูกของเล่มที่ปิด/ไม่มี ต้องถูกตัด");
+  Object.assign(gas, SAVE);
+
+  const code = fs.readFileSync("gas/Code.gs", "utf8"), app = fs.readFileSync("gas/app.html", "utf8"), idx = fs.readFileSync("gas/index.html", "utf8");
+  assert.ok(/function apiManuals\(token\)\s*\{\s*requireAuth_\(token\)/.test(code));
+  assert.ok(/NEED_LOGIN = \[[^\]]*"manuals"/.test(app), "หน้าห้องสมุดต้องบังคับล็อกอิน");
+  assert.ok(!idx.includes('data-tab="manuals"'), "ห้องสมุดรวมอยู่ใต้เมนูความรู้ช่าง ไม่มีปุ่มเมนูของตัวเอง");
+  assert.ok(/needs-login[^>]*data-tab="parts"[^>]*>[\s\S]*?ความรู้ช่าง/.test(idx), "เมนูความรู้ช่างต้องซ่อนจนล็อกอิน");
+  assert.ok(idx.split('data-know="manuals"').length === 3 && idx.split('data-know="parts"').length === 3, "แถบสลับต้องอยู่ทั้งสองหน้า");
+  assert.ok(/id="tab-manuals"[^>]*>\s*<h2 class="sr-only">/.test(idx) && /id="tab-parts"[^>]*>\s*<h2 class="sr-only">/.test(idx), "สองหน้าต้องมีหัวข้อ");
+  assert.ok(/b\.dataset\.tab === \(name === "manuals" \? "parts" : name\)/.test(app), "หน้าคู่มือต้องไฮไลต์เมนูความรู้ช่าง");
+  assert.ok(/partSheet_\(SHEET_MANUAL/.test(code) && /partSheet_\(SHEET_MANLINK/.test(code), "setup/upgradeSheet ต้องสร้างชีตคู่มือ");
+
+  // ฟังก์ชันแนะนำเป็นฟังก์ชันบริสุทธิ์ — ตัดมาจาก app.html รันตรง ๆ
+  const src = app.match(/function manualSuggest\(links, ctx\) \{[\s\S]*?\n\}\n/)[0];
+  const sug = vm.runInNewContext("(" + src.replace(/^function manualSuggest/, "function") + ")");
+  const S = (a, c) => JSON.parse(JSON.stringify(sug(a, c)));
+  const links = [
+    { book: "A", page: 10, diagram: "D1", ref: "3", machine: "" },          // ชิ้นส่วนตรง
+    { book: "A", page: 11, diagram: "D1", ref: "4", machine: "" },          // ชิ้นส่วนอื่นของแผนภาพเดียวกัน → ห้ามขึ้น
+    { book: "B", page: 5, diagram: "D1", ref: "", machine: "" },            // อุปกรณ์ตรง
+    { book: "C", page: 7, diagram: "", ref: "", machine: "M1" },            // เครื่องตรง
+    { book: "D", page: 2, diagram: "D2", ref: "", machine: "" },            // อุปกรณ์ของเครื่อง
+    { book: "E", page: 9, diagram: "D9", ref: "", machine: "" },            // ไม่เกี่ยว
+  ];
+  let h = S(links, { machine: "M1", partRef: "D1#3 · x", diagIds: ["D1", "D2"] });
+  assert.deepStrictEqual(h.map((x) => x.book), ["A", "C", "B", "D"], "เรียงตามความเจาะจง และตัดชิ้นส่วนอื่น/เรื่องไม่เกี่ยว");
+  assert.ok(!h.some((x) => x.page === 11), "ชิ้นส่วนอื่นของแผนภาพเดียวกันต้องไม่ขึ้น");
+  assert.deepStrictEqual(S(links, {}), [], "ไม่มีบริบท = ไม่แนะนำอะไร");
+  assert.strictEqual(S(Array(20).fill(0).map((_, i) => ({ book: "X", page: i + 1, machine: "M1" })), { machine: "M1" }).length, 6, "จำกัด 6 รายการ");
+  assert.strictEqual(S([{ book: "X", page: 1, machine: "M1" }, { book: "X", page: 1, diagram: "D1", ref: "" }], { machine: "M1", partRef: "D1" }).length, 1, "เล่ม+หน้าเดียวกันไม่ซ้ำ");
+}
+
+// ═══ ผังโรงงาน: จับคู่ชื่อเครื่องในผังกับทะเบียน (alias) ═══
+{
+  const pl = fs.readFileSync("gas/plant.html", "utf8"), lay = fs.readFileSync("gas/plant_layout.html", "utf8");
+  const norm = pl.match(/const normName = [^\n]*\n/)[0];
+  const rec = pl.match(/function reconcile\(machines\) \{[\s\S]*?\n\}\n/)[0];
+  const run = (LAYOUT, machines) => {
+    const c = { LAYOUT, MACHINES: [], OFFMAP: [] };
+    vm.runInNewContext(norm + rec.replace(/^function reconcile/, "var reconcile = function") + ";reconcile(machines);", Object.assign(c, { machines }));
+    return c;
+  };
+  // ชื่อสำรอง: ชื่อในผังต่างจากทะเบียนก็จับคู่ได้ และทะเบียนแถวเดียวไม่แชร์สถานะให้เครื่องในผังสองตัว
+  const L = [{ id: "a", n: "Extrusion machine #1 - 80", alias: ["Extrusion 1 - 80"] }, { id: "b", n: "M1", alias: ["Powder mill"] },
+             { id: "c", n: "M2", alias: ["Powder mill 2"] }, { id: "d", n: "ไม่มีในทะเบียน" }];
+  const M = [{ name: "Extrusion 1 - 80", code: "E1", aliases: ["Ext1-80"] }, { name: "Powder mill", code: "P", aliases: ["Powder mill 1", "Powder mill 2"] }, { name: "ไม่มีในผัง", code: "Z" }];
+  const r = run(L, M);
+  assert.deepStrictEqual(r.MACHINES.map((m) => m.known), [true, true, false, false], "แถวทะเบียนเดียวจับคู่ได้ตัวเดียว");
+  assert.strictEqual(r.MACHINES[0].n, "Extrusion 1 - 80", "ชื่อที่แสดงมาจากทะเบียน");
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(r.OFFMAP)), ["ไม่มีในผัง"]);
+  // ของจริง: เครื่องที่วางอยู่แล้วในผังต้องจับคู่ทะเบียนตั้งต้นได้ (เดิมหลุด 11 ตัวเพราะสะกดต่างกัน)
+  const code = fs.readFileSync("gas/Code.gs", "utf8");
+  const seg = code.slice(code.indexOf("ensure_(SHEET_MACHINES,"), code.indexOf("ensure_(SHEET_PMPLAN"));
+  const reg = [...seg.matchAll(/\[\s*'([^']*)',\s*'([^']*)',\s*'([^']*)',\s*'([^']*)',\s*'([^']*)',\s*'([^']*)',\s*'([^']*)',\s*'([^']*)',\s*'([^']*)'\s*\]/g)]
+    .filter((m) => m[9] === "ใช่").map((m) => ({ name: m[2], code: m[1], aliases: m[8].split(",").map((s) => s.trim()).filter(Boolean) }));
+  const ctx = {}; vm.runInNewContext(lay.replace(/<\/?script[^>]*>/g, "") + ";this.LAYOUT = LAYOUT;", ctx);
+  const real = run(ctx.LAYOUT, reg), known = (id) => real.MACHINES.find((m) => m.id === id).known;
+  assert.ok(!/NaN|undefined/.test(JSON.stringify(real.MACHINES.map((m) => m.n))));
+  /* ส่วนนี้เจาะจงผังของโรงงานต้นทาง — รีโป template มีผังตัวอย่างกลาง ๆ ข้ามไป */
+  if (ctx.LAYOUT.some((m) => m.id === "ext1")) {
+    ["ext1", "ext2", "ext3", "uv1", "uv2", "air2", "air3", "mil1", "cool1", "cool2", "mix2", "mix3", "cut1", "xpe1"].forEach((id) => assert.ok(known(id), id + " ต้องจับคู่ทะเบียนได้"));
+  }
+}
+
+// ═══ ผังโรงงาน: state model (ฟังก์ชันบริสุทธิ์ แยกจากการวาด) ═══
+{
+  const pl = fs.readFileSync("gas/plant.html", "utf8");
+  const src = pl.match(/function plantModel\(state, machines, stages\) \{[\s\S]*?\n\}\n/)[0];
+  const model = vm.runInNewContext("(" + src.replace(/^function plantModel/, "function") + ")");
+  const J = (o) => JSON.parse(JSON.stringify(o));                                  // ข้ามขอบ vm
+  const ms = ["a1", "a2", "b1", "c1"].map((id) => ({ id }));
+  const ST = [{ id: "A", ids: ["a1", "a2"] }, { id: "B", ids: ["b1"] }, { id: "C", ids: ["c1"] }];
+  const run = (s) => J(model(s, ms, ST));
+
+  let r = run({ a1: "run", a2: "run", b1: "run", c1: "run" });
+  assert.ok(Object.values(r.moving).every(Boolean), "เดินทั้งหมด = เคลื่อนไหวทั้งหมด");
+  assert.deepStrictEqual(r.stages.map((x) => x.level), ["full", "full", "full"]);
+  assert.deepStrictEqual(r.flows.map((f) => f.state), ["active", "active"]);
+  assert.ok(r.flows.every((f) => !f.starved));
+
+  r = run({ a1: "run", a2: "stop", b1: "run", c1: "run" });
+  assert.strictEqual(r.stages[0].level, "part", "เดินบางตัว");
+  assert.deepStrictEqual([r.moving.a1, r.moving.a2], [true, false], "ตัวที่หยุดต้องไม่เคลื่อนไหว");
+  assert.strictEqual(r.flows[0].state, "active", "ยังมีเครื่องเดินอยู่ เส้นยังไหล");
+
+  r = run({ a1: "stop", a2: "stop", b1: "run", c1: "run" });
+  assert.strictEqual(r.flows[0].state, "blocked", "ต้นทางเสียทั้งขั้น = เส้นติด");
+  assert.strictEqual(r.flows[0].starved, true, "ปลายทางเดินอยู่แต่ไม่มีของส่งมา");
+  assert.strictEqual(r.flows[1].state, "active");
+
+  r = run({ a1: "plan", a2: "plan", b1: "run", c1: "unknown" });
+  assert.strictEqual(r.flows[0].state, "idle", "หยุดตามแผนไม่ใช่ติดขัด");
+  assert.strictEqual(r.flows[1].state, "active");
+  assert.strictEqual(r.moving.c1, false, "ไม่ทราบสถานะต้องไม่ถูกเดาว่าเดิน");
+
+  r = run({});                                                                      // ยังไม่มีข้อมูลสถานะเลย
+  assert.ok(Object.values(r.moving).every((v) => v === false));
+  assert.deepStrictEqual(r.flows.map((f) => f.state), ["idle", "idle"]);
+  assert.deepStrictEqual(r.stages.map((x) => x.unknown), [0, 0, 0], "ไม่มีค่า = ไม่นับว่า unknown (ผู้เรียกกำหนดเป็น unknown เอง)");
+  assert.ok(/data-move/.test(pl) && !/stageRun/.test(pl), "ตัววาดต้องอ่านจากโมเดล ไม่มีกฎซ้ำ");
+}
+
+// MT = ช่างซ่อมบำรุง ต้องมีใน RANK (ไม่งั้นได้ RANK 0 เงียบ ๆ เหมือนที่เคยเกิดกับ ADMIN) และไม่ใช่หัวหน้า
+{
+  assert.strictEqual(gas.RANK.MT, gas.RANK.TECH);
+  assert.ok(gas.RANK.MT < gas.RANK.LEAD, "ช่างซ่อมบำรุงต้องไม่ได้สิทธิ์หัวหน้าโดยบังเอิญ");
+}
 }

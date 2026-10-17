@@ -113,6 +113,7 @@ You would have to build these yourself: spare-parts/stock integration · labour 
 |---|---|
 | [docs/SETUP.md](docs/SETUP.md) | Step-by-step install |
 | [docs/RUNBOOK.md](docs/RUNBOOK.md) | Deploy, roll back, reset a PIN, common failures |
+| [docs/PLANT.md](docs/PLANT.md) | Plant board — lay machines out for your factory (optional) |
 | [docs/SHEETS.th.md](docs/SHEETS.th.md) | Every sheet and column (Thai) |
 
 ## Buy me a beer

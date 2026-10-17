@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<!--! Free CMMS for poor engineers — https://github.com/twnote05/Free-CMMS-For-poor-Engineer
+     Required Notice: Copyright 2026 IE จอมขี้เกียจ
+     PolyForm Noncommercial 1.0.0 — ห้ามใช้เชิงพาณิชย์ · ดู LICENSE.md -->
+<html lang="th">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>ผังโรงงาน</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+/* เครื่องทุกตัวประกอบจากชิ้นส่วนเรขาคณิตชุดเดียวกัน — กล่อง ทรงกระบอก กรวย ลูกกลิ้ง
+   วางตามโซนในเลย์เอาต์โรงงาน · สถานะเดิน/หยุดทาสีที่ตัวเครื่อง ไม่ใช่แค่ที่ป้าย */
+:root {
+  --ground: #e7ebf0; --face: #f8fafc; --face-2: #eef2f6;
+  --edge: #c3ccd6; --edge-2: #d8dfe6;
+  --ink: #19222c; --ink-2: #5e6a76;
+  --accent: #0f6f7e;
+  --run: #15803d; --stop: #b42318; --plan: #92610a; --unknown: #64748b;
+  --run-bg: #dcf4e4; --stop-bg: #fce4e2; --plan-bg: #fbeeca;
+  --floor: #d4dbe3; --floor-2: #c7cfd8; --wall: #94a2b0;
+  --zone: rgba(15,111,126,.07); --zone-edge: rgba(15,111,126,.35);
+  --store: rgba(148,163,184,.16); --store-edge: rgba(100,116,139,.4);
+  --room-fill: rgba(190,180,160,.3); --room-edge: rgba(140,130,110,.55);
+  --yard: #dfe4ea; --yard-edge: #b9c3cd;
+  --mtop: #eef2f6; --mlit: #cfd8e1; --mdark: #a9b5c1; --steel: #8b98a6;
+  --medge: #ffffff; --mshadow: rgba(25,34,44,.13);
+  --pin: #ffffff; --pin-edge: #243040;
+  --ui: 'IBM Plex Sans Thai','Segoe UI',Tahoma,sans-serif;
+  --num: 'IBM Plex Mono', ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0d131a; --face: #192129; --face-2: #141b23;
+    --edge: #334049; --edge-2: #28333c; --ink: #e6ebf0; --ink-2: #94a3b2;
+    --accent: #3fc8da; --run: #4ade80; --stop: #fca5a5; --plan: #fbbf24; --unknown: #94a3b8;
+    --run-bg: #10301e; --stop-bg: #381513; --plan-bg: #352507;
+    --floor: #18212b; --floor-2: #141c25; --wall: #44525f;
+    --zone: rgba(63,200,218,.07); --zone-edge: rgba(63,200,218,.3);
+    --store: rgba(148,163,184,.1); --store-edge: rgba(148,163,184,.28);
+    --room-fill: rgba(190,180,160,.12); --room-edge: rgba(190,180,160,.3);
+    --yard: #151c24; --yard-edge: #2d3844;
+    --mtop: #4a5765; --mlit: #333f4b; --mdark: #222c36; --steel: #5d6b7a;
+    --medge: #7e8c9b; --mshadow: rgba(0,0,0,.34);
+    --pin: #0f1720; --pin-edge: #5b6b7d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0d131a; --face: #192129; --face-2: #141b23;
+  --edge: #334049; --edge-2: #28333c; --ink: #e6ebf0; --ink-2: #94a3b2;
+  --accent: #3fc8da; --run: #4ade80; --stop: #fca5a5; --plan: #fbbf24; --unknown: #94a3b8;
+  --run-bg: #10301e; --stop-bg: #381513; --plan-bg: #352507;
+  --floor: #18212b; --floor-2: #141c25; --wall: #44525f;
+  --zone: rgba(63,200,218,.07); --zone-edge: rgba(63,200,218,.3);
+  --store: rgba(148,163,184,.1); --store-edge: rgba(148,163,184,.28);
+  --room-fill: rgba(190,180,160,.12); --room-edge: rgba(190,180,160,.3);
+  --yard: #151c24; --yard-edge: #2d3844;
+  --mtop: #4a5765; --mlit: #333f4b; --mdark: #222c36; --steel: #5d6b7a;
+  --medge: #7e8c9b; --mshadow: rgba(0,0,0,.34);
+  --pin: #0f1720; --pin-edge: #5b6b7d;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font-family: var(--ui); margin: 0;
+       padding-block: 16px; padding-left: 16px; padding-right: 16px; }
+.wrap { max-width: 1760px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 20px; }
+h1 { font-size: 22px; font-weight: 700; margin: 0; }
+.sub { font-size: 12px; color: var(--ink-2); margin: 3px 0 0; }
+.clock { text-align: right; }
+.clock b { font-family: var(--num); font-size: 26px; font-weight: 600; display: block; line-height: 1; }
+.clock span { font-size: 11.5px; color: var(--ink-2); }
+
+/* เลือกโหมดสีเอง — จอติดผนังในออฟฟิศกลางวันอยากได้สว่าง ส่วนจอหน้าไลน์กลางคืนอยากได้มืด
+   ค่าตั้งต้นตามเครื่อง เผื่อคนเปิดจากมือถือตัวเองที่ตั้งไว้แล้ว */
+.theme { margin-left: auto; display: flex; border: 1px solid var(--edge); background: var(--face); }
+.theme button { font-family: var(--ui); font-size: 11.5px; font-weight: 600; color: var(--ink-2);
+                background: none; border: none; padding: 6px 11px; cursor: pointer; }
+.theme button + button { border-left: 1px solid var(--edge-2); }
+.theme button:hover { color: var(--accent); }
+.theme button[aria-pressed="true"] { background: var(--accent); color: var(--face); }
+
+.tally { display: flex; gap: 8px; flex-wrap: wrap; }
+.tal { display: flex; align-items: baseline; gap: 6px; border: 1px solid var(--edge);
+       background: var(--face); padding: 6px 12px; font-size: 11.5px; color: var(--ink-2); }
+.tal b { font-family: var(--num); font-size: 17px; }
+
+.card { border: 1px solid var(--edge); background: var(--face); }
+.card-h { padding: 9px 13px; border-bottom: 1px solid var(--edge-2); background: var(--face-2);
+          display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; }
+.card-h h2 { font-size: 12.5px; font-weight: 700; margin: 0; }
+.card-h .note { font-size: 11px; color: var(--ink-2); margin-left: auto; }
+
+.stage { display: grid; grid-template-columns: 250px 1fr; gap: 12px; align-items: start; }
+.grp { font-size: 10.5px; font-weight: 700; color: var(--ink-2); letter-spacing: .05em;
+       padding: 8px 13px 4px; background: var(--face-2); border-bottom: 1px solid var(--edge-2); }
+.item { display: flex; align-items: center; gap: 8px; padding: 7px 13px; cursor: pointer;
+        border: none; border-bottom: 1px solid var(--edge-2); background: none; width: 100%;
+        font-family: var(--ui); font-size: 12px; color: var(--ink); text-align: left; }
+.item:hover { background: var(--face-2); }
+.item[aria-pressed="true"] { background: var(--face-2); box-shadow: inset 3px 0 0 var(--accent); font-weight: 600; }
+.item .nm { flex: 1; min-width: 0; line-height: 1.25; }
+/* หลอดสัญญาณในรายการ — วงแหวนกับไส้ใน แบบเดียวกับที่วาดบนผัง
+   ไม่ทราบสถานะ = หลอดกลวง ไม่ใช่หลอดเทา จะได้ต่างจาก "ดับ" อย่างชัดเจน */
+.dot { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; position: relative;
+       border: 2px solid var(--unknown); background: var(--face); }
+.dot::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; background: transparent; }
+.dot[data-s="run"]  { border-color: var(--run); box-shadow: 0 0 0 3px color-mix(in srgb, var(--run) 26%, transparent); }
+.dot[data-s="run"]::after  { background: var(--run); animation: beat 1.9s ease-in-out infinite; }
+.dot[data-s="stop"] { border-color: var(--stop); box-shadow: 0 0 0 3px color-mix(in srgb, var(--stop) 26%, transparent); }
+.dot[data-s="stop"]::after { background: var(--stop); animation: blink 1s steps(1) infinite; }
+.dot[data-s="plan"] { border-color: var(--plan); }
+.dot[data-s="plan"]::after { background: var(--plan); }
+.dot[data-s="unknown"]::after { background: none; border-top: 2px solid var(--unknown); margin-top: 3px; }
+@keyframes beat { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
+@keyframes blink { 0%,49% { opacity: 1 } 50%,100% { opacity: .1 } }
+.blinks { animation: blinks 1s steps(1) infinite; }
+@keyframes blinks { 0%,49% { opacity: .35 } 50%,100% { opacity: 0 } }
+
+.legend { display: flex; flex-wrap: wrap; gap: 5px 14px; padding: 10px 13px; font-size: 11.5px; color: var(--ink-2); }
+.legend span { display: flex; align-items: center; gap: 6px; }
+.sw { width: 11px; height: 11px; border-radius: 2px; }
+
+.scenewrap { position: relative; }
+.scene { background: var(--face-2); overflow: hidden; touch-action: none; cursor: grab; }
+.scene.drag { cursor: grabbing; }
+.scene svg { display: block; width: 100%; height: auto; }
+.zoomer { position: absolute; right: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 4px; }
+.zoomer button { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--face); color: var(--ink); font: 600 15px/1 var(--ui); cursor: pointer; }
+.zoomer button:hover { border-color: var(--accent); color: var(--accent); }
+g.mc { cursor: pointer; }
+g.mc[data-s="stop"], g.mc[data-s="unknown"] { opacity: .62; }
+g.mc[data-sel="1"] .halo { opacity: 1; }
+.halo { opacity: 0; }
+.spin { animation: spin 2.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg) } }
+.pump { animation: pump 1.5s ease-in-out infinite; }
+@keyframes pump { 0%,100% { opacity: .2 } 50% { opacity: .9 } }
+.crawl { stroke-dasharray: 9 13; animation: crawl 1s linear infinite; }
+@keyframes crawl { to { stroke-dashoffset: -22 } }
+g.mc[data-move="0"] .spin,
+g.mc[data-move="0"] .pump,
+g.mc[data-move="0"] .crawl { animation-play-state: paused; }
+.lbl { font-family: var(--ui); font-size: 11px; font-weight: 600; fill: var(--ink); }
+.lbl2 { font-family: var(--ui); font-size: 10px; fill: var(--ink-2); }
+.zone { font-family: var(--ui); font-size: 12px; font-weight: 700; fill: var(--ink-2); opacity: .55; letter-spacing: .08em; }
+.room-t { font-family: var(--ui); font-size: 10.5px; font-weight: 600; fill: var(--ink-2); }
+.store-t { font-family: var(--ui); font-size: 9.5px; fill: var(--ink-2); opacity: .85; }
+
+/* ── แถบลำดับงาน — ผังบอกว่าเครื่องอยู่ตรงไหน แถบนี้บอกว่าของเดินไปทางไหน ── */
+.flowbar { display: flex; align-items: stretch; flex-wrap: wrap; }
+.stg { flex: 1 1 150px; min-width: 0; padding: 11px 13px; border-right: 1px solid var(--edge-2);
+       border-bottom: 1px solid var(--edge-2); background: none; cursor: pointer; text-align: left;
+       font-family: var(--ui); color: var(--ink); display: flex; flex-direction: column; gap: 5px; }
+.stg:hover { background: var(--face-2); }
+.stg[aria-pressed="true"] { background: var(--face-2); box-shadow: inset 0 3px 0 var(--accent); }
+.stg-h { display: flex; align-items: center; gap: 7px; }
+.stg-n { font-family: var(--num); font-size: 10px; font-weight: 600; color: #fff;
+         background: var(--ink-2); border-radius: 50%; width: 17px; height: 17px;
+         display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.stg[data-s="run"] .stg-n { background: var(--run); }
+.stg[data-s="part"] .stg-n { background: var(--plan); }
+.stg[data-s="down"] .stg-n { background: var(--stop); }
+.stg-t { font-size: 12.5px; font-weight: 600; }
+.stg-e { font-family: var(--num); font-size: 10px; color: var(--ink-2); }
+.stg-v { font-family: var(--num); font-size: 15px; font-weight: 600; }
+.stg[data-s="down"] .stg-v { color: var(--stop); }
+.stg[data-s="part"] .stg-v { color: var(--plan); }
+.stg[data-s="run"] .stg-v { color: var(--run); }
+.stg-w { font-size: 10.5px; color: var(--stop); font-weight: 600; min-height: 1.1em; }
+
+.demo { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 9px 13px;
+        border: 1px dashed var(--edge); background: var(--face-2); font-size: 11.5px; color: var(--ink-2); }
+/* [hidden] เป็นกฎของเบราว์เซอร์ที่แพ้ display ของผู้เขียนเสมอ
+   ไม่มีบรรทัดนี้ แถบล็อกอินจะค้างอยู่ทั้งที่ล็อกอินไปแล้ว */
+.demo[hidden] { display: none; }
+.demo strong { color: var(--ink); font-weight: 600; }
+.demo button { font-family: var(--ui); font-size: 11.5px; font-weight: 600; color: var(--ink);
+               background: var(--face); border: 1px solid var(--edge); padding: 4px 10px; cursor: pointer; }
+.demo button:hover { border-color: var(--accent); color: var(--accent); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.detail { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+.detail > div { padding: 12px 14px; min-width: 0; border-right: 1px solid var(--edge-2); }
+.detail h3 { font-size: 11px; font-weight: 700; margin: 0 0 7px; color: var(--accent); }
+.kv { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; padding: 3px 0; }
+.kv b { font-family: var(--num); font-weight: 600; }
+.age { font-family: var(--num); font-size: 10px; font-weight: 600; padding: 3px 8px;
+       border: 1px solid var(--edge); color: var(--ink-2); background: var(--face); white-space: nowrap; }
+.age[data-f="live"] { color: var(--run); border-color: var(--run); background: var(--run-bg); }
+.age[data-f="old"] { color: var(--plan); border-color: var(--plan); background: var(--plan-bg); }
+.foot { font-size: 11.5px; color: var(--ink-2); line-height: 1.65; }
+.foot code { font-family: var(--num); font-size: 11px; }
+
+@media (max-width: 980px) { .stage { grid-template-columns: 1fr; } .detail { grid-template-columns: 1fr; }
+  .detail > div { border-right: none; border-bottom: 1px solid var(--edge-2); } .clock { margin-left: 0; text-align: left; } }
+/* มือถือ: คนเปิดมาดูว่า "เครื่องไหนหยุด" — แผนที่กับรายการขึ้นก่อน ขั้นตอนการไหลของงานไปไว้ท้ายหน้า
+   แผนที่สูงเต็มส่วนและซูมเข้าตั้งแต่เปิด (เดิมสูง 159px ป้ายเล็กกว่า 2px) ปุ่มทุกปุ่มสูงอย่างน้อย 44px */
+@media (max-width: 640px) {
+  #detailCard { order: 4; } #flowCard { order: 5; } .stage { order: 3; display: flex; flex-direction: column; }
+  #loginBar, #offPanel { order: 6; } .wrap > .foot { order: 7; }
+  .stage .card-h .note { display: none; }
+  .stage > .card { order: -1; }
+  .scene svg { height: 58vh; }
+  .zoomer button { width: 44px; height: 44px; font-size: 18px; }
+  .theme button { min-height: 44px; padding: 0 14px; }
+  .item { min-height: 44px; font-size: 14px; }
+  .demo input, .demo button { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .dot, .spin, .pump, .crawl { animation: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="top">
+    <div><h1>ผังโรงงานเครื่องจักรหลัก</h1>
+      <p class="sub">กระดานสถานะหน้างาน · ข้อมูลชุดเดียวกับหน้าแจ้งซ่อม
+        <a id="backLink" href="#" style="color:var(--accent)">&larr; กลับหน้าหลัก</a></p></div>
+    <div class="theme" role="group" aria-label="โหมดสี">
+      <button type="button" data-th="auto">ตามเครื่อง</button>
+      <button type="button" data-th="light">สว่าง</button>
+      <button type="button" data-th="dark">มืด</button>
+    </div>
+    <div class="clock"><b id="clock">--:--:--</b><span id="today"></span></div>
+  </div>
+
+  <div class="tally" id="tally"></div>
+
+  <div class="card" id="flowCard">
+    <div class="card-h"><h2>ลำดับการไหลของงาน</h2>
+      <span class="note">ผสม → เอ็กซ์ทรูด → เคลือบ UV → ตัด-ตีคลิ๊ก → ติดโฟม XPE → แพ็กกิ้ง · กดขั้นเพื่อดูเครื่องในขั้นนั้น</span></div>
+    <div class="flowbar" id="flowbar"></div>
+  </div>
+
+  <div class="demo" id="loginBar" hidden>
+    <strong>ดูได้เลย</strong>
+    <span>ล็อกอินเฉพาะตอนจะเปลี่ยนสถานะเครื่อง หรืออยากเห็นสาเหตุที่หยุดกับชื่อผู้บันทึก</span>
+    <input id="liEmail" type="email" placeholder="อีเมล" autocomplete="username"
+      style="padding:5px 8px;border:1px solid var(--edge);border-radius:6px;font:inherit">
+    <input id="liPin" type="password" inputmode="numeric" placeholder="PIN" autocomplete="current-password"
+      style="padding:5px 8px;border:1px solid var(--edge);border-radius:6px;font:inherit;width:90px">
+    <button type="button" id="liGo">เข้าสู่ระบบ</button>
+    <span id="liMsg"></span>
+  </div>
+
+  <div class="demo" id="offPanel" hidden>
+    <strong>ยังไม่ได้วางตำแหน่งในผัง</strong>
+    <span id="offList"></span>
+  </div>
+
+  <div class="stage">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <div class="card-h"><h2>เครื่องจักรหลัก</h2><span class="age" data-f="live" id="stAge">—</span></div>
+        <div id="list"></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>สัญลักษณ์</h2></div>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--run)"></i> เดินอยู่</span>
+          <span><i class="sw" style="background:var(--stop)"></i> หยุดเสีย</span>
+          <span><i class="sw" style="background:var(--plan)"></i> หยุดตามแผน PM</span>
+          <span><i class="sw" style="background:var(--unknown)"></i> ไม่ทราบสถานะ</span>
+          <span><i class="sw" style="background:repeating-linear-gradient(90deg,var(--stop) 0 3px,transparent 3px 8px)"></i> เส้นแดงประ = ของไม่ไหล (ขั้นก่อนหน้าเสียทั้งขั้น)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>ผังโรงงาน</h2>
+        <div class="theme" role="group" aria-label="มุมมองผัง">
+          <button type="button" data-view="iso">ไอโซเมตริก</button>
+          <button type="button" data-view="top">มุมบน</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-2);cursor:pointer">
+          <input type="checkbox" id="flowToggle" checked> แสดงเส้นทางการไหล</label>
+        <span class="note">เครื่องที่หยุดจะจางลงและกลไกหยุดนิ่ง — เห็นได้จากอีกฝั่งของโรงงาน</span></div>
+      <div class="scenewrap">
+        <div class="scene" id="scene"></div>
+        <div class="zoomer">
+          <button type="button" id="zIn"  title="ขยาย">+</button>
+          <button type="button" id="zOut" title="ย่อ">&#8722;</button>
+          <button type="button" id="zFit" title="พอดีจอ">&#8982;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="detailCard">
+    <div class="card-h"><h2 id="dName">รายละเอียดเครื่อง</h2><span class="age" id="dAge">—</span></div>
+    <div class="detail">
+      <div><h3>สถานะตอนนี้</h3><div class="foot" id="dState"></div></div>
+      <div><h3>ค่าล่าสุดที่บันทึกไว้</h3><div id="dParam"></div></div>
+      <div><h3>ที่มาของข้อมูล</h3><div class="foot" id="dSrc"></div></div>
+    </div>
+  </div>
+
+  <p class="foot">รายชื่อเครื่องอ่านจากชีต <code>ทะเบียนเครื่องจักร</code> · สถานะอ่านจากชีต
+    <code>บันทึกสถานะเครื่อง</code> ผ่าน <code>apiMachineLog</code> — หน้านี้ไม่ได้เดาสถานะเอง
+    เครื่องที่ยังไม่มีใครบันทึกจะขึ้นว่า "ไม่ทราบสถานะ" · ตำแหน่งวางตามโซนในผังโรงงาน
+    ปรับพิกัดได้ที่ตาราง <code>LAYOUT</code> ในไฟล์นี้</p>
+</div>
+
+<script>
+/* ═══ ไอโซเมตริก 2:1 — จุดในกริดโรงงาน (gx ไปทางขวาของผัง, gy ลงล่าง, gz สูง) ═══ */
+const S = 16, UX = 0.98, UY = 0.49, UZ = 0.80;
+const TOP_S = 9;   // พิกเซลต่อเมตรในโหมดมุมบน                  // พิกเซลต่อหนึ่งหน่วยผังในโหมด Top view
+let OX = 300, OY = 120;
+let VIEW = "iso";                  // iso | top
+
+/* ตัวแปลงพิกัดผัง -> พิกัดบนจอ เป็นจุดเดียวที่รู้เรื่องมุมมอง
+   โหมด top ทิ้งแกน z ทั้งหมด หน้าข้างของกล่องจึงยุบเป็นรูปหลายเหลี่ยมพื้นที่ศูนย์
+   เหลือแต่หน้าบน ซึ่งคือรูปรอยเท้าของเครื่องพอดี — ไม่ต้องเขียนตัววาดชุดที่สอง */
+const P = (x, y, z) => VIEW === "top"
+  ? [OX + x * TOP_S, OY + y * TOP_S]
+  : [OX + (x - y) * UX * S, OY + (x + y) * UY * S - z * UZ * S];
+const pt = (a) => a.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+const poly = (a, f, extra) => '<polygon points="' + pt(a) + '" fill="' + f + '"' + (extra || "") + "/>";
+
+/* ── ชิ้นส่วนพื้นฐาน · ทุกเครื่องประกอบจากสี่ตัวนี้ ───────────────────── */
+function box(x, y, z, w, d, h, top, lit, dark) {
+  top = top || "var(--mtop)"; lit = lit || "var(--mlit)"; dark = dark || "var(--mdark)";
+  return poly([P(x, y + d, z + h), P(x + w, y + d, z + h), P(x + w, y + d, z), P(x, y + d, z)], lit) +
+         poly([P(x + w, y, z + h), P(x + w, y + d, z + h), P(x + w, y + d, z), P(x + w, y, z)], dark) +
+         poly([P(x, y, z + h), P(x + w, y, z + h), P(x + w, y + d, z + h), P(x, y + d, z + h)], top);
+}
+/** กล่องมีขอบสว่างบนสองสัน (โทนที่ 4) — ใช้กับตัวเครื่องที่ยกระดับแล้ว ให้เห็นว่าเป็นแผ่นโลหะมีความหนา ไม่ใช่กล่องเรียบ */
+function slab(x, y, z, w, d, h, top, lit, dark) {
+  return box(x, y, z, w, d, h, top, lit, dark) +
+    '<polyline points="' + pt([P(x, y + d, z + h), P(x + w, y + d, z + h), P(x + w, y, z + h)]) +
+    '" fill="none" stroke="var(--medge)" stroke-width=".9" stroke-linejoin="round"/>';
+}
+/** เงาใต้ฐาน — แผ่นเรียบบนพื้น ทำให้เครื่องไม่ลอย */
+const footShadow = (x, y, w, d) =>
+  poly([P(x - 0.35, y - 0.35, 0.01), P(x + w + 0.35, y - 0.35, 0.01), P(x + w + 0.35, y + d + 0.35, 0.01), P(x - 0.35, y + d + 0.35, 0.01)], "var(--mshadow)");
+/** ช่องระบายอากาศ n เส้นบนหน้าตรง (หน้าที่หันเข้าหาคนดู) */
+function vents(x, y, z, w, h, n) {
+  let g = "";
+  for (let i = 1; i <= n; i++) {
+    const a = P(x + 0.25, y, z + h * i / (n + 1)), b = P(x + w - 0.25, y, z + h * i / (n + 1));
+    g += '<line x1="' + a[0].toFixed(1) + '" y1="' + a[1].toFixed(1) + '" x2="' + b[0].toFixed(1) + '" y2="' + b[1].toFixed(1) +
+         '" stroke="var(--mdark)" stroke-width="1"/>';
+  }
+  return g;
+}
+/** ป้ายชื่อเครื่องบนหน้าตรง + สกรูสองตัว */
+function nameplate(x, y, z, w, h) {
+  const q = [P(x, y, z + h), P(x + w, y, z + h), P(x + w, y, z), P(x, y, z)];
+  const a = P(x + 0.1, y, z + h - 0.1), b = P(x + w - 0.1, y, z + 0.1);
+  return poly(q, "var(--mtop)", ' stroke="var(--medge)" stroke-width=".6"') +
+    '<circle cx="' + a[0].toFixed(1) + '" cy="' + a[1].toFixed(1) + '" r=".9" fill="var(--steel)"/>' +
+    '<circle cx="' + b[0].toFixed(1) + '" cy="' + b[1].toFixed(1) + '" r=".9" fill="var(--steel)"/>';
+}
+/** เรียงชิ้นส่วนของเครื่องหนึ่งตัวจากไกลไปใกล้ตามจุดกลาง (x+y) แล้วต่อเป็นสตริง — painter's order ภายในตัวเครื่อง
+    parts = [[x+y ของจุดกลาง, svg], ...] */
+const paint = (parts) => parts.slice().sort((a, b) => a[0] - b[0]).map((q) => q[1]).join("");
+/** ราวกันตกรอบสี่เหลี่ยม: เสาที่มุม + ราวบน (ใช้กับแท่นยกสูงของเครื่องผสม/เอ็กซ์ทรูด) */
+function railing(x, y, z, w, d, h) {
+  const c = [[x, y], [x + w, y], [x + w, y + d], [x, y + d]];
+  let g = "";
+  c.forEach((q) => { g += strut([q[0], q[1], z], [q[0], q[1], z + h], "var(--steel)", 1.3); });
+  [[0, 1], [1, 2], [2, 3], [3, 0]].forEach((e) => { g += strut([c[e[0]][0], c[e[0]][1], z + h], [c[e[1]][0], c[e[1]][1], z + h], "var(--steel)", 1.1); });
+  return g;
+}
+/** ท่อน้ำเส้นตรงหนาตามแนวแกนที่ระบุ (ท่อเข้า/ออกที่ป้ายในแปลนบอกขนาด DN) */
+const pipeRun = (a, b, col) => strut(a, b, col || "var(--steel)", 3.2);
+/** ตะแกรง/ลูกกลิ้งขวางทางสายพาน n แท่ง (โต๊ะลูกกลิ้ง) */
+function rollerBed(x, y, z, len, w, n) {
+  let g = "";
+  for (let i = 0; i < n; i++) g += box(x + (len - 0.2) * i / (n - 1), y, z, 0.2, w, 0.2, "var(--steel)", "var(--steel)", "var(--mdark)");
+  return g;
+}
+/** ราวข้างสายพานสองข้าง */
+const sideRails = (x, y, z, len, w) =>
+  box(x, y - 0.12, z, len, 0.1, 0.28, "var(--mtop)", "var(--mlit)", "var(--mdark)") +
+  box(x, y + w + 0.02, z, len, 0.1, 0.28, "var(--mtop)", "var(--mlit)", "var(--mdark)");
+/** ทรงกระบอกตั้ง — วงรีบนกับตัวถัง สองหน้าพอ ไม่ต้องแบ่งเหลี่ยม */
+function cyl(x, y, z, r, h, top, side) {
+  const c = P(x, y, z + h), b = P(x, y, z);
+  const rx = r * UX * S, ry = r * UY * S;
+  return '<path d="M' + (c[0] - rx) + " " + c[1] + " L" + (b[0] - rx) + " " + b[1] +
+         " A" + rx + " " + ry + " 0 0 0 " + (b[0] + rx) + " " + b[1] +
+         " L" + (c[0] + rx) + " " + c[1] + 'Z" fill="' + (side || "var(--mdark)") + '"/>' +
+         '<ellipse cx="' + c[0] + '" cy="' + c[1] + '" rx="' + rx + '" ry="' + ry +
+         '" fill="' + (top || "var(--mlit)") + '"/>';
+}
+/** กรวย/ไซโลปากกว้างก้นแคบ */
+function hopper(x, y, z, rT, rB, h) {
+  const t = P(x, y, z + h), b = P(x, y, z);
+  const tx = rT * UX * S, ty = rT * UY * S, bx = rB * UX * S;
+  return '<path d="M' + (t[0] - tx) + " " + t[1] + " L" + (b[0] - bx) + " " + b[1] +
+         " L" + (b[0] + bx) + " " + b[1] + " L" + (t[0] + tx) + " " + t[1] + 'Z" fill="var(--mdark)"/>' +
+         '<ellipse cx="' + t[0] + '" cy="' + t[1] + '" rx="' + tx + '" ry="' + ty + '" fill="var(--mlit)"/>';
+}
+/** ลูกกลิ้ง/เพลา นอนตามแกน gx */
+function roller(x, y, z, len, r) {
+  return box(x, y - r, z - r, len, r * 2, r * 2, "var(--steel)", "var(--steel)", "var(--mdark)");
+}
+/** สายพานลำเลียง — เส้นประวิ่งบนผิว */
+function belt(x, y, z, len, w) {
+  const a = P(x, y + w / 2, z + 0.42), b = P(x + len, y + w / 2, z + 0.42);
+  return box(x, y, z, len, w, 0.4, "var(--mlit)", "var(--mdark)", "var(--mdark)") +
+         '<path class="crawl" d="M' + a[0] + " " + a[1] + " L" + b[0] + " " + b[1] +
+         '" stroke="var(--accent)" stroke-width="2.5" fill="none" stroke-linecap="round"/>';
+}
+/** เส้นโครง/ราวกันตก/ขาค้ำ — ลากระหว่างจุดสามมิติสองจุด */
+function strut(a, b, col, w) {
+  const p = P(a[0], a[1], a[2]), q = P(b[0], b[1], b[2]);
+  return '<line x1="' + p[0] + '" y1="' + p[1] + '" x2="' + q[0] + '" y2="' + q[1] +
+         '" stroke="' + (col || "var(--steel)") + '" stroke-width="' + (w || 1.2) + '" stroke-linecap="round"/>';
+}
+/** วงแหวนนอน — ราวรอบถัง ขอบจาน ปากท่อ */
+function ring(x, y, z, r, col, w) {
+  const c = P(x, y, z);
+  return '<ellipse cx="' + c[0] + '" cy="' + c[1] + '" rx="' + (r * UX * S) + '" ry="' + (r * UY * S) +
+         '" fill="none" stroke="' + (col || "var(--steel)") + '" stroke-width="' + (w || 1.2) + '"/>';
+}
+
+const spinAt = (x, y, z, inner) => {
+  const c = P(x, y, z);
+  return '<g class="spin" style="transform-origin:' + c[0].toFixed(1) + "px " + c[1].toFixed(1) + 'px">' + inner + "</g>";
+};
+
+/* ── เครื่องแต่ละชนิด ประกอบจากชิ้นส่วนข้างบน ────────────────────────── */
+const KIND = {
+  /* เอ็กซ์ทรูด — ตู้ไฟ → ชุดขับ (มอเตอร์ เกียร์) → บาร์เรลทรงเรียวมีแถบฮีตเตอร์ + ฮอปเปอร์ + พัดลม + ปั๊มสุญญากาศ
+     → หอขึ้นรูป/คาเลนเดอร์สองชั้นมีราว → โต๊ะเย็น/ชุดดึง → ชุดตัดมีใบเลื่อยหมุน · ความยาวรวม 14 ม. สิ้นสุดที่ป้ายสายในแปลน CAD (x≈46) */
+  ext(x, y) {
+    const parts = [], add = (cx, cy, svg) => parts.push([cx + cy, svg]);
+    add(x + 7, y + 1, footShadow(x - 0.2, y - 0.2, 14.7, 2.9));
+    /* ตู้คอนโทรลหลังเครื่อง + รางสายไฟ */
+    add(x + 0.8, y - 0.9, slab(x, y - 1.5, 0, 1.6, 0.8, 2.2) + vents(x + 0.15, y - 0.7, 0.3, 1.3, 1.5, 3) + nameplate(x + 0.5, y - 0.7, 1.4, 0.8, 0.3));
+    add(x + 2.2, y - 0.9, box(x + 1.6, y - 1.2, 2.3, 3.2, 0.3, 0.14, "var(--steel)", "var(--steel)", "var(--mdark)") + strut([x + 1.2, y - 1.1, 2.2], [x + 1.6, y - 1.1, 2.3], "var(--steel)", 1.2));
+    /* ชุดขับ: แท่น + มอเตอร์มีครีบระบาย + เกียร์มีแผ่นชื่อ */
+    add(x + 1.5, y + 1.0, slab(x, y + 0.1, 0, 5.6, 1.8, 0.85) + vents(x + 0.3, y + 1.9, 0.15, 5.0, 0.55, 2));
+    add(x + 0.55, y + 1.0, cyl(x + 0.55, y + 1.0, 0.85, 0.5, 0.85, "var(--steel)", "var(--steel)") +
+        spinAt(x + 0.55, y + 1.0, 1.7, ring(x + 0.55, y + 1.0, 1.7, 0.5, "var(--accent)", 2)) +
+        [0.95, 1.1, 1.25].map((z) => ring(x + 0.55, y + 1.0, z, 0.5, "var(--medge)", 0.8)).join(""));
+    add(x + 1.9, y + 1.0, slab(x + 1.2, y + 0.45, 0.85, 1.5, 1.1, 1.1) + nameplate(x + 1.5, y + 1.55, 1.3, 0.8, 0.3));
+    /* บาร์เรลเรียว + แถบฮีตเตอร์ + ฮอปเปอร์สองตัว + ปล่องไอ + ปั๊มสุญญากาศข้างเครื่อง */
+    let br = roller(x + 2.7, y + 1.0, 1.75, 2.9, 0.4);
+    for (let d = 3.0; d < 5.4; d += 0.45) br += strut([x + d, y + 0.62, 1.78], [x + d, y + 1.38, 1.78], "var(--mdark)", 1.4);
+    [3.3, 4.6].forEach((d) => { br += hopper(x + d, y + 1.0, 2.2, 0.55, 0.2, 1.0); });
+    add(x + 4.2, y + 1.0, br);
+    add(x + 5.0, y + 2.4, cyl(x + 5.0, y + 2.4, 0, 0.45, 1.0, "var(--steel)", "var(--steel)") +
+        spinAt(x + 5.0, y + 2.4, 1.0, ring(x + 5.0, y + 2.4, 1.0, 0.35, "var(--accent)", 1.6)) +
+        strut([x + 5.0, y + 2.4, 1.0], [x + 4.9, y + 1.2, 2.1], "var(--steel)", 2.2));
+    /* หอขึ้นรูป/คาเลนเดอร์: โครง 2 ชั้น + ลูกกลิ้ง + ราวกันตกบนสุด */
+    add(x + 7.2, y + 1.0, slab(x + 5.8, y - 0.1, 0, 2.9, 2.2, 3.3) + vents(x + 6.0, y + 2.1, 0.4, 2.5, 2.4, 4) + nameplate(x + 7.0, y + 2.1, 0.5, 0.8, 0.3) +
+        roller(x + 5.9, y + 1.0, 1.5, 2.7, 0.52) + roller(x + 5.9, y + 1.0, 2.5, 2.7, 0.42) +
+        railing(x + 5.8, y - 0.1, 3.3, 2.9, 2.2, 0.7));
+    /* โต๊ะเย็น/ชุดดึง มีราว ลูกกลิ้ง */
+    add(x + 10.6, y + 1.0, slab(x + 8.9, y + 0.3, 0, 3.4, 1.4, 0.75, "var(--mdark)", "var(--mdark)", "var(--mdark)") +
+        belt(x + 8.9, y + 0.3, 0.75, 3.4, 1.4) + sideRails(x + 8.9, y + 0.3, 0.75, 3.4, 1.4) + rollerBed(x + 9.1, y + 0.35, 0.75, 3.0, 1.3, 7));
+    /* ชุดตัด + ตู้คอนโทรล + ใบเลื่อยหมุน */
+    add(x + 13.2, y + 1.0, slab(x + 12.4, y + 0.2, 0, 1.6, 1.6, 2.0) + nameplate(x + 12.7, y + 1.8, 0.8, 0.8, 0.3) +
+        belt(x + 12.6, y + 0.45, 2.0, 1.4, 1.1) +
+        spinAt(x + 13.2, y + 1.0, 2.4, '<ellipse cx="' + P(x + 13.2, y + 1.0, 2.4)[0].toFixed(1) + '" cy="' + P(x + 13.2, y + 1.0, 2.4)[1].toFixed(1) + '" rx="8" ry="8" fill="none" stroke="var(--steel)" stroke-width="2.4"/>'));
+    return paint(parts);
+  },
+  /* สาย UV — ลำดับและความยาวตามป้ายในแปลน CAD (Layout.dxf): ฝุ่น → แปรงคู่ → โรลเลอร์เคลือบ → ลมร้อน →
+     UV 2 หลอด → ห้องให้ความร้อน → UV 7 หลอด → สายพาน (+ชุดทำความเย็น 40P ข้างไลน์) → ถังน้ำ 10 ม. → เป่าลม → ยกออก
+     ความยาวรวม ~50 ม. (โมเดลเดิม 29 ม. สั้นกว่าแปลนจริง) · ชิ้นส่วนเรียงไกล→ใกล้ตามจุดกลาง (x+y) ก่อนวาด
+     หมายเหตุ: แปลนวาดเครื่องชุดเดียวสองแถว ที่นี่ถือว่า UV 1 กับ UV 2 เป็นสายหน้าตาเหมือนกัน */
+  uv(x, y) {
+    const parts = [], D = 2.3;                          // D = ความลึกตัวเครื่องขวางไลน์
+    const add = (cx, cy, svg) => parts.push([cx + cy, svg]);
+    const SEQ = [
+      ["dust",  2.5, 1.5], ["brush", 1.5, 1.4], ["coat", 2.2, 1.9], ["hot", 5.0, 1.7], ["uv2", 2.0, 1.9],
+      ["heat",  4.0, 1.7], ["uv7", 4.5, 2.0], ["conv", 3.0, 0.75], ["tank", 10.0, 0.9], ["air", 2.0, 1.5], ["unload", 3.45, 2.4],
+    ];
+    const GAP = 0.55;
+    let u = 4.8;                                         // CAD: ป้าย Dust cleaner อยู่ห่างจุดอ้างอิง 4.8 ม.
+    const at = {};
+    SEQ.forEach((c) => { at[c[0]] = u; u += c[1] + GAP; });
+    const END = u - GAP;
+    /* สายพานตลอดไลน์ — โผล่ให้เห็นตรงช่องว่างระหว่างเครื่อง ส่วนที่อยู่ใต้ตัวเครื่องถูกบังเอง */
+    add(x + END / 2, y, footShadow(x + 1, y - 0.1, END, D + 0.2));
+    add(x + 1.5, y + 0.9, belt(x + 0.8, y + 0.55, 0.55, END + 1.4, 1.2));
+    for (let lx = 1.5; lx < END; lx += 4.2) {
+      add(x + lx, y + 0.5, strut([x + lx, y + 0.6, 0], [x + lx, y + 0.6, 0.55], "var(--steel)", 1.6) +
+                           strut([x + lx, y + 1.7, 0], [x + lx, y + 1.7, 0.55], "var(--steel)", 1.6));
+    }
+    const body = (name, len, h, top) => {
+      const cx = at[name], y0 = y - 0.05;
+      let g = slab(x + cx, y0, 0.18, len, D, h);
+      g += vents(x + cx + 0.2, y0 + D, 0.3, len - 0.4, h - 0.4, h > 1.6 ? 3 : 2);
+      g += nameplate(x + cx + len / 2 - 0.4, y0 + D, h * 0.55, 0.8, 0.35);
+      return g + (top || "");
+    };
+    const lamps = (cx, len, n) => {                      // หลอด UV เป็นช่องเรืองแสงบนหน้าตรง กะพริบตามสถานะ
+      let g = "";
+      for (let i = 0; i < n; i++) {
+        const lx = x + cx + 0.3 + (len - 0.6) * (i + 0.5) / n;
+        const a = P(lx - 0.12, y - 0.05 + D, 1.15), b2 = P(lx + 0.12, y - 0.05 + D, 1.15), c = P(lx + 0.12, y - 0.05 + D, 1.65), d = P(lx - 0.12, y - 0.05 + D, 1.65);
+        g += '<g class="pump">' + poly([a, b2, c, d], "var(--accent)") + "</g>";
+      }
+      return g;
+    };
+    const stack = (cx, z0, r) => cyl(x + cx, y + D / 2, z0, r, 0.9, "var(--steel)", "var(--steel)");
+    const fan = (cx, cy, z0, r) => cyl(x + cx, y + cy, z0, r, 0.25, "var(--steel)", "var(--mdark)") +
+                                   spinAt(x + cx, y + cy, z0 + 0.25, ring(x + cx, y + cy, z0 + 0.25, r * 0.7, "var(--accent)", 1.6));
+
+    add(x + at.dust + 1.2, y, body("dust", 2.5, 1.5, stack(at.dust + 0.7, 1.68, 0.3)));
+    add(x + at.brush + 0.7, y, body("brush", 1.5, 1.4,
+      roller(x + at.brush + 0.35, y + 0.7, 1.58, 0.8, 0.18) + roller(x + at.brush + 0.35, y + 1.5, 1.58, 0.8, 0.18)));
+    add(x + at.coat + 1.1, y, body("coat", 2.2, 1.9,
+      roller(x + at.coat + 0.3, y + 0.8, 2.12, 1.6, 0.3) + roller(x + at.coat + 0.5, y + 1.6, 2.12, 1.2, 0.22)));
+    add(x + at.hot + 2.5, y, body("hot", 5.0, 1.7,
+      fan(at.hot + 1.0, 1.15, 1.88, 0.45) + fan(at.hot + 2.6, 1.15, 1.88, 0.45) + stack(at.hot + 4.2, 1.88, 0.3)));
+    add(x + at.uv2 + 1.0, y, body("uv2", 2.0, 1.9, "") + lamps(at.uv2, 2.0, 2));
+    add(x + at.heat + 2.0, y, body("heat", 4.0, 1.7, stack(at.heat + 1.0, 1.88, 0.3) + stack(at.heat + 3.0, 1.88, 0.3)));
+    add(x + at.uv7 + 2.25, y, body("uv7", 4.5, 2.0, stack(at.uv7 + 1.5, 2.18, 0.35) + stack(at.uv7 + 3.3, 2.18, 0.35)) + lamps(at.uv7, 4.5, 7));
+    /* ตู้ไฟควบคุมข้างไลน์ + ชุดทำความเย็น 40P (ไม่รวมในกำลังไฟของเครื่อง ตามหมายเหตุในแปลน) */
+    add(x + at.conv + 0.4, y + D + 0.1, slab(x + at.conv, y + D + 0.1, 0, 0.8, 0.6, 2.0) + nameplate(x + at.conv + 0.15, y + D + 0.7, 1.2, 0.5, 0.3));
+    add(x + at.conv + 3.4, y + D + 0.9, slab(x + at.conv + 2.2, y + D + 0.4, 0, 2.4, 1.6, 1.7) +
+        vents(x + at.conv + 2.4, y + D + 2.0, 0.3, 2.0, 1.2, 3) + fan(at.conv + 3.4, D + 1.2, 1.7, 0.6));
+    add(x + at.tank + 5.0, y, slab(x + at.tank, y - 0.05, 0.18, 10.0, D, 0.9, "var(--mlit)", "var(--mlit)", "var(--mdark)") +
+        poly([P(x + at.tank + 0.2, y + 0.15, 1.09), P(x + at.tank + 9.8, y + 0.15, 1.09), P(x + at.tank + 9.8, y + D - 0.25, 1.09), P(x + at.tank + 0.2, y + D - 0.25, 1.09)],
+             "var(--accent)", ' fill-opacity=".22"') +
+        nameplate(x + at.tank + 4.6, y + D - 0.05, 0.4, 0.8, 0.35));
+    add(x + at.air + 1.0, y, body("air", 2.0, 1.5, stack(at.air + 1.0, 1.68, 0.3)));
+    /* เครื่องยกออก — โครงเสา 4 ต้น คานบน และแผ่นดูด */
+    const ux = x + at.unload;
+    let un = "";
+    [[0, 0], [3.2, 0], [0, D], [3.2, D]].forEach((q) => { un += strut([ux + q[0], y + q[1], 0.18], [ux + q[0], y + q[1], 2.4], "var(--steel)", 2); });
+    un += box(ux - 0.1, y - 0.1, 2.4, 3.4, D + 0.2, 0.22) + vents(ux, y + D, 2.45, 3.2, 0.12, 1);
+    un += strut([ux + 1.2, y + 0.6, 2.4], [ux + 1.2, y + 0.6, 1.1], "var(--accent)", 2.2) + strut([ux + 2.2, y + 0.6, 2.4], [ux + 2.2, y + 0.6, 1.1], "var(--accent)", 2.2);
+    add(ux + 1.7, y + 0.5, un);
+
+    parts.sort((p, q) => p[0] - q[0]);
+    return parts.map((q) => q[1]).join("");
+  },
+  /* คัด-สล็อต — ฐาน + ครอบใบมีด + มอเตอร์ + ตู้คอนโทรล + สายพานเข้า/ออก ราวข้าง ช่องระบาย ป้าย
+     ตู้ดูดฝุ่นข้างสายคัด (แปลน CAD: ตู้ไฟชุดดูดฝุ่นสล็อต 81 kW ที่ปลายสาย) — เฉพาะเครื่องคัด ไม่ใส่ให้ชุดบดเศษสล็อต */
+  cut(x, y, m) {
+    const parts = [], add = (cx, cy, svg) => parts.push([cx + cy, svg]);
+    add(x + 4, y, footShadow(x - 3.2, y - 0.1, 14.4, 2.5));
+    add(x - 1.6, y + 0.4, belt(x - 3.2, y + 0.4, 0, 3.2, 1.3) + sideRails(x - 3.2, y + 0.4, 0.1, 3.2, 1.3) + rollerBed(x - 3.0, y + 0.45, 0.1, 2.9, 1.2, 6));
+    add(x + 2.8, y + 1.1, slab(x, y, 0, 5.6, 2.2, 1.0) + vents(x + 0.3, y + 2.2, 0.15, 5.0, 0.7, 2) + nameplate(x + 2.4, y + 2.2, 0.32, 0.8, 0.3));
+    add(x + 2.8, y + 1.0, slab(x + 0.25, y + 0.2, 1.0, 5.1, 1.8, 1.6, "var(--mtop)", "var(--mlit)", "var(--mdark)"));
+    /* แถบหน้าต่างบนครอบ — ของจริงเปิดดูใบมีดได้โดยไม่ต้องยกฝา */
+    [0.5, 2.0, 3.5].forEach((d) => {
+      add(x + d + 0.5, y + 2.0, poly([P(x + d, y + 2.0, 2.1), P(x + d + 1.1, y + 2.0, 2.1),
+                 P(x + d + 1.1, y + 2.0, 2.5), P(x + d, y + 2.0, 2.5)], "var(--face-2)",
+                ' stroke="var(--medge)" stroke-width="0.8"'));
+    });
+    /* มอเตอร์ขับใบมีดเกาะข้างเครื่อง */
+    [1.3, 3.6].forEach((d) => {
+      add(x + d, y + 2.35, cyl(x + d, y + 2.35, 0.5, 0.36, 0.7, "var(--steel)", "var(--steel)") +
+                           spinAt(x + d, y + 2.35, 1.2, ring(x + d, y + 2.35, 1.2, 0.36, "var(--accent)", 2)));
+    });
+    /* ใบเลื่อยโผล่พ้นครอบ — หมุนเมื่อเครื่องเดิน หยุดเมื่อเครื่องหยุด */
+    [1.1, 2.4, 3.7].forEach((d) => {
+      const c = P(x + d, y + 1.1, 2.75);
+      add(x + d, y + 1.1, '<g class="spin" style="transform-origin:' + c[0].toFixed(1) + "px " + c[1].toFixed(1) + 'px">' +
+           '<ellipse cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" rx="10" ry="10" fill="none" stroke="var(--steel)" stroke-width="3"/>' +
+           '<line x1="' + (c[0] - 10).toFixed(1) + '" y1="' + c[1].toFixed(1) + '" x2="' + (c[0] + 10).toFixed(1) + '" y2="' + c[1].toFixed(1) +
+           '" stroke="var(--steel)" stroke-width="2"/></g>');
+    });
+    add(x + 6.5, y + 0.8, slab(x + 5.8, y + 0.2, 0, 1.5, 1.3, 2.6) +
+        poly([P(x + 5.8, y + 1.5, 1.6), P(x + 7.3, y + 1.5, 1.6), P(x + 7.3, y + 1.5, 2.3), P(x + 5.8, y + 1.5, 2.3)], "var(--face-2)", ' stroke="var(--medge)" stroke-width="0.8"') +
+        nameplate(x + 6.1, y + 1.5, 0.5, 0.9, 0.3));
+    add(x + 9.2, y + 1.0, belt(x + 7.4, y + 0.4, 0, 3.6, 1.3) + sideRails(x + 7.4, y + 0.4, 0.1, 3.6, 1.3) + rollerBed(x + 7.6, y + 0.45, 0.1, 3.2, 1.2, 7));
+    if (!m || !/^slw/.test(m.id)) {
+      /* ตู้ดูดฝุ่น + ท่อขึ้นหลังคาเครื่อง */
+      add(x + 9.9, y + 3.0, slab(x + 9.3, y + 2.5, 0, 1.2, 0.9, 2.2) + vents(x + 9.45, y + 3.4, 0.3, 0.9, 1.4, 3) +
+          cyl(x + 9.9, y + 2.95, 2.2, 0.28, 0.6, "var(--steel)", "var(--steel)"));
+    }
+    return paint(parts);
+  },
+  /* XPE — ชุดม้วนคลี่ + ลูกกลิ้งดึง + ชุดรีดความร้อน + โต๊ะระบายความร้อน/สายพานออก + ตู้ไฟ
+     ตู้ไฟ 70 kW อยู่ด้านซ้ายของเครื่องตามป้าย "IXPE electrical cabinet" ในแปลน CAD */
+  xpe(x, y) {
+    const parts = [], add = (cx, cy, svg) => parts.push([cx + cy, svg]);
+    add(x + 4, y, footShadow(x - 3.2, y - 0.1, 15.4, 2.3));
+    add(x - 2.5, y + 0.9, slab(x - 3.3, y + 0.35, 0, 1.6, 0.9, 2.2) + vents(x - 3.15, y + 1.25, 0.3, 1.3, 1.5, 3) + nameplate(x - 2.9, y + 1.25, 1.4, 0.8, 0.3));
+    /* ม้วนวัสดุบนแท่น + แกนม้วน + ลูกกลิ้งดึงสองตัวบนเสา */
+    add(x + 1.5, y + 1.0, slab(x, y, 0, 3.0, 2.0, 1.2) + vents(x + 0.3, y + 2.0, 0.2, 2.4, 0.8, 2) +
+        cyl(x + 1.3, y + 1.0, 1.2, 1.1, 1.0) + cyl(x + 1.3, y + 1.0, 1.2, 0.3, 1.1, "var(--steel)", "var(--steel)") +
+        spinAt(x + 1.3, y + 1.0, 2.2,
+          '<ellipse cx="' + P(x + 1.3, y + 1.0, 2.2)[0].toFixed(1) + '" cy="' + P(x + 1.3, y + 1.0, 2.2)[1].toFixed(1) +
+          '" rx="' + (1.1 * UX * S).toFixed(1) + '" ry="' + (1.1 * UY * S).toFixed(1) + '" fill="none" stroke="var(--accent)" stroke-width="2"/>'));
+    add(x + 3.2, y + 1.0, strut([x + 2.9, y + 0.1, 1.2], [x + 2.9, y + 0.1, 2.4], "var(--steel)", 1.8) + strut([x + 2.9, y + 1.9, 1.2], [x + 2.9, y + 1.9, 2.4], "var(--steel)", 1.8) +
+        roller(x + 2.9 - 0.1, y + 0.2, 2.4, 0.2, 0.0) + box(x + 2.8, y + 0.1, 2.3, 0.22, 1.8, 0.22, "var(--steel)", "var(--steel)", "var(--mdark)"));
+    /* ชุดรีดความร้อน: โครง + ลูกกลิ้งร้อนมองเห็นทางช่อง + ปล่องไอร้อน */
+    add(x + 5.3, y + 0.9, slab(x + 3.8, y + 0.15, 1.2, 3.0, 1.7, 1.9) + vents(x + 4.0, y + 1.85, 1.35, 2.6, 1.3, 3) + nameplate(x + 5.0, y + 1.85, 2.4, 0.8, 0.32) +
+        poly([P(x + 4.1, y + 1.85, 1.55), P(x + 5.4, y + 1.85, 1.55), P(x + 5.4, y + 1.85, 2.0), P(x + 4.1, y + 1.85, 2.0)], "var(--face-2)", ' stroke="var(--medge)" stroke-width=".8"') +
+        cyl(x + 6.2, y + 1.0, 3.1, 0.3, 0.8, "var(--steel)", "var(--steel)"));
+    /* โต๊ะระบายความร้อน + สายพานออก มีราว ลูกกลิ้ง และพัดลมระบายความร้อนสองตัว */
+    add(x + 10.1, y + 1.0, belt(x + 8.4, y + 0.35, 0, 3.4, 1.3) + sideRails(x + 8.4, y + 0.35, 0.1, 3.4, 1.3) + rollerBed(x + 8.6, y + 0.4, 0.1, 3.0, 1.2, 7) +
+        [9.2, 10.8].map((d) => strut([x + d, y + 0.3, 0], [x + d, y + 0.3, 1.2], "var(--steel)", 1.4) + strut([x + d + 0.8, y + 1.7, 0], [x + d + 0.8, y + 1.7, 1.2], "var(--steel)", 1.4)).join("") +
+        [9.2, 10.9].map((d) => cyl(x + d, y + 1.0, 1.25, 0.4, 0.2, "var(--steel)", "var(--mdark)") + spinAt(x + d, y + 1.0, 1.45, ring(x + d, y + 1.0, 1.45, 0.3, "var(--accent)", 1.6))).join(""));
+    return paint(parts);
+  },
+  /* ผสมร้อน-เย็น — ถังผสมร้อนบน ถังเย็นล่าง มอเตอร์บนฝา แท่นมีราวกันตกกับบันได ท่อน้ำเข้า DN80/ออก DN100 และตู้ไฟชุดเครื่อง
+     ท่อกับตู้ไฟตามป้ายในแปลน CAD (Mix 3: water inlet DN80 / outlet DN100 / ตู้ไฟชุดเครื่อง 260 kW) */
+  mix(x, y) {
+    const parts = [], add = (cx, cy, svg) => parts.push([cx + cy, svg]);
+    add(x + 2, y + 1.6, footShadow(x - 0.4, y - 0.4, 6.8, 4.4));
+    add(x + 2.0, y + 1.6, slab(x, y, 0, 4.0, 3.2, 0.9) + vents(x + 0.3, y + 3.2, 0.15, 3.4, 0.6, 2) + railing(x + 0.05, y + 0.05, 0.9, 3.9, 3.1, 0.7));
+    /* บันได 3 ขั้นด้านหน้า */
+    add(x + 3.0, y + 3.7, [0, 1, 2].map((k) => box(x + 2.3, y + 3.2 + k * 0.28, 0, 0.9, 0.3, 0.3 * (3 - k), "var(--mtop)", "var(--mlit)", "var(--mdark)")).join(""));
+    /* ถังร้อน: ตัวถัง ขอบเสริมสามวง ฝาครอบ + ช่องเติม + มอเตอร์ + ใบกวน */
+    add(x + 1.4, y + 1.1, cyl(x + 1.4, y + 1.1, 0.9, 1.3, 2.5) +
+        [1.4, 2.2, 3.0].map((z) => ring(x + 1.4, y + 1.1, z, 1.3, "var(--medge)", 1)).join("") +
+        cyl(x + 0.5, y + 0.7, 3.4, 0.28, 0.5, "var(--steel)", "var(--steel)") +
+        cyl(x + 1.4, y + 1.1, 3.4, 0.45, 0.9, "var(--steel)", "var(--steel)") +
+        spinAt(x + 1.4, y + 1.1, 4.3,
+          '<line x1="' + (P(x + 1.4, y + 1.1, 4.3)[0] - 12).toFixed(1) + '" y1="' + P(x + 1.4, y + 1.1, 4.3)[1].toFixed(1) +
+          '" x2="' + (P(x + 1.4, y + 1.1, 4.3)[0] + 12).toFixed(1) + '" y2="' + P(x + 1.4, y + 1.1, 4.3)[1].toFixed(1) +
+          '" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/>'));
+    /* ท่อส่งวัสดุร้อน → ถังเย็น (ท่อลาดจากข้างถังร้อนลงฝาถังเย็น) */
+    add(x + 2.3, y + 1.8, strut([x + 1.9, y + 1.5, 2.2], [x + 2.5, y + 2.0, 2.1], "var(--steel)", 4.2));
+    /* ถังเย็น: ตัวถัง + แจ็กเก็ตน้ำ + วาล์วปล่อยวัสดุ */
+    add(x + 2.9, y + 2.3, cyl(x + 2.9, y + 2.3, 0.9, 1.0, 1.5) +
+        [1.2, 1.6, 2.0].map((z) => ring(x + 2.9, y + 2.3, z, 1.0, "var(--medge)", 1)).join("") +
+        box(x + 2.6, y + 2.9, 0.35, 0.6, 0.5, 0.5, "var(--steel)", "var(--steel)", "var(--mdark)") + nameplate(x + 2.5, y + 3.2, 0.5, 0.5, 0.25));
+    /* ท่อน้ำเข้า DN80 (ฟ้า) กับออก DN100 (เทา) ลากไปทางซ้ายของแท่น */
+    add(x - 0.4, y + 3.3, pipeRun([x + 2.2, y + 3.4, 0.5], [x - 1.2, y + 3.4, 0.5], "var(--accent)") + pipeRun([x + 2.2, y + 3.4, 0.5], [x + 2.2, y + 3.4, 1.4], "var(--accent)") +
+        pipeRun([x + 3.6, y + 3.7, 0.4], [x - 1.2, y + 3.7, 0.4], "var(--steel)"));
+    /* ตู้ไฟชุดเครื่อง */
+    add(x + 5.0, y + 1.2, slab(x + 4.4, y + 0.6, 0, 1.4, 0.9, 2.2) + vents(x + 4.55, y + 1.5, 0.3, 1.1, 1.5, 3) + nameplate(x + 4.7, y + 1.5, 1.4, 0.8, 0.3));
+    return paint(parts);
+  },
+  /* โม่ผง — ตัวโม่ + ตะแกรงร่อน + ไซโคลน + ตู้ถุงกรองฝุ่น + มอเตอร์พูลเลย์ แท่นมีช่องระบายและป้ายชื่อ */
+  mill(x, y) {
+    const parts = [], add = (cx, cy, svg) => parts.push([cx + cy, svg]);
+    add(x + 1.7, y + 1.6, footShadow(x + 0.1, y - 0.1, 3.6, 3.3));
+    add(x + 1.35, y + 2.1, slab(x + 0.4, y + 1.2, 0, 1.9, 1.8, 0.8) + vents(x + 0.55, y + 3.0, 0.1, 1.6, 0.55, 2) + nameplate(x + 0.9, y + 3.0, 0.45, 0.8, 0.25) +
+        cyl(x + 1.35, y + 2.1, 0.8, 0.72, 0.95) +
+        cyl(x + 1.35, y + 2.1, 1.75, 0.88, 0.4, "var(--mlit)", "var(--mtop)") + ring(x + 1.35, y + 2.1, 2.15, 0.88, "var(--medge)", 1.2));
+    /* มอเตอร์กับพูลเลย์ข้างเครื่อง */
+    add(x + 2.55, y + 2.1, cyl(x + 2.55, y + 2.1, 0.3, 0.42, 0.72, "var(--steel)", "var(--steel)") +
+        spinAt(x + 2.55, y + 2.1, 1.02, ring(x + 2.55, y + 2.1, 1.02, 0.42, "var(--accent)", 2)));
+    /* ไซโคลน แล้วท่อโค้งพาฝุ่นไปถุงกรอง — ส่วนที่ตันบ่อยที่สุด จึงวาดให้เห็นทั้งเส้น */
+    add(x + 1.35, y + 0.75, hopper(x + 1.35, y + 0.75, 1.7, 0.42, 0.14, 0.8) + cyl(x + 1.35, y + 0.75, 2.5, 0.42, 0.55, "var(--mlit)", "var(--mtop)"));
+    let bag = slab(x + 2.5, y + 0.15, 0, 0.95, 1.0, 3.0) + nameplate(x + 2.65, y + 1.15, 0.6, 0.6, 0.25);
+    for (let d = 2.62; d < 3.4; d += 0.22) bag += strut([x + d, y + 1.15, 0.9], [x + d, y + 1.15, 2.9], "var(--mdark)", 1.2);
+    add(x + 3.0, y + 0.65, bag);
+    const pa = P(x + 1.35, y + 0.75, 3.05), pb = P(x + 2.97, y + 0.65, 3.0), pm = P(x + 2.2, y + 0.7, 3.9);
+    add(x + 2.4, y + 0.7, '<path d="M' + pa[0].toFixed(1) + " " + pa[1].toFixed(1) + " Q" + pm[0].toFixed(1) + " " + pm[1].toFixed(1) + " " + pb[0].toFixed(1) + " " + pb[1].toFixed(1) +
+         '" fill="none" stroke="var(--steel)" stroke-width="4" stroke-linecap="round"/>');
+    return paint(parts);
+  },
+  /* ไซโลวัตถุดิบ — ถังตั้งบนขา มีแถบเสริมความแข็งแรง บันไดลิง ช่องตรวจ ตัวกรองฝุ่นบนหลังคา และปากปล่อยด้านล่าง */
+  silo(x, y) {
+    const cx = x + 1.2, cy = y + 1.2, parts = [], add = (kx, ky, svg) => parts.push([kx + ky, svg]);
+    add(cx, cy, footShadow(x - 0.3, y - 0.3, 3.4, 3.0));
+    let g = "";
+    [[0.2, 0.2], [2.2, 0.2], [0.2, 2.2], [2.2, 2.2]].forEach((q) => { g += strut([x + q[0], y + q[1], 0], [x + q[0], y + q[1], 1.5], "var(--steel)", 2.4); });
+    g += cyl(cx, cy, 1.4, 1.2, 3.2) + hopper(cx, cy, 0, 1.2, 0.35, 1.4);
+    [2.4, 3.4, 4.2].forEach((z) => { g += ring(cx, cy, z, 1.2, "var(--medge)", 1); });
+    g += cyl(cx, cy, 4.6, 0.55, 0.45, "var(--steel)", "var(--steel)") + cyl(cx - 0.55, cy - 0.35, 4.6, 0.22, 0.2, "var(--mlit)", "var(--mdark)");
+    const lx = cx + 1.0, ly = cy - 0.75;
+    g += strut([lx, ly - 0.16, 0.2], [lx, ly - 0.16, 4.4], "var(--steel)", 1.2) + strut([lx, ly + 0.16, 0.2], [lx, ly + 0.16, 4.4], "var(--steel)", 1.2);
+    for (let z = 0.5; z < 4.4; z += 0.45) g += strut([lx, ly - 0.16, z], [lx, ly + 0.16, z], "var(--steel)", 1);
+    g += nameplate(cx - 0.4, cy + 1.25, 2.0, 0.8, 0.3);
+    add(cx, cy, g);
+    return paint(parts);
+  },
+  /* ชุดปั๊มลม — ตู้ปั๊มสกรู ช่องระบาย ถังเก็บลมพร้อมเกจ ท่อลมและมอเตอร์พัดลม */
+  comp(x, y) {
+    const parts = [], add = (cx, cy, svg) => parts.push([cx + cy, svg]);
+    add(x + 1.8, y + 1.0, footShadow(x - 0.1, y - 0.1, 4.0, 2.5));
+    add(x + 1.8, y + 1.0, slab(x, y, 0, 3.6, 2.0, 0.3));
+    add(x + 1.4, y + 1.0, slab(x + 0.2, y + 0.2, 0.3, 2.3, 1.6, 1.9) + vents(x + 0.35, y + 1.8, 0.5, 2.0, 1.3, 4) + nameplate(x + 1.0, y + 1.8, 1.9, 0.8, 0.3));
+    add(x + 3.1, y + 1.0, cyl(x + 3.1, y + 1.0, 0.3, 0.52, 2.8) + [0.9, 1.7, 2.5].map((z) => ring(x + 3.1, y + 1.0, z, 0.52, "var(--medge)", 1)).join("") +
+        cyl(x + 3.1, y + 1.0, 3.1, 0.12, 0.25, "var(--steel)", "var(--steel)"));
+    /* ท่อลมจากตู้ปั๊มไปถัง + เกจแรงดัน */
+    add(x + 2.8, y + 1.0, strut([x + 2.5, y + 1.0, 1.9], [x + 2.9, y + 1.0, 2.6], "var(--steel)", 3) +
+        '<circle cx="' + P(x + 3.1, y + 0.45, 2.3)[0].toFixed(1) + '" cy="' + P(x + 3.1, y + 0.45, 2.3)[1].toFixed(1) + '" r="3.6" fill="var(--face)" stroke="var(--steel)" stroke-width="1.2"/>');
+    add(x + 1.35, y + 2.05, cyl(x + 1.35, y + 2.05, 0, 0.5, 0.9, "var(--steel)", "var(--steel)") +
+        spinAt(x + 1.35, y + 2.05, 0.9,
+          '<ellipse cx="' + P(x + 1.35, y + 2.05, 0.9)[0].toFixed(1) + '" cy="' + P(x + 1.35, y + 2.05, 0.9)[1].toFixed(1) +
+          '" rx="' + (0.5 * UX * S).toFixed(1) + '" ry="' + (0.5 * UY * S).toFixed(1) + '" fill="none" stroke="var(--accent)" stroke-width="2"/>'));
+    return paint(parts);
+  },
+  /* ห้องอินเวอร์เตอร์โซล่าเซลล์ — ตู้อินเวอร์เตอร์เรียงกัน กั้นตะแกรง มีหลังคาเอียงกันฝน */
+  inv(x, y) {
+    const parts = [], add = (cx, cy, svg) => parts.push([cx + cy, svg]);
+    add(x + 2.6, y + 0.9, footShadow(x - 0.3, y - 0.3, 6.0, 2.8) + slab(x, y, 0, 5.2, 1.8, 0.3, "var(--wall)", "var(--wall)", "var(--mdark)"));
+    /* ตู้อินเวอร์เตอร์เรียงใต้เพิง — ของจริงเปิดโล่งเพื่อระบายความร้อน */
+    for (let i = 0; i < 4; i++) {
+      add(x + 0.85 + i * 1.15, y + 0.9, slab(x + 0.4 + i * 1.15, y + 0.45, 0.3, 0.9, 0.95, 1.7) + vents(x + 0.5 + i * 1.15, y + 1.4, 0.55, 0.7, 1.2, 3) +
+          nameplate(x + 0.65 + i * 1.15, y + 1.4, 1.75, 0.5, 0.2));
+    }
+    let fr = "";
+    [[0.15, 0.15], [5.05, 0.15], [0.15, 1.65], [5.05, 1.65]].forEach((q) => { fr += strut([x + q[0], y + q[1], 0.3], [x + q[0], y + q[1], 2.5], "var(--mdark)", 2); });
+    for (let d = 0.15; d <= 5.05; d += 0.55) fr += strut([x + d, y + 1.65, 0.3], [x + d, y + 1.65, 2.2], "var(--steel)", 0.6);
+    add(x + 2.6, y + 1.65, fr);
+    /* หลังคาเอียงลาดออกด้านหน้า + แถบช่องลมใต้ชายคา */
+    let rf = poly([P(x - 0.2, y - 0.25, 3.0), P(x + 5.4, y - 0.25, 3.0), P(x + 5.4, y + 2.05, 2.6), P(x - 0.2, y + 2.05, 2.6)], "var(--mtop)", ' stroke="var(--medge)" stroke-width="1"');
+    for (let d = 0; d <= 5.2; d += 0.4) rf += strut([x + d, y - 0.25, 3.0], [x + d, y + 2.05, 2.6], "var(--mdark)", 0.6);
+    rf += strut([x - 0.2, y + 2.05, 2.6], [x + 5.4, y + 2.05, 2.6], "var(--mdark)", 2);
+    const c = P(x + 2.6, y + 0.9, 2.3);
+    rf += '<g class="pump"><rect x="' + (c[0] - 24).toFixed(1) + '" y="' + (c[1] - 4).toFixed(1) + '" width="48" height="5" rx="2.5" fill="var(--accent)"/></g>';
+    add(x + 2.6, y + 2.2, rf);
+    return paint(parts);
+  },
+  /* คูลลิ่งทาวเวอร์ — ปล่องสอบเข้า พัดลมดูดด้านบน อ่างน้ำด้านล่าง */
+  cool(x, y) {
+    const cx = x + 1.5, cy = y + 1.5;
+    let g = footShadow(x - 0.5, y - 0.5, 4.2, 4.2) + nameplate(cx - 0.4, cy + 1.45, 0.62, 0.8, 0.25) + cyl(cx, cy, 0, 1.5, 0.55, "var(--mlit)", "var(--mtop)");   // อ่างน้ำกลม
+    g += ring(cx, cy, 0.55, 1.5, "var(--mdark)", 1.4);
+    /* หน้าแปลนท่อเข้า-ออกที่ข้างอ่าง — จุดที่ช่างไปจับทุกครั้งที่ล้างอ่าง */
+    g += cyl(cx - 0.35, cy + 1.45, 0.12, 0.2, 0.3, "var(--steel)", "var(--steel)");
+    g += cyl(cx + 0.35, cy + 1.45, 0.12, 0.2, 0.3, "var(--steel)", "var(--steel)");
+    g += hopper(cx, cy, 0.55, 0.85, 1.42, 2.5);               // ปล่อง FRP สอบเข้า
+    g += cyl(cx, cy, 3.05, 0.85, 0.5, "var(--mlit)", "var(--mtop)");   // คอถัง
+    g += ring(cx, cy, 3.55, 0.85, "var(--steel)", 1.3);
+    g += cyl(cx, cy, 3.55, 0.3, 0.45, "var(--steel)", "var(--steel)"); // มอเตอร์พัดลม
+    /* ราวกันตกรอบอ่าง + ขาค้ำทแยง เหมือนตัวจริงที่ขึ้นไปยืนล้างได้ */
+    g += ring(cx, cy, 0.9, 1.52, "var(--steel)", 1.1);
+    [0, 1, 2, 3, 4, 5].forEach((i) => {
+      const a = (i / 6) * Math.PI * 2, px = cx + Math.cos(a) * 1.52, py = cy + Math.sin(a) * 1.52;
+      g += strut([px, py, 0.5], [px, py, 0.9]);
+    });
+    /* บันไดลิงข้างถัง */
+    const lx = cx + 1.1, ly = cy - 0.95;
+    g += strut([lx, ly - 0.16, 0.5], [lx, ly - 0.16, 3.7]);
+    g += strut([lx, ly + 0.16, 0.5], [lx, ly + 0.16, 3.7]);
+    for (let z = 0.8; z < 3.7; z += 0.42) g += strut([lx, ly - 0.16, z], [lx, ly + 0.16, z], "var(--steel)", 1);
+    g += spinAt(cx, cy, 4.0,
+      '<g>' + strut([cx - 0.95, cy, 4.0], [cx + 0.95, cy, 4.0], "var(--accent)", 3) +
+      strut([cx, cy - 0.95, 4.0], [cx, cy + 0.95, 4.0], "var(--accent)", 3) + "</g>");
+    return g;
+  },
+  /* ห้องกรองน้ำ — ถังกรองสามใบมีแถบรัด ท่อรวมบนหัวถัง วาล์วมือหมุน และชุดปั๊ม */
+  water(x, y) {
+    const parts = [], add = (cx, cy, svg) => parts.push([cx + cy, svg]);
+    add(x + 2.2, y + 1.1, footShadow(x - 0.3, y - 0.3, 5.0, 2.8) + slab(x, y, 0, 4.4, 2.2, 0.35));
+    [0.9, 2.2, 3.5].forEach((d) => {
+      add(x + d, y + 1.1, cyl(x + d, y + 1.1, 0.35, 0.52, 2.3) + [0.9, 1.6, 2.3].map((z) => ring(x + d, y + 1.1, z, 0.52, "var(--medge)", 1)).join("") +
+          cyl(x + d, y + 1.1, 2.65, 0.14, 0.3, "var(--steel)", "var(--steel)") + '<circle cx="' + P(x + d, y + 0.58, 2.2)[0].toFixed(1) + '" cy="' + P(x + d, y + 0.58, 2.2)[1].toFixed(1) + '" r="2.4" fill="var(--face)" stroke="var(--steel)" stroke-width="1"/>');
+    });
+    add(x + 2.0, y + 0.4, slab(x + 0.4, y + 0.15, 0.35, 3.6, 0.5, 0.5, "var(--steel)", "var(--steel)", "var(--mdark)") + vents(x + 0.55, y + 0.65, 0.4, 3.3, 0.4, 2) +
+        pipeRun([x + 0.9, y + 1.1, 2.95], [x + 3.5, y + 1.1, 2.95], "var(--steel)"));
+    add(x + 3.9, y + 0.45, cyl(x + 3.9, y + 0.45, 0.35, 0.33, 0.7, "var(--steel)", "var(--steel)") +
+        spinAt(x + 3.9, y + 0.45, 1.05,
+          '<ellipse cx="' + P(x + 3.9, y + 0.45, 1.05)[0].toFixed(1) + '" cy="' + P(x + 3.9, y + 0.45, 1.05)[1].toFixed(1) +
+          '" rx="' + (0.33 * UX * S).toFixed(1) + '" ry="' + (0.33 * UY * S).toFixed(1) + '" fill="none" stroke="var(--accent)" stroke-width="2"/>'));
+    return paint(parts);
+  },
+  /* ตู้ไฟหลัก MDB — ตู้ต่อกันสามบาน มีช่องระบาย มือจับ และป้ายแรงดัน */
+  mdb(x, y) {
+    const parts = [], add = (cx, cy, svg) => parts.push([cx + cy, svg]);
+    add(x + 1.3, y + 0.6, footShadow(x - 0.2, y - 0.2, 3.0, 1.6) + slab(x, y, 0, 2.6, 1.2, 0.2));
+    for (let i = 0; i < 3; i++) {
+      const px = x + 0.15 + i * 0.82;
+      add(px + 0.34, y + 0.6, slab(px, y + 0.2, 0.2, 0.68, 0.8, 1.7) + vents(px + 0.1, y + 1.0, 0.3, 0.48, 0.6, 2) + nameplate(px + 0.14, y + 1.0, 1.15, 0.4, 0.22) +
+          strut([px + 0.55, y + 1.0, 0.9], [px + 0.55, y + 1.0, 1.1], "var(--steel)", 1.6));
+    }
+    return paint(parts);
+  },
+  /* ชนิดทั่วไป — กล่องเดียว ขนาดกำหนดได้ใน LAYOUT: { k:"generic", w:4, d:3, h:2.5 }
+     ใช้กับเครื่องที่ยังไม่มีโมเดลเฉพาะ และเป็นตัวสำรองเมื่อชนิดในผังพิมพ์ผิด — มีเงา ช่องระบาย และป้ายเหมือนตัวอื่น */
+  generic(x, y, m) {
+    const w = (m && m.w) || 3, d = (m && m.d) || 2, h = (m && m.h) || 2;
+    return footShadow(x - 0.1, y - 0.1, w + 0.2, d + 0.2) + slab(x, y, 0, w, d, 0.2, "var(--mdark)", "var(--mdark)", "var(--mdark)") +
+           slab(x + 0.2, y + 0.2, 0.2, w - 0.4, d - 0.4, h) + vents(x + 0.4, y + d - 0.2, 0.4, w - 0.8, h - 0.4, Math.max(2, Math.round(h))) +
+           nameplate(x + w / 2 - 0.4, y + d - 0.2, h * 0.5, 0.8, 0.3);
+  },
+  /* แพ็กกิ้ง — ชุดอุปกรณ์ปลายไลน์ตามเลขในแปลน CAD (ระยะจากจุดอ้างอิงคือ 77.4, 8.6 ม.; ป้ายเป็นจุดวางตัวหนังสือ ตำแหน่งคลาดได้ ±1-2 ม.)
+     ชุดบน (y 10-15): 8 เครื่องพลิกแผ่น → 9 สายพานตรวจ → 11 โต๊ะลูกกลิ้งต่อ ↔ 10 เครื่องเรียงซ้อนแผ่น → พาเลท + เครื่องพันฟิล์ม
+     ชุดล่าง (y 22-27): 7 เครื่องพลิกแผ่น + โต๊ะตรวจพื้นกระจก + ตู้ไฟ · 5/6 (สายพานตรวจหลัง XPE 2) อยู่ในตัว XPE 2 แล้ว ไม่วาดซ้ำ
+     เลื่อยหลายใบ (เลข 1) เป็นเครื่องในทะเบียนอีกตัว ไม่ได้ใส่ในผัง จึงไม่วาดที่นี่ */
+  pack(x, y) {
+    const parts = [], add = (cx, cy, svg) => parts.push([cx + cy, svg]);
+    const flip = (px, py) =>                      // เครื่องพลิกแผ่น: โครง + ดรัมลูกกลิ้ง + ช่องระบาย + ป้าย
+      slab(px, py, 0, 2.0, 1.8, 1.0) + vents(px + 0.2, py + 1.8, 0.15, 1.6, 0.7, 2) +
+      [[0.15, 0.15], [1.65, 0.15], [0.15, 1.45], [1.65, 1.45]].map((q) => strut([px + q[0] + 0.1, py + q[1] + 0.1, 1.0], [px + q[0] + 0.1, py + q[1] + 0.1, 1.9], "var(--steel)", 1.8)).join("") +
+      roller(px + 0.2, py + 0.9, 1.7, 1.6, 0.35) + spinAt(px + 1.0, py + 0.9, 2.05, ring(px + 1.0, py + 0.9, 2.05, 0.35, "var(--accent)", 1.6)) +
+      nameplate(px + 0.6, py + 1.8, 0.3, 0.8, 0.28);
+    add(x - 2.2, y + 3.0, footShadow(x - 3.6, y + 2.2, 22, 8));
+    /* 8 เครื่องพลิกแผ่น + 9 สายพานตรวจ (มีราว และราวไฟตรวจ) */
+    add(x - 2.5, y + 3.4, flip(x - 3.5, y + 2.6));
+    add(x + 0.8, y + 3.0, belt(x - 1.3, y + 2.9, 0.6, 4.2, 1.2) + sideRails(x - 1.3, y + 2.9, 0.6, 4.2, 1.2) +
+        [0.4, 3.6].map((d) => strut([x - 1.3 + d, y + 2.9, 0.6], [x - 1.3 + d, y + 2.9, 1.9], "var(--steel)", 1.6) + strut([x - 1.3 + d, y + 4.1, 0.6], [x - 1.3 + d, y + 4.1, 1.9], "var(--steel)", 1.6)).join("") +
+        box(x - 1.1, y + 2.85, 1.9, 3.8, 1.3, 0.12, "var(--accent)", "var(--accent)", "var(--mdark)"));
+    /* 11 โต๊ะลูกกลิ้งต่อ */
+    add(x + 4.6, y + 1.6, box(x + 3.0, y + 0.9, 0, 3.2, 1.3, 0.7, "var(--mtop)", "var(--mlit)", "var(--mdark)") + rollerBed(x + 3.1, y + 0.95, 0.7, 2.9, 1.2, 8));
+    /* 10 เครื่องเรียงซ้อนแผ่น — เสา 4 ต้น คานบน หัวดูด และตั้งแผ่นที่เรียงแล้ว */
+    const sx = x + 3.8, sy = y + 4.7;
+    let st = "";
+    [[0, 0], [2.3, 0], [0, 2.3], [2.3, 2.3]].forEach((q) => { st += strut([sx + q[0], sy + q[1], 0], [sx + q[0], sy + q[1], 3.0], "var(--steel)", 2); });
+    for (let k = 0; k < 4; k++) st += box(sx + 0.3, sy + 0.4, 0.05 + k * 0.28, 1.7, 1.4, 0.26, "var(--mtop)", "var(--mlit)", "var(--mdark)");
+    st += box(sx - 0.1, sy - 0.1, 3.0, 2.5, 2.5, 0.2) + strut([sx + 1.15, sy + 1.15, 3.0], [sx + 1.15, sy + 1.15, 1.9], "var(--accent)", 2.4) +
+          box(sx + 0.35, sy + 0.35, 1.8, 1.6, 1.6, 0.12, "var(--steel)", "var(--steel)", "var(--mdark)");
+    add(sx + 1.2, sy + 1.2, st);
+    /* พาเลทซ้อน + เครื่องพันฟิล์ม ปลายไลน์ (เลื่อนไปท้ายเครื่องเรียง) */
+    let pal = box(x + 7.4, y - 2.2, 0, 5.2, 4, 0.35, "var(--mdark)", "var(--mdark)", "var(--mdark)");
+    [[0.4, 0.4], [2.9, 0.4], [0.4, 2.3], [2.9, 2.3]].forEach((q, i) => {
+      const n = 2 + (i % 3);
+      for (let k = 0; k < n; k++) pal += box(x + 7.4 + q[0], y - 2.2 + q[1], 0.35 + k * 0.42, 1.9, 1.4, 0.4);
+    });
+    pal += cyl(x + 12.0, y - 0.2, 0.35, 0.45, 2.4, "var(--steel)", "var(--steel)");
+    const wc = P(x + 12.0, y - 0.2, 2.75);
+    pal += spinAt(x + 12.0, y - 0.2, 2.75, '<line x1="' + (wc[0] - 15).toFixed(1) + '" y1="' + wc[1].toFixed(1) + '" x2="' + (wc[0] + 15).toFixed(1) + '" y2="' + wc[1].toFixed(1) + '" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/>');
+    add(x + 10, y - 0.2, pal);
+    /* ชุดล่าง: 7 เครื่องพลิกแผ่น · โต๊ะตรวจพื้นกระจก (มีไฟ) · ตู้ไฟ */
+    add(x - 3.0, y + 18.0, flip(x - 3.9, y + 17.2));
+    add(x + 0.3, y + 14.4, slab(x - 1.0, y + 13.6, 0, 2.6, 1.6, 0.85) +
+        poly([P(x - 0.9, y + 13.7, 0.86), P(x + 1.5, y + 13.7, 0.86), P(x + 1.5, y + 15.1, 0.86), P(x - 0.9, y + 15.1, 0.86)], "var(--face)", ' fill-opacity=".85" stroke="var(--medge)" stroke-width=".8"') +
+        '<g class="pump">' + poly([P(x - 0.8, y + 13.8, 0.9), P(x + 1.4, y + 13.8, 0.9), P(x + 1.4, y + 14.0, 0.9), P(x - 0.8, y + 14.0, 0.9)], "var(--accent)") + "</g>" +
+        [[-0.9, 13.65], [1.35, 13.65], [-0.9, 15.0], [1.35, 15.0]].map((q) => strut([x + q[0], y + q[1], 0.86], [x + q[0], y + q[1], 1.8], "var(--steel)", 1.4)).join(""));
+    add(x + 1.0, y + 7.9, slab(x + 0.6, y + 7.6, 0, 0.8, 0.6, 1.9) + nameplate(x + 0.75, y + 8.2, 1.1, 0.5, 0.3));
+    add(x - 4.4, y + 11.4, slab(x - 4.8, y + 11.1, 0, 0.8, 0.6, 1.9));
+    return paint(parts);
+  },
+};
+
+<?!= include("plant_layout") ?>
+
+
+/* MACHINES คือ LAYOUT ที่จับคู่กับทะเบียนแล้ว — ประกอบตอนโหลดข้อมูล ไม่ใช่ตอนเขียนโค้ด */
+let MACHINES = LAYOUT.map(function (m) { return Object.assign({}, m); });
+
+
+
+
+/* ═══ ลำดับการไหลของงาน ═══
+   วัตถุดิบเข้าที่ผสม ออกเป็นแผ่นที่เอ็กซ์ทรูด เคลือบที่ UV ตัดคลิ๊กที่ Cut-Slot
+   ติดโฟม XPE แล้วจบที่แพ็กกิ้ง — ขั้นไหนหยุด ขั้นถัดไปก็ไม่มีของเข้า
+   ผังวางตามตำแหน่งจริงในโรงงาน เส้นทางจึงวนรอบอาคาร ไม่ได้เรียงซ้ายไปขวา */
+/* ═══ ป้ายสถานะ ═══
+   ทำเป็นหลอดไฟสัญญาณแบบที่ติดอยู่บนตู้คอนโทรลจริง — วงแหวนนอก ไส้ใน และแสงฟุ้ง
+   ไม่ใช่จุดกลมทึบ เพราะจุดทึบสี่สีแยกจากกันด้วยสีอย่างเดียว คนตาบอดสีอ่านไม่ออก
+   "ไม่ทราบสถานะ" จึงเป็นหลอดกลวงไม่มีไส้ = ไม่มีสัญญาณเข้ามา ต่างจากหลอดดับ */
+function lamp(cx, cy, st, r) {
+  r = r || 7;
+  const c = FILL[st];
+  let g = "";
+  if (st === "run" || st === "stop") {
+    g += '<circle class="' + (st === "run" ? "pump" : "blinks") + '" cx="' + cx + '" cy="' + cy +
+         '" r="' + (r + 3) + '" fill="' + c + '" opacity=".3"/>';
+  }
+  g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="var(--face)" stroke="' + c + '" stroke-width="2"/>';
+  if (st !== "unknown") g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r - 3.2) + '" fill="' + c + '"/>';
+  else g += '<line x1="' + (cx - 3) + '" y1="' + cy + '" x2="' + (cx + 3) + '" y2="' + cy +
+            '" stroke="' + c + '" stroke-width="2" stroke-linecap="round"/>';
+  return g;
+}
+
+/** ป้ายชื่อเครื่องพร้อมหลอดสถานะ — มีแผ่นรองเพื่อให้อ่านออกทับตัวเครื่อง
+    เครื่องที่เดินปกติและไม่ได้เลือก = บรรทัดเดียว (หลอดเขียวบอกสถานะอยู่แล้ว) ที่เหลือมีบรรทัดสถานะด้วย
+    x, y = มุมซ้ายบนของป้าย — ตำแหน่งตัดสินที่ placeLabels() หลังวัดตัวเครื่องจริงแล้ว */
+const tagW = (name) => Math.max(96, name.length * 6.2 + 40);
+const tagH = (st, id) => (st === "run" && id !== sel ? 24 : 34);
+
+function tag(x, y, st, name, id) {
+  const w = tagW(name), h = tagH(st, id), two = h > 24;
+  return '<g class="mc tg" data-id="' + id + '" data-s="' + st + '" data-move="' + (st === "run" ? 1 : 0) +
+    '" data-ax="' + (x + 14).toFixed(1) + '" data-ay="' + (y + h / 2).toFixed(1) + '">' +
+    '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + w + '" height="' + h + '" rx="5" ' +
+    'fill="var(--face)" fill-opacity=".93" stroke="' + FILL[st] + '" stroke-width="1.5"/>' +
+    '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="3.5" height="' + h + '" rx="1.5" fill="' + FILL[st] + '"/>' +
+    lamp(x + 5 + 14, y + h / 2, st, 7) +
+    '<text class="lbl" x="' + (x + 18 + 14).toFixed(1) + '" y="' + (y + (two ? 15 : h / 2 + 4)).toFixed(1) + '">' + esc(name) + "</text>" +
+    (two ? '<text class="lbl2" x="' + (x + 32).toFixed(1) + '" y="' + (y + 27).toFixed(1) + '">' + esc(LABEL[st]) + "</text>" : "") + "</g>";
+}
+
+/* วางป้ายหลังวาดตัวเครื่องแล้ว — วัดตัวเครื่องจริงด้วย getBBox ไม่ใช่เดาจากจุดอ้างอิง
+   ให้คะแนนแต่ละตำแหน่งรอบเครื่อง (บน/ล่าง/ข้าง × 4 ระยะ): ทับป้ายอื่นแพงสุด · ทับตัวเครื่องอื่นกับตัวหนังสือโซน/ห้องรองลงมา
+   · ยิ่งไกลตำแหน่งปกติ (เหนือเครื่อง) ยิ่งเสียคะแนน แล้วเลือกที่ถูกสุด
+   เครื่องที่ต้องดู (เลือกอยู่ · หยุดเสีย · หยุดตามแผน) ได้เลือกก่อน จะได้ที่ดีที่สุด
+   ใช้ได้ทั้งสองมุมมอง — วัดจากภาพที่วาดแล้ว ไม่ได้ผูกกับสูตรไอโซเมตริก */
+function placeLabels() {
+  const cam = $("#cam"), svg = $("#scene svg");
+  if (!cam || !svg) return;
+  const rank = (m) => (m.id === sel ? 0 : { stop: 1, plan: 2, unknown: 3, run: 4 }[state[m.id]]);
+  const bodyOf = (g) => {
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    g.querySelectorAll(":scope > *:not(.halo)").forEach((c) => {
+      const b = c.getBBox();
+      if (!b.width && !b.height) return;
+      x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.width); y1 = Math.max(y1, b.y + b.height);
+    });
+    return x1 < x0 ? null : { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  };
+  const ov = (a, c) => Math.max(0, Math.min(a.x + a.w, c.x + c.w) - Math.max(a.x, c.x)) *
+                       Math.max(0, Math.min(a.y + a.h, c.y + c.h) - Math.max(a.y, c.y));
+  const core = (b) => ({ x: b.x + b.w * 0.2, y: b.y + b.h * 0.2, w: b.w * 0.6, h: b.h * 0.6 });   // ตัวเครื่องเฉียง ๆ มีมุมว่าง ไม่นับกรอบเต็ม
+
+  const bodies = {}, order = MACHINES.slice().sort((a, b) => rank(a) - rank(b) || (a.x + a.y) - (b.x + b.y));
+  let fail = false;
+  try {
+    /* ขนาดตัวเครื่องไม่เปลี่ยนตามสถานะ — วัดครั้งเดียวต่อเครื่องต่อมุมมอง (วัดทั้งผังราว 15 ms ต่อครั้ง ซึ่งเป็นส่วนที่ช้าสุดของการวาด) */
+    cam.querySelectorAll("g.mc").forEach((g) => {
+      const k = VIEW + "|" + g.dataset.id;
+      let b = BODY[k];
+      if (!b) { b = bodyOf(g); if (b) BODY[k] = b; }
+      if (b) bodies[g.dataset.id] = b;
+    });
+  } catch (_) { fail = true; }
+  const texts = [];
+  try {
+    cam.querySelectorAll("text.zone, text.room-t, text.store-t, #cam > circle[r=\"12\"]").forEach((t) => {   // รวมหมุดเลขขั้นตอนการไหล
+      const b = t.getBBox(); texts.push({ x: b.x, y: b.y, w: b.width, h: b.height });
+    });
+  } catch (_) { /* ไม่มีตัวหนังสือให้เลี่ยงก็ไม่เป็นไร */ }
+
+  const placed = [], out = [];
+  order.forEach((m) => {
+    const st = state[m.id], w = tagW(m.n), h = tagH(st, m.id);
+    let b = bodies[m.id];
+    if (fail || !b) { const a = P(m.x + 2.5, m.y + 1.2, 5.6); b = { x: a[0] - 20, y: a[1] - 10, w: 40, h: 20 }; }   // วัดไม่ได้: ตำแหน่งเหนือเครื่องแบบเดิม
+    const cx = b.x + b.w / 2, L = b.x, R = b.x + b.w, T = b.y, B = b.y + b.h, mid = b.y + b.h / 2 - h / 2;
+    const cands = [];
+    for (let r = 0; r < 4; r++) {
+      const gap = 5 + r * (h + 5);
+      cands.push([cx - w / 2, T - gap - h], [L, T - gap - h], [R - w, T - gap - h],
+                 [cx - w / 2, B + gap], [L, B + gap], [R - w, B + gap],
+                 [L - gap - w, T], [R + gap, T], [L - gap - w, mid], [R + gap, mid]);
+    }
+    let best = null, bestCost = Infinity;
+    cands.forEach((c, i) => {
+      const rect = { x: c[0], y: c[1], w: w, h: h };
+      const wide = { x: rect.x - 2, y: rect.y - 2, w: w + 4, h: h + 4 };
+      let cost = i * 8;
+      placed.forEach((q) => { cost += 50 * ov(wide, q); });
+      Object.keys(bodies).forEach((id) => { if (id !== m.id) cost += ov(rect, core(bodies[id])); });
+      texts.forEach((t) => { cost += 3 * ov(rect, t); });
+      if (cost < bestCost) { bestCost = cost; best = { rect: rect, i: i }; }
+    });
+    placed.push(best.rect);
+    out.push({ m: m, st: st, r: best.rect, far: best.i > 0, b: b });
+  });
+
+  /* วาดจากสำคัญน้อยไปมาก — ตัวที่เลือก/หยุดเสียอยู่บนสุด */
+  let g = "";
+  out.slice().reverse().forEach((o) => {
+    if (o.far) {
+      const ax = o.b.x + o.b.w / 2, ay = o.b.y + o.b.h * 0.4;
+      const nx = Math.min(Math.max(ax, o.r.x), o.r.x + o.r.w), ny = Math.min(Math.max(ay, o.r.y), o.r.y + o.r.h);
+      g += '<line x1="' + ax.toFixed(1) + '" y1="' + ay.toFixed(1) + '" x2="' + nx.toFixed(1) + '" y2="' + ny.toFixed(1) +
+           '" stroke="' + FILL[o.st] + '" stroke-width="1" stroke-opacity=".55"/>';
+    }
+    g += tag(o.r.x, o.r.y, o.st, o.m.n, o.m.id);
+  });
+  cam.insertAdjacentHTML("beforeend", g);
+
+  /* ป้ายที่ถูกย้ายออกนอกขอบเดิมต้องไม่ถูกตัด — ขยาย viewBox ให้ครอบ */
+  const vb = svg.viewBox.baseVal;
+  let x0 = vb.x, y0 = vb.y, x1 = vb.x + vb.width, y1 = vb.y + vb.height;
+  out.forEach((o) => { x0 = Math.min(x0, o.r.x - 6); y0 = Math.min(y0, o.r.y - 6); x1 = Math.max(x1, o.r.x + o.r.w + 6); y1 = Math.max(y1, o.r.y + o.r.h + 6); });
+  svg.setAttribute("viewBox", x0.toFixed(0) + " " + y0.toFixed(0) + " " + (x1 - x0).toFixed(0) + " " + (y1 - y0).toFixed(0));
+}
+
+
+/* ═══ โมเดลสถานะ — ฟังก์ชันบริสุทธิ์ (ไม่แตะ DOM ไม่อ่านเวลา) ═══
+   รับ "สถานะรายเครื่อง" กับ "ลำดับขั้นการไหล" แล้วตอบว่าหน้าจอควรทำอะไร: เครื่องไหนเคลื่อนไหว เส้นไหนไหล เส้นไหนติด
+   ตัววาด (drawScene / drawStages) อ่านผลจากที่นี่ที่เดียว จะได้ไม่มีกฎ "ถือว่าเดิน" กระจายอยู่หลายที่แล้วเพี้ยนจากกัน
+   state: id -> run | stop | plan | unknown   ·   stages: [{id, ids:[...]}, ...] ตามลำดับการไหล
+   ผลลัพธ์:
+     moving[id]   true เมื่อ run เท่านั้น (หมุน/สายพานวิ่ง/หลอดกะพริบ) — plan/stop/unknown หยุดนิ่ง ไม่เดาว่ากำลังเดิน
+     stages[i]    { run, stop, plan, unknown, total, level: full|part|down }   full=เดินครบ part=เดินบางตัว down=ไม่มีตัวไหนเดิน
+     flows[i]     เส้นจากขั้น i ไปขั้น i+1: "active" ขั้นต้นทางมีเครื่องเดิน · "blocked" ต้นทางไม่มีเครื่องเดินและมีเครื่องหยุดเสีย
+                  · "idle" ต้นทางไม่เดินแต่ไม่มีเครื่องเสีย (หยุดตามแผน/ไม่ทราบ) · starved = ปลายทางเดินอยู่แต่ไม่มีของส่งมา */
+function plantModel(state, machines, stages) {
+  const moving = {};
+  machines.forEach((m) => { moving[m.id] = state[m.id] === "run"; });
+  const count = (ids, st) => ids.filter((i) => state[i] === st).length;
+  const st = stages.map((s) => {
+    const run = count(s.ids, "run"), total = s.ids.length;
+    return { id: s.id, run: run, stop: count(s.ids, "stop"), plan: count(s.ids, "plan"), unknown: count(s.ids, "unknown"),
+             total: total, level: run === 0 ? "down" : run < total ? "part" : "full" };
+  });
+  const flows = [];
+  for (let i = 0; i < st.length - 1; i++) {
+    const a = st[i], b = st[i + 1];
+    flows.push({ from: a.id, to: b.id, state: a.run > 0 ? "active" : a.stop > 0 ? "blocked" : "idle", starved: a.run === 0 && b.run > 0 });
+  }
+  return { moving: moving, stages: st, flows: flows };
+}
+
+
+const LABEL = { run:"เดินอยู่", stop:"หยุดเสีย", plan:"หยุดตามแผน PM", unknown:"ไม่ทราบสถานะ" };
+const FILL = { run:"var(--run)", stop:"var(--stop)", plan:"var(--plan)", unknown:"var(--unknown)" };
+
+/* ชื่อสถานะฝั่ง server เป็นภาษาไทยและใช้ร่วมกับใบแจ้งซ่อม — แปลงเป็นคีย์สั้นที่ผังใช้
+   ค่าที่ไม่รู้จักไม่เดาเป็น "เดินอยู่" เพราะกระดานที่เดาคือกระดานที่หลอกคนหน้าเครื่อง */
+const ST_KEY = { "เดินปกติ":"run", "หยุดเสีย":"stop", "หยุดตามแผน PM":"plan", "หยุด":"stop" };
+const ST_TEXT = { run:"เดินปกติ", stop:"หยุดเสีย", plan:"หยุดตามแผน PM" };
+
+const state = {};          // id -> run/stop/plan/unknown
+const raw = {};            // id -> แถวสถานะล่าสุดจาก server (since/note/by/at)
+let STATE_AT = 0;          // เวลาที่ดึงข้อมูลมาได้ ไม่ใช่เวลาที่เครื่องเปลี่ยนสถานะ
+let CFG = null, ME = null, OFFMAP = [];
+LAYOUT.forEach((m) => { state[m.id] = "unknown"; });
+
+const $ = (s) => document.querySelector(s);
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const two = (n) => String(n).padStart(2, "0");
+function ago(ms) {
+  const m = Math.round((Date.now() - ms) / 60000);
+  if (m < 1) return "เมื่อครู่";
+  if (m < 60) return m + " นาทีที่แล้ว";
+  return Math.floor(m / 60) + " ชม. " + (m % 60) + " น. ที่แล้ว";
+}
+
+let sel = "", selStage = null, showFlow = true;
+
+/* รูปตัวเครื่องไม่ขึ้นกับสถานะ/การเลือก (สีสถานะอยู่ที่ห่อ <g> และป้าย) จึงวาดครั้งเดียวต่อเครื่องต่อมุมมองแล้วใช้ซ้ำ
+   ตอนนี้ตัวเครื่องรวมกันราว 270 KB ของ SVG ถ้าสร้างใหม่ทุกครั้งที่กดเลือก มือถือรุ่นถูกจะสะดุด */
+const GEO = {}, BODY = {};
+const geo = (m) => GEO[VIEW + "|" + m.id] || (GEO[VIEW + "|" + m.id] = (KIND[m.k] || KIND.generic)(m.x, m.y, m));
+
+function drawScene() {
+  /* ไกลไปใกล้ ตาม gx+gy เพื่อให้เครื่องหน้าทับเครื่องหลังถูกชั้น */
+  const order = MACHINES.slice().sort((a, b) => (a.x + a.y) - (b.x + b.y));
+  let g = "";
+
+  /* พื้นโรงงาน — ขอบพอดีกับที่เครื่องวางอยู่จริง ไม่เผื่อพื้นที่ว่างให้ฉากลอย */
+  /* ขอบอาคารตามสัดส่วนแปลนจริง — กว้างต่อสูงประมาณ 1.87 : 1 */
+  const X0 = -1.5, X1 = BLD_W + 1.5, Y0 = -1.5, Y1 = BLD_H + 1.5;
+  g += poly([P(X0, Y0, 0), P(X1, Y0, 0), P(X1, Y1, 0), P(X0, Y1, 0)], "var(--floor)");
+  for (let i = X0; i <= X1; i += 10) {
+    g += '<line x1="' + P(i, Y0, 0)[0] + '" y1="' + P(i, Y0, 0)[1] + '" x2="' + P(i, Y1, 0)[0] +
+         '" y2="' + P(i, Y1, 0)[1] + '" stroke="var(--floor-2)" stroke-width="1"/>';
+  }
+  for (let j = Y0; j <= Y1; j += 10) {
+    g += '<line x1="' + P(X0, j, 0)[0] + '" y1="' + P(X0, j, 0)[1] + '" x2="' + P(X1, j, 0)[0] +
+         '" y2="' + P(X1, j, 0)[1] + '" stroke="var(--floor-2)" stroke-width="1"/>';
+  }
+  /* โซน — วาดเป็นแผ่นพื้นมีขอบ ตอบคำถามแรกที่คนถามหน้ากระดานว่าเครื่องไหนอยู่ด้วยกัน */
+  ZONEBOX.forEach((z) => {
+    g += poly([P(z.x0, z.y0, 0.01), P(z.x1, z.y0, 0.01), P(z.x1, z.y1, 0.01), P(z.x0, z.y1, 0.01)],
+      "var(--zone)", ' stroke="var(--zone-edge)" stroke-width="1.5" stroke-dasharray="7 5"' +
+      (z.dim ? ' opacity=".55"' : ""));
+    const p = P(z.x0 + 0.6, z.y0 + 1.5, 0);
+    g += '<text class="zone" x="' + p[0] + '" y="' + p[1] + '">' + esc(z.t) + "</text>";
+  });
+
+  /* ลานนอกอาคาร */
+  YARDS.forEach((z) => {
+    g += poly([P(z.x0, z.y0, 0), P(z.x1, z.y0, 0), P(z.x1, z.y1, 0), P(z.x0, z.y1, 0)],
+      "var(--yard)", ' stroke="var(--yard-edge)" stroke-width="1.5" stroke-dasharray="9 6"');
+    const p = P(z.x0 + 0.6, z.y0 + 1.4, 0);
+    g += '<text class="zone" x="' + p[0] + '" y="' + p[1] + '">' + esc(z.t) + "</text>";
+  });
+
+  /* พื้นที่พักของ — ลายทแยงจาง ๆ บอกว่ามีของกองอยู่ ไม่ใช่พื้นว่าง */
+  STORES.forEach((z) => {
+    g += poly([P(z.x0, z.y0, 0.02), P(z.x1, z.y0, 0.02), P(z.x1, z.y1, 0.02), P(z.x0, z.y1, 0.02)],
+      "var(--store)", ' stroke="var(--store-edge)" stroke-width="1"');
+    const p = P(z.x0 + 0.4, z.y0 + 1.1, 0);
+    g += '<text class="store-t" x="' + p[0] + '" y="' + p[1] + '">' + esc(z.t) + "</text>";
+  });
+
+  /* ผนังภายในอ่านจาก WALLS ใน plant_layout */
+  const wall = (a, b) => '<line x1="' + P(a[0], a[1], 0)[0] + '" y1="' + P(a[0], a[1], 0)[1] +
+    '" x2="' + P(b[0], b[1], 0)[0] + '" y2="' + P(b[0], b[1], 0)[1] +
+    '" stroke="var(--wall)" stroke-width="4" stroke-linecap="round"/>';
+  WALLS.forEach((w) => { g += wall([w[0], w[1]], [w[2], w[3]]); });
+
+  /* ห้องและสำนักงาน — แค่สี่เหลี่ยมกับชื่อ ของที่ไม่ใช่เครื่องจักรไม่ต้องมีทรงสามมิติ
+     ปั้นให้สวยก็ไม่ได้บอกอะไรเพิ่ม มีแต่แย่งสายตาไปจากเครื่องที่กำลังหยุด */
+  ROOMS.forEach((r) => {
+    g += poly([P(r.x0, r.y0, 0.03), P(r.x1, r.y0, 0.03), P(r.x1, r.y1, 0.03), P(r.x0, r.y1, 0.03)],
+      "var(--room-fill)", ' stroke="var(--room-edge)" stroke-width="1.2"');
+    const p = P(r.x0 + 0.35, r.y0 + (r.y1 - r.y0) / 2, 0.03);
+    g += '<text class="room-t" x="' + p[0] + '" y="' + p[1] + '">' + esc(r.t) + "</text>";
+  });
+
+  /* เส้นทางการไหลของงาน วาดบนพื้นก่อนตัวเครื่อง จะได้ลอดใต้เครื่องเหมือนทางเดินจริง
+     ช่วงไหนที่ขั้นต้นทางไม่มีเครื่องเดินเลย เส้นนั้นหยุดนิ่งและจาง = ไม่มีของส่งต่อ */
+  const M = plantModel(state, MACHINES, STAGES);
+  if (showFlow) {
+    for (let i = 0; i < STAGES.length - 1; i++) {
+      const legs = [STAGES[i].at].concat(STAGES[i].via || [], [STAGES[i + 1].at]);
+      const f = M.flows[i];
+      const d = legs.map((q, k) => (k ? "L" : "M") + P(q[0], q[1], 0.12).join(" ")).join(" ");
+      /* ไหลอยู่ = เส้นประวิ่งสีฟ้า · ติด = เส้นประแดงนิ่ง (ต้นทางมีเครื่องหยุดเสียและไม่มีตัวไหนเดิน) · ว่าง = เส้นจาง */
+      g += '<path d="' + d + '" fill="none" stroke="' + (f.state === "blocked" ? "var(--stop)" : "var(--accent)") + '" stroke-width="3" ' +
+           'stroke-linecap="round" stroke-linejoin="round"' +
+           (f.state === "active" ? ' class="crawl"' : f.state === "blocked" ? ' stroke-dasharray="3 9" opacity=".7"' : ' opacity=".22"') + "/>";
+    }
+    STAGES.forEach((s, i) => {
+      const p = P(s.at[0], s.at[1], 0.12);
+      g += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="12" fill="var(--accent)"/>' +
+           '<text x="' + p[0] + '" y="' + (p[1] + 4) + '" text-anchor="middle" ' +
+           /* ตัวเลขใช้สีพื้นการ์ด ไม่ใช่ขาวตาย — โหมดมืด accent เป็นฟ้าอ่อน ขาวบนฟ้าอ่อนอ่านไม่ออก */
+           'style="font-family:var(--num);font-size:12px;font-weight:600;fill:var(--face)">' + (i + 1) + "</text>";
+    });
+  }
+
+  order.forEach((m) => {
+    const st = state[m.id];
+    const base = P(m.x + 3, m.y + 1.5, 0);
+    g += '<g class="mc" data-id="' + m.id + '" data-s="' + st + '" data-move="' + (M.moving[m.id] ? 1 : 0) + '" data-sel="' + (m.id === sel ? 1 : 0) + '">' +
+         '<ellipse class="halo" cx="' + base[0] + '" cy="' + base[1] + '" rx="88" ry="44" fill="none" stroke="var(--accent)" stroke-width="2.5"/>' +
+         geo(m) + "</g>";
+  });
+
+  /* ขอบ viewBox ต้องครอบทั้งอาคาร ลาน และเครื่องทุกตัว — เครื่องที่ตั้งอยู่นอกอาคาร
+     (คูลลิ่งทาวเวอร์ ห้องกรองน้ำ) ถ้าวัดแค่ขนาดอาคารจะถูกตัดขอบทิ้งเงียบ ๆ */
+  const XB = Math.max(BLD_W + 2, ...YARDS.map((y) => y.x1 + 1), ...MACHINES.map((m) => m.x + 8));
+  const YB = Math.max(BLD_H + 12, ...YARDS.map((y) => y.y1 + 1), ...MACHINES.map((m) => m.y + 6));
+  const c1 = P(X0, Y1, 0), c2 = P(XB, Y0, 0), c3 = P(XB, YB, 0), c4 = P(X0, Y0, 0),
+        c5 = P(X0, YB, 0), c6 = P(XB, Y1, 0);
+  const xs = [c1, c2, c3, c4, c5, c6].map((c) => c[0]), ys = [c1, c2, c3, c4, c5, c6].map((c) => c[1]);
+  /* ไอโซเมตริกต้องเผื่อที่ให้ป้ายที่ยื่นไปทางขวาและตัวเครื่องที่สูงขึ้นไปด้านบน
+     Top view ไม่มีความสูง เผื่อเท่ากันทุกด้านพอ */
+  const pad = VIEW === "top" ? [24, 150, 24, 24] : [24, 190, 95, 26];
+  const minX = Math.min.apply(null, xs) - pad[0], maxX = Math.max.apply(null, xs) + pad[1];
+  const minY = Math.min.apply(null, ys) - pad[2], maxY = Math.max.apply(null, ys) + pad[3];
+  $("#scene").innerHTML = '<svg viewBox="' + minX.toFixed(0) + " " + minY.toFixed(0) + " " +
+    (maxX - minX).toFixed(0) + " " + (maxY - minY).toFixed(0) +
+    '" role="img" aria-label="' + (VIEW === "top" ? "ผังโรงงานมุมมองจากด้านบน" : "ผังไอโซเมตริกของเครื่องจักรหลักทั้งโรงงาน") +
+    ' แสดงสถานะเดินหรือหยุดของแต่ละเครื่อง">' +
+    '<g id="cam">' + g + "</g></svg>";
+  placeLabels();
+  applyCam();
+  $("#scene").querySelectorAll("g.mc").forEach((el) =>
+    el.addEventListener("click", () => { if (!cam.moved) pick(el.dataset.id, true); }));
+}
+
+/* ─── ซูม/เลื่อนผัง ───────────────────────────────────────────────────────
+   transform บน <g> ไม่ใช่ viewBox เพราะ viewBox ถูกเขียนใหม่ทุกครั้งที่วาด
+   แต่ cam อยู่นอกฟังก์ชัน มุมที่ผู้ใช้เล็งไว้เลยไม่เด้งกลับตอนสถานะอัปเดต */
+const cam = { k: 1, x: 0, y: 0, moved: false };
+const CAM_MIN = 0.6, CAM_MAX = 8;
+
+const isPhone = () => matchMedia("(max-width: 640px)").matches;
+/* มือถือเริ่มที่ซูม 2.6 รอบกลางผัง — ภาพทั้งอาคารกว้าง 300px เห็นแค่จุด ต้องกด "พอดีจอ" ถึงจะกลับไปเห็นทั้งหมด */
+function phoneCam() {
+  const svg = $("#scene svg");
+  if (!isPhone() || !svg) return;
+  const vb = svg.viewBox.baseVal;
+  cam.k = 1; cam.x = 0; cam.y = 0;
+  zoomAt(2.6, vb.x + vb.width / 2, vb.y + vb.height / 2);
+}
+
+function applyCam() {
+  const el = $("#cam");
+  if (!el) return;
+  el.setAttribute("transform", "translate(" + cam.x + "," + cam.y + ") scale(" + cam.k + ")");
+  /* ป้ายอยู่ใน <g> ที่ถูกสเกล ถ้าปล่อยไว้ซูมเข้าไปดูเครื่องแล้วป้ายจะบังเครื่อง
+     หักสเกลคืนรอบจุดยึดของป้ายเอง ตำแหน่งคงเดิม ขนาดบนจอคงที่ */
+  /* ปล่อยให้ป้ายโตตามการซูมได้ถึงสองเท่า พอครบแล้วคงขนาดไว้ อ่านออกแต่ไม่บังเครื่อง */
+  const inv = Math.min(cam.k, 2) / cam.k;
+  el.querySelectorAll(".tg").forEach((t) => {
+    const ax = t.dataset.ax, ay = t.dataset.ay;
+    t.setAttribute("transform", "translate(" + ax + "," + ay + ") scale(" + inv + ") translate(" + (-ax) + "," + (-ay) + ")");
+  });
+}
+
+/* ซูมที่จุดไหน จุดนั้นต้องอยู่กับที่ ไม่งั้นภาพไหลหนีมือ */
+function zoomAt(k2, px, py) {
+  k2 = Math.min(CAM_MAX, Math.max(CAM_MIN, k2));
+  cam.x = px - (px - cam.x) * (k2 / cam.k);
+  cam.y = py - (py - cam.y) * (k2 / cam.k);
+  cam.k = k2;
+  applyCam();
+}
+
+function svgPt(ev) {
+  const svg = $("#scene svg"), m = svg.getScreenCTM().inverse(),
+        p = svg.createSVGPoint();
+  p.x = ev.clientX; p.y = ev.clientY;
+  const q = p.matrixTransform(m);
+  return [q.x, q.y];
+}
+
+function bindCam() {
+  const box = $("#scene");
+  box.addEventListener("wheel", (ev) => {
+    ev.preventDefault();
+    const p = svgPt(ev);
+    zoomAt(cam.k * (ev.deltaY < 0 ? 1.18 : 1 / 1.18), p[0], p[1]);
+  }, { passive: false });
+
+  let from = null;
+  box.addEventListener("pointerdown", (ev) => {
+    if (ev.button) return;
+    from = { p: svgPt(ev), x: cam.x, y: cam.y };
+    cam.moved = false;
+    box.setPointerCapture(ev.pointerId);
+    box.classList.add("drag");
+  });
+  box.addEventListener("pointermove", (ev) => {
+    if (!from) return;
+    const p = svgPt(ev), dx = (p[0] - from.p[0]) * cam.k, dy = (p[1] - from.p[1]) * cam.k;
+    if (Math.abs(dx) + Math.abs(dy) > 3) cam.moved = true;
+    cam.x = from.x + dx; cam.y = from.y + dy;
+    applyCam();
+  });
+  const stop = (ev) => {
+    if (!from) return;
+    from = null;
+    box.classList.remove("drag");
+    if (ev.pointerId !== undefined && box.hasPointerCapture(ev.pointerId)) box.releasePointerCapture(ev.pointerId);
+    setTimeout(() => { cam.moved = false; }, 0);   // ปล่อยให้ click ที่ตามมาอ่านค่าได้ก่อน
+  };
+  box.addEventListener("pointerup", stop);
+  box.addEventListener("pointercancel", stop);
+
+  const mid = () => {
+    const vb = $("#scene svg").viewBox.baseVal;
+    return [vb.x + vb.width / 2, vb.y + vb.height / 2];
+  };
+  $("#zIn").addEventListener("click", () => { const c = mid(); zoomAt(cam.k * 1.35, c[0], c[1]); });
+  $("#zOut").addEventListener("click", () => { const c = mid(); zoomAt(cam.k / 1.35, c[0], c[1]); });
+  $("#zFit").addEventListener("click", () => { cam.k = 1; cam.x = 0; cam.y = 0; applyCam(); });
+}
+
+function drawList() {
+  const grps = [];
+  MACHINES.forEach((m) => { if (!grps.includes(m.grp)) grps.push(m.grp); });
+  const attn = MACHINES.filter((m) => state[m.id] === "stop" || state[m.id] === "plan");
+  const row = (m) => '<button type="button" class="item" data-id="' + m.id + '" aria-pressed="' + (m.id === sel) + '">' +
+      '<i class="dot" data-s="' + state[m.id] + '"></i><span class="nm">' + esc(m.n) + "</span></button>";
+  $("#list").innerHTML = (attn.length ? '<div class="grp">ต้องดูตอนนี้ · ' + attn.length + " เครื่อง</div>" + attn.map(row).join("") : "") + grps.map((gname) =>
+    '<div class="grp">' + esc(gname) + "</div>" +
+    MACHINES.filter((m) => m.grp === gname).map((m) =>
+      '<button type="button" class="item" data-id="' + m.id + '" aria-pressed="' + (m.id === sel) + '">' +
+      '<i class="dot" data-s="' + state[m.id] + '"></i><span class="nm">' + esc(m.n) + "</span></button>").join("")
+  ).join("");
+  $("#list").querySelectorAll(".item").forEach((b) =>
+    b.addEventListener("click", () => pick(b.dataset.id, true)));
+  $("#stAge").textContent = STATE_AT ? "ดึงข้อมูลเมื่อ " + ago(STATE_AT) : "ยังไม่ได้โหลดข้อมูล";
+}
+
+function drawTally() {
+  const c = { run:0, stop:0, plan:0, unknown:0 };
+  MACHINES.forEach((m) => c[state[m.id]]++);
+  $("#tally").innerHTML =
+    '<span class="tal">เดินอยู่ <b style="color:var(--run)">' + c.run + "</b> / " + MACHINES.length + " เครื่อง</span>" +
+    (c.stop ? '<span class="tal">หยุดเสีย <b style="color:var(--stop)">' + c.stop + "</b></span>" : "") +
+    (c.plan ? '<span class="tal">หยุดตามแผน PM <b style="color:var(--plan)">' + c.plan + "</b></span>" : "") +
+    (c.unknown ? '<span class="tal">ไม่ทราบสถานะ <b style="color:var(--unknown)">' + c.unknown + "</b></span>" : "");
+}
+
+function drawDetail() {
+  const m = MACHINES.find((x) => x.id === sel);
+  if (!m) return;
+  const st = state[m.id], r = raw[m.id] || null;
+
+  $("#dName").textContent = m.n;
+  $("#dAge").textContent = r && r.since ? "สถานะนี้ตั้งแต่ " + whenText(r.since) : "ยังไม่มีบันทึกสถานะ";
+
+  /* ไม่มีแถวในชีต = ไม่รู้ ไม่ใช่ "เดินอยู่" — บอกตรง ๆ ว่าต้องไปบันทึก */
+  let body = '<b style="color:' + FILL[st] + '">' + LABEL[st] + "</b>";
+  if (!m.known) {
+    body += "<br>" + esc('ชื่อนี้ยังไม่ตรงกับชื่อใดในชีตทะเบียนเครื่องจักร — ' +
+      'เติมชื่อนี้ลงช่อง "ชื่อเดิมที่เคยใช้" ของเครื่องที่ถูกต้อง แล้วกระดานจะจับคู่ให้เอง');
+  } else if (!r) {
+    body += "<br>" + esc("ยังไม่มีใครบันทึกสถานะของเครื่องนี้ ระบบไม่เดาแทน");
+  } else if (!ME) {
+    /* ชุดสาธารณะไม่มีสาเหตุกับผู้บันทึกมาด้วย — บอกว่าทำไมถึงไม่เห็น ไม่ใช่ปล่อยว่าง */
+    body += '<div class="foot" style="margin-top:6px">ล็อกอินเพื่อดูสาเหตุและชื่อผู้บันทึก</div>';
+  } else {
+    if (r.note) body += "<br>" + esc(r.note);
+    body += '<div class="foot" style="margin-top:6px">บันทึกโดย ' + esc(r.by || "ไม่ระบุ") +
+            (r.at ? " · " + whenText(r.at) : "") + "</div>";
+  }
+  $("#dState").innerHTML = body;
+
+  /* ช่องบันทึกสถานะ — ไม่ซ่อนตามบทบาท เพราะการซ่อนปุ่มไม่ใช่การกันสิทธิ์
+     ตัวกันจริงคือ canTouchMachine_ ที่ server ซึ่งจะตอบกลับมาว่าแตะไม่ได้ */
+  $("#dParam").innerHTML = !ME || !m.known
+    ? '<div class="foot">' + esc(ME ? "เครื่องนี้ยังไม่อยู่ในทะเบียน จึงบันทึกสถานะไม่ได้"
+                                    : "ล็อกอินก่อนจึงจะบันทึกสถานะได้") + "</div>"
+    : '<div class="kv"><span>เปลี่ยนเป็น</span>' +
+      '<select id="msSt" style="font:inherit;padding:4px 6px;border:1px solid var(--edge);border-radius:6px">' +
+      ["run", "stop", "plan"].map((k) =>
+        '<option value="' + k + '"' + (k === st ? " selected" : "") + ">" + esc(ST_TEXT[k]) + "</option>").join("") +
+      "</select></div>" +
+      '<div class="kv"><span>สาเหตุ</span><input id="msNote" placeholder="จำเป็นเมื่อเครื่องหยุด" ' +
+      'style="font:inherit;padding:4px 6px;border:1px solid var(--edge);border-radius:6px;width:60%"></div>' +
+      '<div style="margin-top:8px;display:flex;gap:8px;align-items:center">' +
+      '<button type="button" id="msGo">บันทึกสถานะ</button><span class="foot" id="msMsg"></span></div>';
+
+  const go = $("#msGo");
+  if (go) go.addEventListener("click", () => saveStatus(m));
+
+  $("#dSrc").innerHTML =
+    "สถานะมาจากชีต <code>บันทึกสถานะเครื่อง</code> ผ่าน <code>apiMachineLog</code> — คนบันทึก ไม่ใช่เซนเซอร์<br>" +
+    "รายชื่อและสถานีผู้ดูแลมาจากชีต <code>ทะเบียนเครื่องจักร</code><br>" +
+    (m.known
+      ? "รหัสเครื่อง " + esc(m.code || "ยังไม่ได้กำหนด") + " · ผู้ดูแล " + esc(m.owner || "ยังไม่ได้กำหนด") +
+        ' · <a href="' + esc(ticketUrl(m.n)) + '" target="_top" style="color:var(--accent)">เปิดใบแจ้งซ่อมของเครื่องนี้</a>'
+      : "");
+}
+
+/** แถบลำดับงาน — เดินกี่เครื่องจากกี่เครื่อง และขั้นนี้กำลังรอของจากขั้นก่อนอยู่ไหม */
+function drawStages() {
+  const M = plantModel(state, MACHINES, STAGES);
+  $("#flowbar").innerHTML = STAGES.map((s, i) => {
+    const run = M.stages[i].run, tot = M.stages[i].total;
+    const cls = M.stages[i].level === "full" ? "run" : M.stages[i].level;
+    /* ขั้นก่อนหน้าไม่มีเครื่องเดินเลย = ขั้นนี้เดินไปก็ไม่มีของเข้า
+       บอกตรงนี้เลย ดีกว่าให้หัวหน้าไล่ดูทีละเครื่องว่าทำไมสายนิ่ง */
+    const prev = i > 0 ? STAGES[i - 1] : null;
+    const starve = i > 0 && M.flows[i - 1].starved;
+    return '<button type="button" class="stg" data-stage="' + s.id + '" data-s="' + cls +
+      '" aria-pressed="' + (selStage === s.id) + '">' +
+      '<span class="stg-h"><span class="stg-n">' + (i + 1) + "</span>" +
+      '<span class="stg-t">' + esc(s.t) + "</span>" +
+      '<span class="stg-e">' + esc(s.en) + "</span></span>" +
+      '<span class="stg-v">' + run + " / " + tot + ' <span style="font-size:10.5px;font-weight:400;color:var(--ink-2)">เครื่องเดินอยู่</span></span>' +
+      '<span class="stg-w">' + (starve ? "รอของจาก " + esc(prev.t) : "") + "</span></button>";
+  }).join("");
+  $("#flowbar").querySelectorAll(".stg").forEach((b) =>
+    b.addEventListener("click", () => {
+      const s = STAGES.find((x) => x.id === b.dataset.stage);
+      selStage = selStage === s.id ? null : s.id;
+      if (selStage) sel = s.ids[0];
+      draw();
+    }));
+}
+
+/* กดเพื่อ "เลือกดู" เท่านั้น — การเปลี่ยนสถานะต้องผ่านปุ่มบันทึกที่มีเหตุผลกำกับ
+   กระดานที่กดแล้วสถานะเปลี่ยนทันทีคือกระดานที่ไม่ตรงกับชีต */
+function pick(id, byUser) {
+  sel = id;
+  draw();
+  /* มือถือ: รายละเอียดอยู่ใต้รายการ กดเครื่องแล้วต้องพาไปดูเลย ไม่งั้นไม่รู้ว่ากดติดหรือยัง */
+  if (byUser && isPhone()) $("#detailCard").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+let camStarted = false;
+function draw() {
+  drawScene(); drawList(); drawTally(); drawStages(); drawDetail();
+  if (!camStarted && $("#scene svg")) { camStarted = true; phoneCam(); }
+}
+
+function tick() {
+  const d = new Date();
+  $("#clock").textContent = two(d.getHours()) + ":" + two(d.getMinutes()) + ":" + two(d.getSeconds());
+  $("#today").textContent = d.toLocaleDateString("th-TH", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
+}
+$("#flowToggle").addEventListener("change", (e) => { showFlow = e.target.checked; drawScene(); });
+
+/* ที่เก็บของเบราว์เซอร์อาจอ่านหรือเขียนไม่ได้ (หน้าต่างส่วนตัว · บล็อกคุกกี้)
+   ครอบ try ไว้ทั้งสองทาง หน้าต้องทำงานได้แม้จำค่าไว้ไม่ได้ */
+function setTheme(v) {
+  const r = document.documentElement;
+  if (v === "auto") r.removeAttribute("data-theme"); else r.setAttribute("data-theme", v);
+  document.querySelectorAll("[data-th]").forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.th === v)));
+  try { localStorage.setItem("plantTheme", v); } catch (_) {}
+}
+document.querySelectorAll("[data-th]").forEach((b) =>
+  b.addEventListener("click", () => setTheme(b.dataset.th)));
+let th0 = "auto";
+try { th0 = localStorage.getItem("plantTheme") || "auto"; } catch (_) {}
+setTheme(th0);
+
+/* ═══════════ ชั้นข้อมูลจริง ═══════════
+   ไม่มี API ใหม่ฝั่งหลังบ้านเลย — ใช้ apiGetConfig (ทะเบียน) กับ apiMachineLog (สถานะ)
+   ที่ระบบแจ้งซ่อมมีอยู่แล้ว กระดานนี้จึงไม่มีทางเห็นสถานะที่ต่างจากหน้าสมุดเครื่องจักร */
+
+const TOKEN_KEY = "mt_token";      // คีย์เดียวกับระบบแจ้งซ่อม เปิดจากแท็บเดิมแล้วไม่ต้องล็อกอินซ้ำ
+const getToken = () => { try { return sessionStorage.getItem(TOKEN_KEY) || ""; } catch (_) { return ""; } };
+const setToken = (t) => { try { sessionStorage.setItem(TOKEN_KEY, t); } catch (_) {} };
+const dropToken = () => { try { sessionStorage.removeItem(TOKEN_KEY); } catch (_) {} };
+
+const hasBackend = () => typeof google !== "undefined" && !!(google.script && google.script.run);
+const gs = (fn, ...args) => new Promise((resolve, reject) => {
+  if (!hasBackend()) return reject(new Error("เปิดหน้านี้ผ่าน Web app ของ Apps Script เท่านั้น"));
+  google.script.run
+    .withSuccessHandler(resolve)
+    .withFailureHandler((e) => reject(new Error((e && e.message) || String(e))))[fn](...args);
+});
+
+function whenText(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return String(iso || "");
+  return d.toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) +
+         " · " + ago(d.getTime());
+}
+const ticketUrl = (name) =>
+  (CFG && CFG.webAppUrl ? CFG.webAppUrl : "") + "?machine=" + encodeURIComponent(name);
+
+/* จับคู่ชื่อในตารางตำแหน่ง กับชื่อจริงในทะเบียน — ทะเบียนมีทั้งชื่อ รหัส และชื่อเดิม
+   เทียบแบบไม่สนตัวพิมพ์และช่องว่าง เพราะชื่อเดียวกันถูกพิมพ์ต่างกันในสามระบบ */
+const normName = (v) => String(v || "").toLowerCase().replace(/[\s_\-#.]/g, "");
+
+function reconcile(machines) {
+  const byKey = {};
+  machines.forEach((r) => {
+    [r.name, r.code].concat(r.aliases || []).forEach((k) => {
+      const n = normName(k);
+      if (n && !byKey[n]) byKey[n] = r;
+    });
+  });
+
+  const used = {};
+  MACHINES = LAYOUT.map((m) => {
+    /* ชื่อหลักก่อน แล้วลองชื่อสำรอง (alias) ตามลำดับ — ทะเบียนสะกดต่างจากชื่อในผังได้ ไม่ต้องแก้ชีต
+       แถวทะเบียนหนึ่งแถวจับคู่กับเครื่องในผังได้แค่ตัวเดียว ตัวที่สองจะไม่แชร์สถานะกับตัวแรกเงียบ ๆ */
+    let hit = null;
+    [m.n].concat(m.alias || []).some((k) => {
+      const h = byKey[normName(k)];
+      if (h && !used[h.name]) { hit = h; return true; }
+      return false;
+    });
+    if (hit) used[hit.name] = 1;
+    return Object.assign({}, m, hit
+      ? { n: hit.name, code: hit.code, owner: hit.owner, known: true }
+      : { known: false });
+  });
+
+  /* เครื่องที่อยู่ในทะเบียนแต่ไม่มีที่ยืนในผัง ต้องโผล่ให้เห็น ไม่ใช่หายเงียบ
+     ไม่งั้นกระดานจะดูครบทั้งที่ขาดไปครึ่งโรงงาน */
+  OFFMAP = machines.filter((r) => !used[r.name]).map((r) => r.name);
+}
+
+function applyStatuses(statuses) {
+  MACHINES.forEach((m) => {
+    const r = m.known ? statuses[m.n] : null;
+    raw[m.id] = r || null;
+    state[m.id] = r ? (ST_KEY[r.status] || "unknown") : "unknown";
+  });
+  STATE_AT = Date.now();
+}
+
+/* กล่องนี้คือใบสั่งงานของการจับคู่ชื่อ ไม่ใช่คำเตือนเฉย ๆ
+   ซ้าย = เครื่องในทะเบียนที่ยังไม่มีที่ยืนในผัง · ขวา = ชื่อในผังที่หาในทะเบียนไม่เจอ
+   สองรายการนี้ส่วนใหญ่คือเครื่องเดียวกันที่สะกดคนละแบบ จับคู่ให้ถูกแล้วจบ */
+function drawOffmap() {
+  const lost = MACHINES.filter((m) => !m.known).map((m) => m.n);
+  const box = $("#offPanel");
+  box.hidden = !OFFMAP.length && !lost.length;
+  if (box.hidden) return;
+
+  let t = "";
+  if (lost.length) {
+    t += "ชื่อในผังที่ยังหาไม่เจอในทะเบียน (" + lost.length + "): " + lost.join(" · ") +
+         "  — เครื่องพวกนี้จะขึ้น \"ไม่ทราบสถานะ\" เสมอจนกว่าชื่อจะตรง";
+  }
+  if (OFFMAP.length) {
+    t += (t ? "   |   " : "") +
+         "เครื่องในทะเบียนที่ยังไม่มีตำแหน่งในผัง (" + OFFMAP.length + "): " + OFFMAP.join(" · ");
+  }
+  $("#offList").textContent = t;
+}
+
+function setMsg(id, text, bad) {
+  const el = $(id);
+  if (el) { el.textContent = text || ""; el.style.color = bad ? "var(--stop)" : "var(--ink-2)"; }
+}
+
+/* กระดานต้องขึ้นสถานะได้โดยไม่ต้องล็อกอิน — มันถูกเปิดค้างบนจอหน้าโรงงาน
+   คนที่ล็อกอินได้ของเพิ่มสองอย่าง: สาเหตุที่หยุดกับผู้บันทึก และสิทธิ์กดเปลี่ยนสถานะ */
+async function load() {
+  const token = getToken();
+
+  try {
+    const board = await gs("apiPlantBoard");
+    CFG = { webAppUrl: board.webAppUrl };
+    reconcile(board.machines || []);
+    applyStatuses(board.statuses || {});
+  } catch (e) {
+    setMsg("#liMsg", "โหลดข้อมูลไม่สำเร็จ: " + e.message, true);
+    return;
+  }
+
+  /* ล็อกอินแล้วขอชุดเต็มทับลงไป — ชุดสาธารณะไม่มีสาเหตุกับผู้บันทึก
+     ล้มเหลวก็ไม่เป็นไร กระดานยังแสดงสถานะจากชุดสาธารณะได้ตามเดิม */
+  ME = null;
+  if (token) {
+    try {
+      const log = await gs("apiMachineLog", token);
+      ME = { station: log.station || "" };
+      applyStatuses(log.statuses || {});
+    } catch (e) {
+      dropToken();
+      setMsg("#liMsg", "เซสชันหมดอายุ — กดเปลี่ยนสถานะไม่ได้จนกว่าจะล็อกอินใหม่", true);
+    }
+  }
+
+  drawOffmap();
+  $("#loginBar").hidden = !!ME;
+  /* LAYOUT ว่างได้ (โรงงานใหม่ที่ยังไม่ได้วางผัง) — ต้องไม่ล้มทั้งหน้า */
+  if (!LAYOUT.some((m) => m.id === sel)) sel = LAYOUT.length ? LAYOUT[0].id : "";
+  draw();
+}
+
+async function doLogin() {
+  const email = $("#liEmail").value.trim(), pin = $("#liPin").value.trim();
+  if (!email || !pin) return setMsg("#liMsg", "กรอกอีเมลและ PIN", true);
+  setMsg("#liMsg", "กำลังเข้าสู่ระบบ…");
+  try {
+    const r = await gs("apiLogin", email, pin);
+    if (!r || !r.token) throw new Error(r && r.message ? r.message : "เข้าสู่ระบบไม่สำเร็จ");
+    setToken(r.token);
+    $("#liPin").value = "";
+    setMsg("#liMsg", "");
+    await load();
+  } catch (e) {
+    setMsg("#liMsg", e.message, true);
+  }
+}
+
+async function saveStatus(m) {
+  const st = $("#msSt").value, note = $("#msNote").value.trim();
+  if (st !== "run" && !note) return setMsg("#msMsg", "ระบุสาเหตุที่เครื่องหยุดด้วย", true);
+  setMsg("#msMsg", "กำลังบันทึก…");
+  try {
+    const r = await gs("apiSetMachineStatus", getToken(), m.n, { status: ST_TEXT[st], note: note });
+    applyStatuses((r && r.statuses) || {});
+    draw();                        // วาดใหม่ก่อน แล้วค่อยใส่ข้อความ ไม่งั้นโดนลบทิ้งทันที
+    setMsg("#msMsg", "บันทึกแล้ว");
+  } catch (e) {
+    /* ช่างที่แตะเครื่องนอกสถานีตัวเองจะมาจบที่นี่ — server เป็นคนปฏิเสธ ไม่ใช่หน้าจอ */
+    setMsg("#msMsg", e.message, true);
+  }
+}
+
+/* สลับมุมมองแล้วต้องรีเซ็ตกล้อง — cam.x/cam.y เป็นพิกัดบนจอ ซึ่งคนละระบบกันสองโหมด
+   ถ้าไม่รีเซ็ต ภาพจะกระเด็นออกนอกจอทันทีที่กดสลับ */
+function setView(v) {
+  VIEW = v === "top" ? "top" : "iso";
+  document.querySelectorAll("[data-view]").forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.view === VIEW)));
+  try { localStorage.setItem("plantView", VIEW); } catch (_) {}
+  cam.k = 1; cam.x = 0; cam.y = 0;
+  drawScene();
+  applyCam();
+  phoneCam();
+}
+document.querySelectorAll("[data-view]").forEach((b) =>
+  b.addEventListener("click", () => setView(b.dataset.view)));
+let v0 = "iso";
+try { v0 = localStorage.getItem("plantView") || "iso"; } catch (_) {}
+
+$("#liGo").addEventListener("click", doLogin);
+$("#liPin").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+
+tick(); setInterval(tick, 1000);
+setView(v0);          // ตั้งมุมมองก่อนวาดรอบแรก ไม่งั้นวาดสองรอบเปล่า ๆ
+draw();
+bindCam();
+load();
+$("#backLink").addEventListener("click", (e) => {
+  e.preventDefault();
+  if (CFG && CFG.webAppUrl) top.location.href = CFG.webAppUrl;
+});
+
+/* ดึงซ้ำทุก 60 วินาที — ไม่ใช่เรียลไทม์โดยตั้งใจ สถานะเครื่องเปลี่ยนเป็นหลักนาที
+   ไม่ใช่หลักวินาที และโควตารันไทม์ของ Apps Script เป็นของบัญชีเดียวทั้งสองระบบ */
+setInterval(load, 60000);
+</script>
+</body>
+</html>

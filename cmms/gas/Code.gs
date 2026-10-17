@@ -46,7 +46,8 @@ var HEADERS = [
   'จำนวนครั้งที่ส่งกลับ', 'ประเภท', 'รูป',
   'ผู้รับซ่อมภายนอก', 'กำหนดรับคืน', 'เหตุผลที่ยกเลิก',
   'เครื่องหยุดเดิน', 'รหัสสาเหตุ', 'อะไหล่ที่ใช้',
-  'รายการค่าใช้จ่าย'   // ต่อท้ายเสมอ — รัน upgradeSheet() เพื่อเติมให้ชีตที่มีอยู่แล้ว
+  'รายการค่าใช้จ่าย',  // ต่อท้ายเสมอ — รัน upgradeSheet() เพื่อเติมให้ชีตที่มีอยู่แล้ว
+  'ชิ้นส่วนที่เสีย'    // "รหัสแผนภาพ#เลขที่ · ชื่อ" จากหน้าแผนภาพอะไหล่ ดู partRefStamp_
 ];
 
 var AUDIT_HEADERS = ['เวลา', 'ผู้ใช้', 'การกระทำ', 'หมายเลขแจ้งซ่อม', 'ฟิลด์', 'ค่าเดิม', 'ค่าใหม่'];
@@ -98,6 +99,7 @@ var FIELD_MAP = {
   cost: 'ค่าใช้จ่าย',
   parts: 'อะไหล่ที่ใช้',
   cost_items: 'รายการค่าใช้จ่าย',
+  part_ref: 'ชิ้นส่วนที่เสีย',
   pr_no: 'เลขที่ PR',
   status_legacy: 'สถานะ',
   status: 'สถานะ (ละเอียด)',
@@ -318,6 +320,16 @@ function dueFrom_(createdAt, priority) {
 /* ─────────── หน้าเว็บ ─────────── */
 
 function doGet(e) {
+  /* ผังโรงงานเป็นหน้าแยก ไม่ใช่แท็บในหน้าเดิม — มันเป็น SVG เต็มจอที่กินทั้งความกว้าง
+     ยัดรวมหน้าเดียวแล้วเปิดบนมือถือไม่ไหว และเป็นหน้าที่เปิดค้างไว้บนจอหน้าโรงงาน
+     คนละอายุการใช้งานกับหน้าแจ้งซ่อมที่เปิด ๆ ปิด ๆ */
+  if (e && e.parameter && e.parameter.page === 'plant') {
+    return HtmlService.createTemplateFromFile('plant').evaluate()
+      .setTitle('ผังโรงงาน — ' + String(cfg_('ชื่อบริษัท', 'YOUR COMPANY')))
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
+  }
+
   var t = HtmlService.createTemplateFromFile('index');
 
   // รับชื่อเครื่องจาก QR แต่ต้องมีอยู่จริงในทะเบียนเท่านั้น
@@ -325,8 +337,18 @@ function doGet(e) {
   var raw = (e && e.parameter && e.parameter.machine) || '';
   t.prefillMachine = whitelistMachine_(raw);
 
+  /* ลิงก์ไปผังโรงงานต้องกดได้ตั้งแต่ยังไม่ล็อกอิน แต่ webAppUrl ที่หน้าเว็บใช้อยู่
+     มาจาก apiGetConfig ซึ่งต้องมี token — ตอนยังไม่ล็อกอินจึงเป็นค่าว่าง
+     ส่งมาทาง template แทน ไม่ต้องเพิ่ม endpoint ใหม่ และ location.href ใช้ไม่ได้
+     เพราะหน้านี้รันใน iframe ของ Apps Script ซึ่งเป็นคนละโดเมนกับ /exec */
+  t.plantUrl = ScriptApp.getService().getUrl() + '?page=plant';
+
+  /* ชื่อระบบอ่านจากชีต ตั้งค่า — โรงงานอื่นตั้งชื่อเองได้โดยไม่ต้องแก้โค้ด
+     ส่งทาง template เพราะหัวเมนูต้องโชว์ก่อนล็อกอิน (apiGetConfig ต้องมี token) */
+  t.systemName = String(cfg_('ชื่อระบบ', 'EngineerHub'));
+
   return t.evaluate()
-    .setTitle('ระบบแจ้งซ่อมบำรุง — YOUR COMPANY')
+    .setTitle(t.systemName + ' — ' + String(cfg_('ชื่อบริษัท', 'YOUR COMPANY')))
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
@@ -358,7 +380,7 @@ function prop_(key) {
    คนตั้งค่าไม่ได้ก๊อปรหัสเปล่ามาวาง เขากด "คัดลอกลิงก์" แล้ววางทั้งลิงก์
    ซึ่งได้ค่าหน้าตาแบบนี้ลงไปใน Script Properties
 
-     1PxvE1q93ctPXjBNSDrWgnEY-EK2MZwXn?usp=drive_link
+     1AbCdEfGhIjKlMnOpQrStUvWxYz012345?usp=drive_link
      https://drive.google.com/drive/folders/1Pxv...?usp=sharing
 
    DriveApp.getFolderById() ปฏิเสธทั้งสองแบบ แล้วโยน "รหัสไฟล์หรือโฟลเดอร์ไม่ถูกต้อง"
@@ -611,6 +633,10 @@ function setup() {
   clearCache();                       // เพิ่งแตะโครงชีต อย่าให้แคชค้างของเก่า
   ensure_(SHEET_AUDIT, AUDIT_HEADERS);
   ensure_(SHEET_HOLIDAY, HOLIDAY_HEAD);
+  partSheet_(SHEET_PARTDIAG, PARTDIAG_HEAD);
+  partSheet_(SHEET_PARTS, PARTS_HEAD);
+  partSheet_(SHEET_MANUAL, MANUAL_HEAD);
+  partSheet_(SHEET_MANLINK, MANLINK_HEAD);
 
   // ทะเบียนจริงจากเอกสาร FM-MT-01/Rev.03 — รหัสเครื่องมีอาคารอยู่ในตัว (SM-B4-EX-03)
   ensure_(SHEET_MACHINES,
@@ -707,6 +733,10 @@ function setup() {
     ['SLA ไม่เร่งด่วน',   168, 'ต้องปิดงานภายในกี่ชั่วโมง'],
     ['เปิดแจ้งเตือน',     'ใช่', 'ใส่ "ไม่" เพื่อปิดอีเมลทั้งหมด'],
     ['เปิด Audit Log',   'ใช่', 'ใส่ "ไม่" เพื่อหยุดบันทึกประวัติการแก้ไข'],
+    ['ชื่อระบบ',          'EngineerHub',   'ชื่อที่โชว์บนหัวเมนู แท็บเบราว์เซอร์ และอีเมลแจ้งเตือน'],
+    ['เวลาเริ่มกะเช้า',   '07:30', 'พิมพ์เป็นข้อความ HH:mm — กะเช้า 07:30-19:30 รวมโอที'],
+    ['เวลาเริ่มกะดึก',    '19:30', 'พิมพ์เป็นข้อความ HH:mm — กะดึก 19:30-07:30 รวมโอที (ข้ามเที่ยงคืน)'],
+    ['เป้าเช็คก่อนเดินเครื่อง (นาที)', 30, 'ต้องเช็คเครื่อง+ลงพารามิเตอร์ให้เสร็จภายในกี่นาทีนับจากเริ่มกะ'],
     ['ชื่อบริษัท',        'YOUR COMPANY', 'ใช้บนหัวเอกสาร PDF'],
     ['สิทธิ์รูปภาพ',      'ทุกคนที่มีลิงก์', 'ใส่ "เฉพาะในองค์กร" ถ้าไม่ต้องการให้รูปเปิดสาธารณะ'],
     ['คอลัมน์เครื่องจักร', 'เครื่องจักร', 'ชื่อคอลัมน์ในชีต Daily Check ที่เก็บชื่อเครื่อง'],
@@ -779,7 +809,11 @@ function upgradeSheet() {
     addMissingCols_(SHEET_USERS, USERS_HEAD),
     /* สร้างชีตเช็คลิสต์ให้เลย พร้อมหัวคอลัมน์ — ชื่อหัวพิมผิดแม้ตัวเดียว คอลัมน์นั้นหายเงียบ */
     newSheet_(PARAM_SHEET_CHECK, CHECK_HEAD),
-    newSheet_(SHEET_PARAM_OK, PARAM_OK_HEAD)
+    newSheet_(SHEET_PARAM_OK, PARAM_OK_HEAD),
+    partSheet_(SHEET_PARTDIAG, PARTDIAG_HEAD),
+    partSheet_(SHEET_PARTS, PARTS_HEAD),
+    partSheet_(SHEET_MANUAL, MANUAL_HEAD),
+    partSheet_(SHEET_MANLINK, MANLINK_HEAD)
   ];
   SpreadsheetApp.flush();
   clearCache();
@@ -1056,7 +1090,7 @@ var CACHE_SEC = 300;
 /* ⚠️ เพิ่ม/ลบช่องใน apiGetConfig() แล้วต้องขยับเลขท้ายคีย์นี้ทุกครั้ง
    ไม่งั้นเครื่องที่เคยเปิดจะได้ก้อนแคชโครงเก่าที่ไม่มีช่องใหม่ไปอีก 5 นาที
    แล้วคนตั้งค่าจะนั่งงงว่าใส่ค่าในชีตแล้วทำไมหน้าเว็บไม่ขึ้น (เจอมาแล้วกับปุ่มเลี้ยงเบียร์) */
-var CACHE_KEY_CONFIG = 'cfg_v8';   // v6 = เพิ่ม machineDown — ขยับเลขทุกครั้งที่เพิ่ม/ลบฟิลด์ใน apiGetConfig
+var CACHE_KEY_CONFIG = 'cfg_v9';   // v6 = เพิ่ม machineDown — ขยับเลขทุกครั้งที่เพิ่ม/ลบฟิลด์ใน apiGetConfig
 var CACHE_SEC_FORM = 21600;   // ลิงก์ฟอร์มแทบไม่เปลี่ยน เก็บยาวกว่าแคชตั้งค่า
 /* เพดานของ CacheService คือ 100KB ต่อคีย์ และนับเป็น "ไบต์" ไม่ใช่จำนวนตัวอักษร
    ภาษาไทยกินตัวละ 3 ไบต์ใน UTF-8 ถ้าเช็คด้วย .length จะประเมินต่ำไป 3 เท่า
@@ -1194,6 +1228,7 @@ function apiGetConfig(token) {
     webAppUrl: ScriptApp.getService().getUrl(),
     slaHours: slaHoursFor_(PRIORITY_DEFAULT),   // ใช้เป็นค่าอ้างอิงบนหน้า KPI เท่านั้น
     companyName: String(cfg_('ชื่อบริษัท', 'YOUR COMPANY')),
+    systemName: String(cfg_('ชื่อระบบ', 'EngineerHub')),
     formUrl: String(cfg_('ลิงก์ฟอร์มเช็คชีต', '')),
     beerQr: beerQrUrl_(),
     beerPromptPay: promptPayPayload_(cfg_('QR เลี้ยงเบียร์ช่าง', '')),
@@ -1427,7 +1462,8 @@ function apiCreateTicket(payload) {
       started_at: '', completed_at: '', technician: '', repair_action: '', repair_minutes: '',
       verified_by: '', verified_at: '', verification_status: '', rejection_note: '',
       reject_count: 0, source: String(payload.source || 'แจ้งซ่อม'),
-      image_url: '', machine_down: down
+      image_url: '', machine_down: down,
+      part_ref: partRefStamp_(payload.part_ref)
     };
 
     /* รูปแนบพังต้องไม่ทำให้ใบแจ้งซ่อมหายไปทั้งใบ
@@ -1668,6 +1704,255 @@ function updateTicketInternal_(ticketId, changes, ctx) {
 /* ฟิลด์ที่เป็นการ "วางแผนและจ่ายงาน" — ตาม Role ที่กำหนด เป็นงานของ Management & Lead
    pr_no = เลขใบขอซื้อจาก ERP หัวหน้าซ่อมบำรุง/หัวหน้าช่างเทคนิคเป็นคนกรอก ใช้ส่งต่อให้ฝ่ายบัญชี */
 var LEAD_ONLY_FIELDS = ['priority', 'due_at', 'assignee', 'pr_no', 'cancel_reason'];
+
+/* ═══════════ แผนภาพอะไหล่ (Exploded view) ═══════════
+   ข้อมูลอยู่ในชีต ไม่ใช่ในโค้ด — เพิ่มเครื่องหรือมอเตอร์ตัวใหม่ได้โดยไม่ต้อง deploy
+
+     ชีต "แผนภาพอะไหล่"  1 แถว = 1 รูป  (รหัส · ชื่อ · เครื่องจักร · ไฟล์รูปบน Drive)
+     ชีต "ชิ้นส่วน"      1 แถว = 1 เลขอ้างอิงบนรูป (เลขที่ · ชื่อ · ตำแหน่งบนรูป · รหัส Stock)
+
+   ตำแหน่งเลขบนรูปเก็บเป็น "% ของรูป" ("x,y,w,h" หลายจุดคั่นด้วย ;) ไม่ใช่พิกเซล
+   เปลี่ยนไฟล์เป็นความละเอียดสูงกว่าแล้วจุดยังตรงที่เดิม
+
+   ใบแจ้งซ่อมเก็บ "รหัสแผนภาพ#เลขที่ · ชื่อ" ไว้ในคอลัมน์ ชิ้นส่วนที่เสีย
+   ส่วนหน้า "รหัสแผนภาพ#เลขที่" ใช้นับสถิติรายชิ้น ส่วนชื่อเป็นภาพถ่ายตอนแจ้ง
+   ถ้าชีตถูกแก้เลขภายหลัง ใบเก่ายังอ่านรู้เรื่อง
+
+   ภาพ/ตารางที่มาจากคู่มือผู้ผลิตเป็นลิขสิทธิ์ของเขา ใช้ภายในโรงงานเท่านั้น ห้ามใส่ในรีโปสาธารณะ */
+
+var SHEET_PARTDIAG = 'แผนภาพอะไหล่';
+var SHEET_PARTS    = 'ชิ้นส่วน';
+var PARTDIAG_HEAD  = ['รหัสแผนภาพ', 'ชื่อแผนภาพ', 'เครื่องจักร', 'ไฟล์รูป', 'แหล่งที่มา', 'หมายเหตุ', 'ใช้งาน'];
+var PARTS_HEAD     = ['รหัสแผนภาพ', 'เลขที่', 'ชื่อ (อังกฤษ)', 'ชื่อไทย', 'ตำแหน่งบนรูป',
+                      'รหัสผู้ผลิต', 'รหัส Stock', 'จำนวนต่อชุด', 'ชุดซ่อม', 'หมายเหตุ', 'รูปปกติ'];
+var PART_SEP       = ' · ';
+var PART_PHOTO_MAX = 1048576;       // รูปสภาพปกติของชิ้นส่วน (ย่อจากมือถือมาแล้ว ปกติไม่ถึง 200KB)
+var PART_DIR_NAME  = 'EngineerHub - แผนภาพอะไหล่';   // โฟลเดอร์สำรองเมื่อแผนภาพไม่มีไฟล์รูปให้อิงโฟลเดอร์
+var PART_IMAGE_MAX = 3 * 1048576;   // ผ่าน google.script.run เป็น base64 — เกินนี้โหลดบนมือถือช้าจนช่างเลิกใช้
+
+/** ชีตข้อความล้วนทั้งชีต — Sheets แปลง "15-1" เป็นวันที่ 15 ม.ค. ตอนวางข้อมูล เลขชิ้นส่วนเพี้ยนทันที */
+function partSheet_(name, headers) {
+  var ss = ss_();
+  if (ss.getSheetByName(name)) return addMissingCols_(name, headers);
+  var sh = ss.insertSheet(name);
+  sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold').setBackground('#e8fbf1');
+  sh.setFrozenRows(1);
+  sh.getRange(2, 1, sh.getMaxRows() - 1, headers.length).setNumberFormat('@');
+  return name + ': สร้างใหม่';
+}
+
+/** ชีตยังไม่ถูกสร้างหรือยังว่าง = ไม่มีแผนภาพ ไม่ใช่ error — ระบบเก่าที่ยังไม่รัน upgradeSheet() ต้องไม่พัง */
+function partsRead_(name) {
+  var sh = ss_().getSheetByName(name);
+  return sh && sh.getLastRow() > 1 ? readSheet_(name) : [];
+}
+
+/** "x,y,w,h;x,y,w,h" (เปอร์เซ็นต์ของรูป) -> [[x,y,w,h], …] ตัดชิ้นที่อ่านไม่ออกหรือตกขอบรูปทิ้ง
+    ค่าเพี้ยนจากการพิมพ์มือต้องไม่ทำให้ทั้งหน้าพัง */
+function parseSpots_(s) {
+  var out = [];
+  String(s == null ? '' : s).split(';').forEach(function (p) {
+    var n = p.split(',').map(function (v) { return Number(String(v).trim()); });
+    if (n.length !== 4 || n.some(function (v) { return !isFinite(v); })) return;
+    if (n[0] < 0 || n[1] < 0 || n[2] <= 0 || n[3] <= 0 || n[0] + n[2] > 101 || n[1] + n[3] > 101) return;
+    out.push(n);
+  });
+  return out;
+}
+
+function partIdOf_(row) { return String(row['รหัสแผนภาพ'] == null ? '' : row['รหัสแผนภาพ']).trim(); }
+
+/** ใบที่ยังไม่ยกเลิก นับต่อชิ้น: { เลขที่: {n, last} } */
+function partFails_(id) {
+  var out = {};
+  rowsToObjects_().forEach(function (t) {
+    if (!t.part_ref || t.status === STATUS_CANCEL) return;
+    var key = String(t.part_ref).split(PART_SEP)[0], i = key.indexOf('#');
+    if (i < 1 || key.slice(0, i) !== id) return;
+    var o = out[key.slice(i + 1)] || (out[key.slice(i + 1)] = { n: 0, last: '' });
+    o.n++;
+    if (String(t.created_at) > o.last) o.last = String(t.created_at);
+  });
+  return out;
+}
+
+/** รูปเป็น data URI — Drive ไม่ต้องเปิดแชร์สาธารณะ เพราะ web app ที่ deploy อ่านไฟล์ในนามเจ้าของ */
+function partImage_(raw, max) {
+  max = max || PART_IMAGE_MAX;
+  var fid = driveId_(raw);
+  if (!fid) throw new Error('แผนภาพนี้ยังไม่มีไฟล์รูป — อัปโหลดรูปขึ้น Google Drive แล้ววางลิงก์ในคอลัมน์ "ไฟล์รูป" ของชีต ' + SHEET_PARTDIAG);
+  var blob;
+  try { blob = DriveApp.getFileById(fid).getBlob(); }
+  catch (e) { throw new Error('เปิดไฟล์รูปไม่ได้ — ตรวจลิงก์ในคอลัมน์ "ไฟล์รูป" และว่าบัญชีเจ้าของระบบเข้าถึงไฟล์นั้นได้'); }
+  var type = blob.getContentType(), bytes = blob.getBytes();
+  if (!/^image\/(png|jpe?g|gif|webp)$/.test(type)) throw new Error('ไฟล์ที่ลิงก์ไว้ไม่ใช่รูป (' + type + ')');
+  if (bytes.length > max) {
+    throw new Error('รูปใหญ่เกิน ' + Math.round(max / 1048576) + 'MB — ย่อก่อนอัปโหลด (รูปเส้นลาย PNG สีเทาเล็กกว่ามาก)');
+  }
+  return 'data:' + type + ';base64,' + Utilities.base64Encode(bytes);
+}
+
+/** รายการแผนภาพที่เปิดใช้งาน — ต้องล็อกอิน: ภาพจากคู่มือผู้ผลิตไม่ควรหลุดออกหน้าเว็บสาธารณะ */
+function apiPartDiagrams(token) {
+  requireAuth_(token);
+  var n = {};
+  partsRead_(SHEET_PARTS).forEach(function (p) {
+    if (String(p['เลขที่']).trim()) { var k = partIdOf_(p); n[k] = (n[k] || 0) + 1; }
+  });
+  return partsRead_(SHEET_PARTDIAG)
+    .filter(function (d) { return partIdOf_(d) && isActive_(d['ใช้งาน']); })
+    .map(function (d) {
+      var id = partIdOf_(d);
+      return { id: id, name: String(d['ชื่อแผนภาพ'] || id), machine: String(d['เครื่องจักร'] || ''), parts: n[id] || 0 };
+    });
+}
+
+function apiPartDiagram(token, id) {
+  requireAuth_(token);
+  id = String(id == null ? '' : id).trim();
+  var d = partsRead_(SHEET_PARTDIAG).filter(function (r) { return partIdOf_(r) === id && isActive_(r['ใช้งาน']); })[0];
+  if (!d) throw new Error('ไม่พบแผนภาพ "' + id + '"');
+
+  var fails = partFails_(id);
+  var str = function (v) { return v == null ? '' : String(v).trim(); };
+  var out = {
+    id: id, name: str(d['ชื่อแผนภาพ']) || id, machine: str(d['เครื่องจักร']),
+    source: str(d['แหล่งที่มา']), note: str(d['หมายเหตุ']),
+    parts: partsRead_(SHEET_PARTS).filter(function (p) { return partIdOf_(p) === id && str(p['เลขที่']); })
+      .map(function (p) {
+        var ref = str(p['เลขที่']), f = fails[ref] || {};
+        return {
+          ref: ref, en: str(p['ชื่อ (อังกฤษ)']), th: str(p['ชื่อไทย']), spots: parseSpots_(p['ตำแหน่งบนรูป']),
+          mfr: str(p['รหัสผู้ผลิต']), sku: str(p['รหัส Stock']), qty: str(p['จำนวนต่อชุด']),
+          kit: str(p['ชุดซ่อม']), note: str(p['หมายเหตุ']), photo: !!driveId_(p['รูปปกติ']), fails: f.n || 0, last: f.last || ''
+        };
+      })
+  };
+  /* รูปพังต้องไม่ทำให้ตารางชิ้นส่วนหายไปด้วย ช่างยังเปิดดูชื่อ/รหัสอะไหล่ได้ */
+  /* ช่อง "ไฟล์รูป" ว่าง = แผนภาพแบบรายการล้วนโดยตั้งใจ (อุปกรณ์ที่ไม่มีภาพ exploded) ไม่ใช่ error
+     มีลิงก์แต่เปิดไม่ได้ต่างหากที่ต้องบอก */
+  if (driveId_(d['ไฟล์รูป'])) {
+    try { out.image = partImage_(d['ไฟล์รูป']); } catch (e) { out.imageError = e.message; }
+  }
+  return out;
+}
+
+/** ที่เก็บรูปของแผนภาพ: โฟลเดอร์เดียวกับรูปแผนภาพ (เขียนได้แน่ เพราะบัญชีนี้เป็นคนวางไว้เอง)
+    ไม่ใช้ DRIVE_FOLDER_ID ตรง ๆ — ที่ผ่านมาโฟลเดอร์นั้นบางที่บัญชีมีสิทธิ์แค่ดู เขียนไม่ได้ */
+function partFolder_(id) {
+  var d = partsRead_(SHEET_PARTDIAG).filter(function (r) { return partIdOf_(r) === id; })[0];
+  var fid = d && driveId_(d['ไฟล์รูป']);
+  if (fid) { try { return DriveApp.getFileById(fid).getParents().next(); } catch (e) { /* ใช้โฟลเดอร์สำรองด้านล่าง */ } }
+  var it = DriveApp.getFoldersByName(PART_DIR_NAME);
+  return it.hasNext() ? it.next() : DriveApp.createFolder(PART_DIR_NAME);
+}
+
+function partMatch_(id, ref) {
+  return function (r) { return partIdOf_(r) === id && String(r['เลขที่']).trim() === ref; };
+}
+
+/** รูปสภาพปกติของชิ้นส่วน — ดึงทีละชิ้นตอนช่างกดเลือก ไม่ฝังมากับ apiPartDiagram (รูปทุกชิ้นรวมกันหนักเกินไป) */
+function apiPartPhoto(token, id, ref) {
+  requireAuth_(token);
+  id = String(id == null ? '' : id).trim(); ref = String(ref == null ? '' : ref).trim();
+  var p = partsRead_(SHEET_PARTS).filter(partMatch_(id, ref))[0];
+  if (!p || !driveId_(p['รูปปกติ'])) return { photo: '' };
+  try { return { photo: partImage_(p['รูปปกติ'], PART_PHOTO_MAX) }; }
+  catch (e) { return { photo: '', error: e.message }; }
+}
+
+/** หัวหน้างานขึ้นไปเท่านั้น: แก้ข้อมูลหลักที่ทุกคนเห็น — ช่างทั่วไปดูได้อย่างเดียว
+    รูปเดิมไม่ถูกลบจาก Drive (แค่เลิกชี้) และทุกครั้งลง Audit */
+function apiSetPartPhoto(token, id, ref, dataUri) {
+  var u = requireAuth_(token, 'LEAD');
+  id = String(id == null ? '' : id).trim(); ref = String(ref == null ? '' : ref).trim();
+  var m = /^data:(image\/(?:png|jpe?g|webp));base64,([A-Za-z0-9+\/=]+)$/.exec(String(dataUri || ''));
+  if (!m) throw new Error('ไฟล์ต้องเป็นรูป PNG / JPG / WEBP');
+  if (m[2].length * 0.75 > PART_PHOTO_MAX) {
+    throw new Error('รูปใหญ่เกิน ' + Math.round(PART_PHOTO_MAX / 1048576) + 'MB — ถ่ายใหม่หรือย่อรูปก่อน');
+  }
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sh = sheet_(SHEET_PARTS), vals = sh.getDataRange().getValues();
+    var head = vals[0].map(function (h) { return String(h).trim(); });
+    var cId = head.indexOf('รหัสแผนภาพ'), cRef = head.indexOf('เลขที่'), cPhoto = head.indexOf('รูปปกติ');
+    if (cPhoto < 0) throw new Error('ชีต ' + SHEET_PARTS + ' ยังไม่มีคอลัมน์ "รูปปกติ" — รัน upgradeSheet() ก่อน');
+    var r = -1;
+    for (var i = 1; i < vals.length; i++) {
+      if (String(vals[i][cId]).trim() === id && String(vals[i][cRef]).trim() === ref) { r = i; break; }
+    }
+    if (r < 0) throw new Error('ไม่พบชิ้นส่วน ' + ref + ' ในแผนภาพ ' + id);
+
+    var ext = m[1].indexOf('png') > -1 ? 'png' : m[1].indexOf('webp') > -1 ? 'webp' : 'jpg';
+    var file = partFolder_(id).createFile(Utilities.newBlob(Utilities.base64Decode(m[2]), m[1],
+      'part-' + id + '-' + ref.replace(/[^\w.-]/g, '_') + '-' + Date.now() + '.' + ext));
+    sh.getRange(r + 1, cPhoto + 1).setValue(file.getUrl());
+    SpreadsheetApp.flush();
+    writeAudit_('เปลี่ยนรูปสภาพปกติของชิ้นส่วน', id + '#' + ref, [
+      { field: 'รูปปกติ', oldValue: String(vals[r][cPhoto] || ''), newValue: file.getUrl() }
+    ], u.name || u.email || '');
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ═══════════ ห้องสมุดคู่มือ (E-Book) ═══════════
+   คู่มือเป็นไฟล์ PDF บน Drive — ระบบไม่เก็บเนื้อหา เก็บแค่ "ทะเบียน" กับ "ตารางผูก" ในชีต
+
+     ชีต "คู่มือ"      1 แถว = 1 เล่ม (ชื่อ · หมวด · ลิงก์ Drive · จำนวนหน้า · สรุป)
+     ชีต "คู่มือ-ผูก"  1 แถว = 1 หัวข้อที่แนะนำ (เล่ม · หน้า · หัวข้อ · ผูกกับ แผนภาพ/ชิ้นส่วน/เครื่องจักร)
+
+   หน้าเว็บคำนวณ "คู่มือที่แนะนำ" ของใบแจ้งซ่อมเอง จากชิ้นส่วนที่เลือก (part_ref) และเครื่องจักรของใบ
+   ตารางผูกแก้ได้ในชีตโดยไม่ต้อง deploy · ช่องผูกเว้นว่างได้ (ค่าที่กรอกไว้ยิ่งเจาะจงยิ่งขึ้นก่อน)
+
+   ไฟล์คู่มือเปิดผ่านลิงก์ Drive โดยตรง (ช่างเข้าระบบด้วย PIN ไม่ใช่บัญชี Google จึงต้องตั้งแชร์เป็น "ทุกคนที่มีลิงก์ดูได้")
+   ใช้กับคู่มือที่แจกฟรี/ไม่เป็นความลับเท่านั้น — เอกสารภายในที่เป็นความลับห้ามใส่ */
+
+var SHEET_MANUAL  = 'คู่มือ';
+var SHEET_MANLINK = 'คู่มือ-ผูก';
+var MANUAL_HEAD   = ['รหัสคู่มือ', 'ชื่อคู่มือ', 'หมวด', 'ผู้จัดทำ/แหล่งที่มา', 'ไฟล์ (Drive)', 'จำนวนหน้า', 'สรุป', 'ใช้งาน'];
+var MANLINK_HEAD  = ['รหัสคู่มือ', 'หน้า', 'หัวข้อ', 'แผนภาพ', 'ชิ้นส่วน', 'เครื่องจักร', 'หมายเหตุ'];
+
+/** ต้องล็อกอิน (ระบบนี้เปิดให้ช่างดูเฉพาะคนที่ล็อกอิน) — ส่งทะเบียนทั้งหมดในครั้งเดียว ข้อมูลหลักร้อยแถว ไม่ต้องแบ่งหน้า */
+function apiManuals(token) {
+  requireAuth_(token);
+  var str = function (v) { return v == null ? '' : String(v).trim(); };
+  var books = partsRead_(SHEET_MANUAL)
+    .filter(function (b) { return str(b['รหัสคู่มือ']) && isActive_(b['ใช้งาน']); })
+    .map(function (b) {
+      return { id: str(b['รหัสคู่มือ']), title: str(b['ชื่อคู่มือ']) || str(b['รหัสคู่มือ']), cat: str(b['หมวด']) || 'อื่น ๆ',
+               source: str(b['ผู้จัดทำ/แหล่งที่มา']), pages: Number(b['จำนวนหน้า']) || 0, summary: str(b['สรุป']),
+               fileId: driveId_(b['ไฟล์ (Drive)']) };
+    });
+  var ok = {};
+  books.forEach(function (b) { ok[b.id] = true; });
+  var links = partsRead_(SHEET_MANLINK)
+    .filter(function (l) { return ok[str(l['รหัสคู่มือ'])]; })        // ผูกกับเล่มที่ปิดใช้งานหรือไม่มีแล้ว = ข้าม
+    .map(function (l) {
+      var m = str(l['เครื่องจักร']);
+      return { book: str(l['รหัสคู่มือ']), page: Number(l['หน้า']) || 0, title: str(l['หัวข้อ']),
+               diagram: str(l['แผนภาพ']), ref: str(l['ชิ้นส่วน']), machine: m ? canonical_(m) : '', note: str(l['หมายเหตุ']) };
+    });
+  return { books: books, links: links };
+}
+
+/** ค่าที่หน้าเว็บส่งมาเป็นแค่ข้อความ เชื่อไม่ได้ — ตรวจกับชีตแล้วสร้างค่าที่จะเก็บเอง
+    ไม่ตรงกับชิ้นส่วนที่มีจริง = ไม่เก็บ (ใบแจ้งซ่อมยังสร้างได้ตามปกติ) */
+function partRefStamp_(raw) {
+  var s = String(raw == null ? '' : raw).trim(), i = s.indexOf('#');
+  if (i < 1) return '';
+  try {
+    var id = s.slice(0, i), ref = s.slice(i + 1);
+    var p = partsRead_(SHEET_PARTS).filter(function (r) {
+      return partIdOf_(r) === id && String(r['เลขที่']).trim() === ref;
+    })[0];
+    if (!p) return '';
+    var th = String(p['ชื่อไทย'] || '').trim(), en = String(p['ชื่อ (อังกฤษ)'] || '').trim();
+    return id + '#' + ref + PART_SEP + (th && en ? th + ' (' + en + ')' : th || en);
+  } catch (e) { return ''; }
+}
 
 /* ═══ อะไหล่ที่ใช้ในใบนี้ ═══
    หนึ่งใบใส่ได้หลายรหัส เก็บเป็นข้อความหลายบรรทัดในคอลัมน์เดียว ไม่ได้แยกเป็นชีตใหม่
@@ -2073,7 +2358,7 @@ var LOCK_MINUTES = 15;
 /* ADMIN เคยหลุดจากตารางนี้ทั้งที่ paramCanApprove_ อ้างถึง
    ผลคือใครที่ใส่บทบาท ADMIN ในชีตจะได้ RANK 0 คือต่ำกว่าช่าง แล้วทำอะไรไม่ได้เลย
    โดยไม่มี error บอกว่าเป็นเพราะบทบาทไม่มีในตาราง */
-var RANK = { TECH: 1, LEAD: 2, ENG: 2, ADMIN: 3 };
+var RANK = { TECH: 1, MT: 1, LEAD: 2, ENG: 2, ADMIN: 3 };   // MT = ช่างซ่อมบำรุง (TECH = ช่างเทคนิค)
 
 /* ตำแหน่งคอลัมน์ในชีต Users (ตรงกับ US ของ Auth.gs) */
 var US = { EMAIL: 0, NAME: 1, ROLE: 2, ACTIVE: 3, PIN: 4, SALT: 5, FAILED: 6, LOCKED: 7,
@@ -4524,6 +4809,48 @@ function apiMachineLog(token) {
   return { statuses: machineStatus_(), options: MSTATUS_ALL, station: user.station || '' };
 }
 
+/* ═══════════ กระดานผังโรงงาน — อ่านอย่างเดียว ไม่ต้องล็อกอิน ═══════════
+   หน้านี้ถูกเปิดค้างไว้บนจอหน้าโรงงาน จะให้คนเดินไปล็อกอินทุกเช้าไม่ไหว
+   จึงเปิดให้อ่านได้โดยไม่มี token แต่ "ตัดของที่ไม่จำเป็นออกก่อนส่ง"
+   ไม่ใช่ส่งชุดเดียวกับที่คนล็อกอินได้:
+
+     ส่ง     — ชื่อเครื่อง ชื่อเดิม หมวด และสถานะเดิน/หยุดพร้อมเวลาที่เกิด
+     ไม่ส่ง  — สาเหตุที่หยุด (มีรายละเอียดงานซ่อม) ผู้บันทึก รหัสเครื่อง ผู้ดูแล
+               สองอย่างหลังเป็นชื่อพนักงาน ซึ่งไม่ควรหลุดให้คนที่มีแค่ลิงก์
+
+   การเปลี่ยนสถานะยังต้องล็อกอินเหมือนเดิม — นี่คือทางอ่าน ไม่ใช่ทางเขียน
+   แคชสั้น 30 วินาที กันคนเปิดค้างหลายจอแล้วยิงอ่านชีตทั้งใบทุกนาที
+   (โควตารันไทม์เป็นของบัญชีเดียวที่แชร์กับระบบคลังอะไหล่) */
+var CACHE_KEY_PLANT = 'plant_v1';
+var CACHE_SEC_PLANT = 30;
+
+function apiPlantBoard() {
+  try {
+    var hit = CacheService.getScriptCache().get(CACHE_KEY_PLANT);
+    if (hit) return JSON.parse(hit);
+  } catch (e) {}
+
+  var all = machineStatus_(), lean = {};
+  Object.keys(all).forEach(function (k) {
+    lean[k] = { status: all[k].status, since: all[k].since };
+  });
+
+  var out = {
+    machines: machines_().map(function (m) {
+      return { name: m.name, group: m.group, aliases: m.aliases };
+    }),
+    statuses: lean,
+    options: MSTATUS_ALL,
+    webAppUrl: ScriptApp.getService().getUrl(),
+    at: new Date().toISOString()
+  };
+
+  try {
+    CacheService.getScriptCache().put(CACHE_KEY_PLANT, JSON.stringify(out), CACHE_SEC_PLANT);
+  } catch (e) {}
+  return out;
+}
+
 /* เขียนแถวสถานะหนึ่งแถว — ไม่ตรวจสิทธิ์ ผู้เรียกเป็นคนตัดสินว่าใครเรียกได้
    มีสามทางที่เรียกเข้ามา: สวิตช์บนการ์ด (หัวหน้า) · เปิดใบแจ้งซ่อม · ตรวจรับงาน
    สองทางหลังไม่ต้องล็อกอินโดยตั้งใจ เพราะคนที่ยืนอยู่หน้าเครื่องคือคนที่รู้จริง
@@ -4744,7 +5071,7 @@ function sendMail_(to, subject, htmlBody) {
   to = String(to || '').trim();
   if (!to) return;
   try {
-    MailApp.sendEmail({ to: to, subject: '[แจ้งซ่อม] ' + subject, htmlBody: htmlBody, name: 'ระบบแจ้งซ่อมบำรุง' });
+    MailApp.sendEmail({ to: to, subject: '[แจ้งซ่อม] ' + subject, htmlBody: htmlBody, name: String(cfg_('ชื่อระบบ', 'EngineerHub')) });
   } catch (err) {
     Logger.log('ส่งอีเมลไม่สำเร็จ: ' + err.message);   // โควตาเต็มก็ไม่ควรทำให้งานหลักพัง
   }
@@ -5374,6 +5701,215 @@ function dayKey_(d) {
   return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 }
 
+/* ═══ กะทำงาน ═══
+   โรงงานมี 2 กะ รวมโอทีแล้ว: เช้า 07:30-19:30 · ดึก 19:30-07:30 (ข้ามเที่ยงคืน)
+   เวลาเริ่มกะอยู่ในชีต ตั้งค่า ไม่ฝังโค้ด — กะที่เปลี่ยนในอนาคตหรือโรงงานอื่นแก้ที่ชีตได้เลย
+
+   "วันของกะ" ของกะดึกคือวันที่กะนั้น "เริ่ม": ส่งฟอร์มตอน 02:00 เป็นของกะดึกที่เริ่มเมื่อวาน
+   ไม่ใช่ของวันนี้ ไม่งั้นช่างกะดึกจะถูกนับว่าไม่ได้เช็คทั้งคืน แล้วไปปนกับกะเช้าของวันเดียวกัน
+   Date.getHours() ใน Apps Script ใช้เขตเวลาของโปรเจค (Asia/Bangkok) จึงไม่ต้องแปลงเอง */
+
+/** "07:30" -> 450 นาทีนับจากเที่ยงคืน · อ่านไม่ออกคืน fallback
+    ช่องที่พิมพ์ 07:30 ในชีตมักถูก Sheets แปลงเป็นเวลา (Date) เอง จึงรับได้ทั้งสองแบบ */
+function clockMin_(v, fallback) {
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    v = Utilities.formatDate(v, Session.getScriptTimeZone(), 'HH:mm');
+  }
+  var m = /^\s*(\d{1,2})[:.](\d{2})\s*$/.exec(String(v == null ? '' : v));
+  if (!m) return fallback;
+  var h = +m[1], n = +m[2];
+  return (h > 23 || n > 59) ? fallback : h * 60 + n;
+}
+
+/** เป้าหมาย "เช็คเสร็จภายในกี่นาทีหลังเริ่มกะ" */
+function readyTargetMin_() {
+  var n = Number(cfg_('เป้าเช็คก่อนเดินเครื่อง (นาที)', 30));
+  return n > 0 ? n : 30;
+}
+
+/** เวลาหนึ่งอยู่ในกะไหน — {key:'เช้า'|'ดึก', name, day:'yyyy-MM-dd' วันของกะ, since: นาทีนับจากเริ่มกะ} */
+function shiftInfo_(d) {
+  var a = clockMin_(cfg_('เวลาเริ่มกะเช้า', '07:30'), 450);
+  var b = clockMin_(cfg_('เวลาเริ่มกะดึก', '19:30'), 1170);
+  if (!(a < b)) { a = 450; b = 1170; }      // ตั้งสลับกันหรือซ้ำกัน = ใช้ค่ามาตรฐาน ดีกว่าคำนวณมั่ว
+  var m = d.getHours() * 60 + d.getMinutes();
+  var key, since, ref = d;
+  if (m >= a && m < b) { key = 'เช้า'; since = m - a; }
+  else if (m >= b)     { key = 'ดึก'; since = m - b; }
+  else                 { key = 'ดึก'; since = m + 1440 - b; ref = new Date(d.getTime() - 86400000); }
+  return { key: key, name: 'กะ' + key, day: dayKey_(ref), since: since };
+}
+
+/**
+ * รายงานคุณภาพเช็คชีต 60 วันล่าสุด — รันเองจากเมนู Apps Script แล้วอ่าน Execution log
+ * อ่านอย่างเดียว ไม่แก้ชีตไหนทั้งนั้น
+ *
+ * ทำไมต้องมีก่อนตั้งเป้า KPI รายคน: ตัวเลขที่จะเอาไปประเมินคนต้องรู้ก่อนว่า
+ *   - แถวไหนระบบรู้ว่าใครตรวจ และแถวไหนไม่รู้ (ถ้าไม่รู้ ช่างจะโดนตัดคะแนนจากข้อมูลที่หาย)
+ *   - ช่างส่งเช็คกี่โมงจริงเมื่อเทียบกับเวลาเริ่มกะ — เป้า 30 นาทีควรเทียบกับของจริงก่อนใช้
+ */
+function checkDataQuality() {
+  var DAYS = 60, now = new Date(), L = [];
+  var from = dayKey_(new Date(now.getTime() - DAYS * 86400000)), to = dayKey_(now);
+  var target = readyTargetMin_();
+  var BUCK = [15, 30, 45, 60, 120];
+
+  L.push('══ คุณภาพเช็คชีต ' + from + ' ถึง ' + to + ' ══');
+  L.push('กะที่ระบบเข้าใจ: เช้าเริ่ม ' + clockStr_(cfg_('เวลาเริ่มกะเช้า', '07:30')) +
+         ' · ดึกเริ่ม ' + clockStr_(cfg_('เวลาเริ่มกะดึก', '19:30')) +
+         ' · เป้า ' + target + ' นาที  (ถ้าเวลาไม่ตรงกับที่ตั้งไว้ แก้ในชีต ตั้งค่า ให้เป็นข้อความ HH:mm)');
+
+  if (prop_(CHECK_PROP_ID)) {
+    L.push('', '── หัวตารางของชีตคำตอบ ──');
+    checkFormSheets_().forEach(function (x) {
+      var seen = {}, dup = 0;
+      x.head.forEach(function (h) {
+        var t = String(h || '').trim().toLowerCase();
+        if (!t) return;
+        if (seen[t]) dup++; seen[t] = 1;
+      });
+      L.push('  ' + x.sh.getName() + ' · ' + x.head.length + ' คอลัมน์ · หัวซ้ำ ' + dup +
+             ' · คอลัมน์ผู้ตรวจ ' + x.meta.all.by.length + ' · เครื่อง ' + x.meta.all.machine.length +
+             ' · กะ ' + x.meta.all.shift.length);
+      L.push('      ผู้ตรวจอ่านจากหัวตาราง: ' + (x.meta.all.by.map(function (i) {
+        return '"' + String(x.head[i]).slice(0, 28) + '"';
+      }).join(' · ') || '(ไม่มี)'));
+    });
+
+    /* แถวดิบ vs แถวที่ใช้ได้ — คำถามที่รายงานรอบแรกตอบไม่ได้: แถวน้อย เพราะ "ไม่มีคนกรอก"
+       หรือเพราะ "ระบบทำแถวหาย" (ตอบแล้วแต่หมวดไม่ถูกจับคู่กับเครื่องในชีต เช็คชีต-เครื่องจักร) */
+    L.push('', '── แถวดิบในชีตคำตอบ เทียบกับแถวที่ระบบนำไปใช้ได้ ──');
+    checkFormSheets_().forEach(function (x) {
+      var vals = x.sh.getDataRange().getValues(); vals.shift();
+      var m = x.meta, raw = 0, ok = 0, empty = 0, unmapped = 0, withBy = 0, grp = {};
+      var total = vals.length, badTs = 0, first = null, last = null;
+      vals.forEach(function (r) {
+        var ts = toDate_(checkCell_(r, m, 'ts'));
+        if (!ts) { badTs++; return; }
+        if (!first || ts < first) first = ts;
+        if (!last || ts > last) last = ts;
+        var key = dayKey_(ts);
+        if (key < from || key > to) return;
+        raw++;
+        if (String(checkCell_(r, m, 'by')).trim()) withBy++;
+        var colMachine = String(checkCell_(r, m, 'machine')).trim();
+        var answered = 0, mapped = 0;
+        x.head.forEach(function (h, i) {
+          var def = checkItemHead_(h);
+          if (!def || !checkAnswer_(r[i])) return;
+          answered++;
+          var name = x.rules.length ? checkMapMachine_(x.rules, def.group) : colMachine;
+          if (name) mapped++; else grp[def.group] = (grp[def.group] || 0) + 1;
+        });
+        if (!answered) empty++; else if (!mapped) unmapped++; else ok++;
+      });
+      /* ชีตทั้งใบ ไม่จำกัดช่วง — เพื่อแยกว่า 0 แถวในช่วงนี้ = ไม่มีคนกรอกแล้ว หรืออ่านเวลาไม่ออก */
+      L.push('  ' + x.sh.getName() + ' [ทั้งชีต ' + total + ' แถว · อ่านเวลาไม่ออก ' + badTs +
+             ' · เก่าสุด ' + (first ? dayKey_(first) : '-') + ' · ล่าสุด ' + (last ? dayKey_(last) : '-') + ']');
+      L.push('      ช่วงนี้: ดิบ ' + raw + ' · ใช้ได้ ' + ok + ' · ไม่มีข้อไหนตอบเลย ' + empty +
+             ' · หมวดไม่ถูกจับคู่เครื่อง ' + unmapped + ' · มีชื่อผู้ตรวจ ' + withBy +
+             (x.rules.length ? '' : ' · (ไม่มีกฎจับคู่ในชีต เช็คชีต-เครื่องจักร)'));
+      var gk = Object.keys(grp);
+      if (gk.length) {
+        L.push('      หมวดที่ไม่ถูกจับคู่: ' + gk.slice(0, 6).map(function (k) {
+          return k + ' (' + grp[k] + ')';
+        }).join(' · '));
+      }
+    });
+  }
+
+  var rows = readCheckRange_(from, to);
+  var regMachine = {};
+  machines_().forEach(function (m) { regMachine[String(m.name).toLowerCase()] = 1; });
+  var known = techAlias_();
+
+  var noWho = 0, badMach = {}, badWho = {}, declared = 0, mismatch = 0;
+  var hist = { 'เช้า': [0, 0, 0, 0, 0, 0], 'ดึก': [0, 0, 0, 0, 0, 0] };
+  var bySheet = {}, sd = {};
+
+  rows.forEach(function (r) {
+    var sh = r.__sheet || '(Daily Check)';
+    var bs = bySheet[sh] || (bySheet[sh] = { rows: 0, who: 0 });
+    bs.rows++;
+
+    var mach = String(canonical_(r['เครื่องจักร']) || '');
+    if (!regMachine[mach.toLowerCase()]) { var mk = mach || '(ว่าง)'; badMach[mk] = (badMach[mk] || 0) + 1; }
+
+    var who = canonTech_(r['ผู้ตรวจ']);
+    if (!who) noWho++;
+    else {
+      bs.who++;
+      if (!known[who.toLowerCase()]) badWho[who] = (badWho[who] || 0) + 1;
+    }
+
+    var s = shiftInfo_(r.__ts);
+    var bi = BUCK.length;
+    for (var i = 0; i < BUCK.length; i++) { if (s.since <= BUCK[i]) { bi = i; break; } }
+    hist[s.key][bi]++;
+
+    if (r.__shift) {
+      declared++;
+      if ((String(r.__shift).indexOf('ดึก') > -1) !== (s.key === 'ดึก')) mismatch++;
+    }
+
+    if (who) {
+      var k = who + '|' + s.day + '|' + s.key;
+      var o = sd[k] || (sd[k] = { who: who, n: 0, early: 0 });
+      o.n++;
+      if (s.since <= target) o.early++;
+    }
+  });
+
+  L.push('', '── ภาพรวม ──');
+  L.push('  แถวเช็ค (แยกเป็นรายเครื่องแล้ว) ' + rows.length);
+  L.push('  รู้ว่าใครตรวจ ' + (rows.length - noWho) + ' · ไม่รู้ ' + noWho +
+         (rows.length ? ' (' + Math.round(noWho * 100 / rows.length) + '%)' : '') +
+         '   ← ถ้าเลขนี้สูง ห้ามเอาไปวัดคน');
+  Object.keys(bySheet).forEach(function (sh) {
+    L.push('    ' + sh + ': ' + bySheet[sh].rows + ' แถว · รู้ผู้ตรวจ ' + bySheet[sh].who);
+  });
+  var bm = Object.keys(badMach);
+  L.push('  ชื่อเครื่องที่ไม่อยู่ในทะเบียน ' + bm.length + ' ชื่อ' +
+         (bm.length ? ': ' + bm.slice(0, 8).map(function (k) { return k + ' (' + badMach[k] + ')'; }).join(' · ') : ''));
+  var bw = Object.keys(badWho);
+  L.push('  ชื่อผู้ตรวจที่ไม่ตรงกับ Users/ชื่อเดิม ' + bw.length + ' ชื่อ' +
+         (bw.length ? ': ' + bw.slice(0, 8).map(function (k) { return k + ' (' + badWho[k] + ')'; }).join(' · ') : ''));
+  L.push('  กะที่ช่างเลือกในฟอร์ม vs กะที่คำนวณจากเวลาส่ง: ไม่ตรงกัน ' + mismatch + ' จาก ' + declared + ' แถวที่ระบุกะ');
+
+  L.push('', '── ช่างส่งเช็คหลังเริ่มกะกี่นาที (% ของแถวทั้งหมดในกะนั้น) ──');
+  L.push('  กะ     ≤15    ≤30    ≤45    ≤60   ≤120   >120   (แถว)');
+  ['เช้า', 'ดึก'].forEach(function (key) {
+    var h = hist[key], tot = h.reduce(function (a, b) { return a + b; }, 0);
+    L.push('  ' + key + '   ' + h.map(function (n) {
+      var p = tot ? Math.round(n * 100 / tot) + '%' : '-';
+      return ('      ' + p).slice(-5) + ' ';
+    }).join('') + '  (' + tot + ')');
+  });
+
+  var per = {};
+  Object.keys(sd).forEach(function (k) {
+    var o = sd[k], p = per[o.who] || (per[o.who] = { shifts: 0, early: 0, n: 0, nEarly: 0 });
+    p.shifts++; if (o.early) p.early++; p.n += o.n; p.nEarly += o.early;
+  });
+  L.push('', '── รายคน (ยังไม่ใช่ KPI — ไม่มีตัวหาร "ควรเช็คกี่เครื่อง") ──');
+  L.push('  ช่าง · กะที่มีเช็ค · กะที่เช็คอย่างน้อย 1 เครื่องทันเป้า ' + target + ' นาที · เครื่องเฉลี่ย/กะ · ทันเป้าเฉลี่ย/กะ');
+  Object.keys(per).sort().forEach(function (who) {
+    var p = per[who];
+    L.push('  ' + who + ' · ' + p.shifts + ' · ' + p.early + ' · ' +
+           (p.n / p.shifts).toFixed(1) + ' · ' + (p.nEarly / p.shifts).toFixed(1));
+  });
+
+  Logger.log(L.join(String.fromCharCode(10)));
+  return L.join(String.fromCharCode(10));
+}
+
+/** ค่าเวลาในชีตตั้งค่า (ข้อความหรือเวลา) แสดงเป็น HH:mm ให้คนตรวจสอบได้ว่าระบบอ่านถูกไหม */
+function clockStr_(v) {
+  var n = clockMin_(v, -1);
+  if (n < 0) return '?? (อ่านไม่ออก ใช้ค่ามาตรฐาน)';
+  return ('0' + Math.floor(n / 60)).slice(-2) + ':' + ('0' + (n % 60)).slice(-2);
+}
+
 /* ═══ เช็คชีตประจำวัน — ไฟล์คำตอบของจริง ═══
    โมดูลนี้เขียนไว้ตอนแรกสำหรับฟอร์มชีตเดียว 5 คอลัมน์
    (ประทับเวลา · เครื่องจักร · ผู้ตรวจ · ผลการตรวจ · หมายเหตุ)
@@ -5404,20 +5940,26 @@ var CHECK_META = {
   /* "เครื่องที่เข้าตรวจสอบ" คือชื่อที่ฟอร์มปั๊มลมใช้ ส่วนฟอร์มสายผลิตใช้ "เครื่องจักร" */
   machine: ['เครื่องจักร', 'เครื่องที่เข้าตรวจสอบ', 'machine'],
   /* ฟอร์มเครื่องจักรรองเรียกคนตรวจว่า "ช่างซ่อมบำรุง" ไม่ใช่ "ผู้ตรวจ" */
-  by:      ['ผู้ตรวจ', 'ผู้บันทึก', 'ชื่อผู้ตรวจ', 'ช่างซ่อมบำรุง', 'อีเมล', 'email', 'ที่อยู่อีเมล'],
+  by:      ['ผู้ตรวจ', 'ผู้บันทึก', 'ชื่อผู้ตรวจ', 'ช่างเทคนิค', 'ช่างซ่อมบำรุง', 'อีเมล', 'email', 'ที่อยู่อีเมล'],
   shift:   ['กะทำงาน', 'กะ', 'shift'],
   day:     ['วันที่ผลิต', 'วันที่'],
   photo:   ['เพิ่มรูป', 'รูป', 'หลักฐาน'],
   status:  ['status machine', 'สถานะเครื่องจักร']
 };
 
-/** หาคอลัมน์ประจำแถวจากหัวตาราง — คืน index ตัวแรกที่ชื่อขึ้นต้น/มีคำที่รู้จัก
+/** หาคอลัมน์ประจำแถวจากหัวตาราง
+    m[k]     = index ตัวแรกที่ชื่อมีคำที่รู้จัก (-1 = ไม่มี) ใช้ตัดสินว่าชีตนี้เป็นฟอร์มเช็คหรือเปล่า
+    m.all[k] = index "ทุกตัว" ที่ตรง — ชีตเดียวเก็บฟอร์มสองรุ่นต่อกัน หัวตารางซ้ำกัน
+               ("เครื่องจักร" ที่คอลัมน์ D รุ่นเก่า และที่ CB รุ่นใหม่) แถวของรุ่นใหม่ช่องแรกว่างทั้งแถว
+               ถ้าอ่านแค่ตัวแรกจะได้เครื่อง/ผู้ตรวจ/กะ เป็นค่าว่าง แล้วแถวนั้นหลุดจาก KPI ของคนโดยไม่มีอะไรฟ้อง
+               ค่าของแถวต้องอ่านผ่าน checkCell_ ซึ่งเลือกช่องแรกที่ "มีของ"
     ข้อตรวจทุกข้อมีวงเล็บเหลี่ยมเสมอ ("กลุ่ม [หัวข้อ]") จึงกันไม่ให้ถูกจับเป็นคอลัมน์ประจำแถว */
 function checkMeta_(head) {
-  var m = {};
+  var m = { all: {} };
   var low = head.map(function (h) { return String(h || '').trim().toLowerCase(); });
   Object.keys(CHECK_META).forEach(function (k) {
     m[k] = -1;
+    m.all[k] = [];
     for (var i = 0; i < low.length; i++) {
       if (low[i].indexOf('[') > -1) continue;
       /* "สถานะเครื่องจักรอุปกรณ์" มีคำว่า "เครื่องจักร" อยู่ข้างใน ฟอร์มที่ไม่มีคอลัมน์
@@ -5425,11 +5967,25 @@ function checkMeta_(head) {
          เครื่องชื่อ "ปกติ" กับ "ผิดปกติ" — ไม่มีอะไรฟ้องเพราะมันก็อ่านได้ปกติทุกอย่าง */
       if (k === 'machine' && low[i].indexOf('สถานะ') > -1) continue;
       for (var j = 0; j < CHECK_META[k].length; j++) {
-        if (low[i].indexOf(CHECK_META[k][j].toLowerCase()) > -1) { m[k] = i; return; }
+        if (low[i].indexOf(CHECK_META[k][j].toLowerCase()) > -1) {
+          m.all[k].push(i);
+          if (m[k] < 0) m[k] = i;
+          break;
+        }
       }
     }
   });
   return m;
+}
+
+/** ค่าของแถวสำหรับคอลัมน์ประจำแถว k — ช่องแรกที่ไม่ว่างในบรรดาคอลัมน์ชื่อซ้ำทั้งหมด ไม่มี = '' */
+function checkCell_(row, m, k) {
+  var cols = (m.all && m.all[k]) || (m[k] > -1 ? [m[k]] : []);
+  for (var i = 0; i < cols.length; i++) {
+    var v = row[cols[i]];
+    if (v !== '' && v != null && String(v).trim() !== '') return v;
+  }
+  return '';
 }
 
 /** "กลุ่ม [หัวข้อ]" -> {group, label} · ไม่มีวงเล็บ = ไม่ใช่ข้อตรวจ */
@@ -5507,7 +6063,7 @@ function checkFormRows_(fromKey, toKey) {
     var m = x.meta, head = x.head;
 
     vals.forEach(function (r, idx) {
-      var ts = toDate_(r[m.ts]);
+      var ts = toDate_(checkCell_(r, m, 'ts'));
       if (!ts) return;
       var key = dayKey_(ts);
       if (key < fromKey || key > toKey) return;
@@ -5516,7 +6072,7 @@ function checkFormRows_(fromKey, toKey) {
          จึงแยกข้อออกเป็นกองตามเครื่องก่อน แล้วค่อยสร้างรายการละหนึ่งเครื่อง
          ไม่มีกฎในชีตตั้งค่า = ทุกข้อไปกองเดียว ซึ่งคือพฤติกรรมเดิมทุกประการ */
       var byMachine = {}, order = [];
-      var colMachine = m.machine > -1 ? String(r[m.machine] || '').trim() : '';
+      var colMachine = String(checkCell_(r, m, 'machine')).trim();
       head.forEach(function (h, i) {
         var def = checkItemHead_(h);
         if (!def) return;
@@ -5533,7 +6089,7 @@ function checkFormRows_(fromKey, toKey) {
         g.items.push({ group: def.group, label: def.label, value: String(r[i]).trim(), state: a });
       });
 
-      var status = m.status > -1 ? String(r[m.status] || '').trim() : '';
+      var status = String(checkCell_(r, m, 'status')).trim();
       order.forEach(function (name) {
         var g = byMachine[name];
         /* ช่างกรอกเฉพาะปั๊มที่เข้าตรวจจริง ตัวที่ไม่ได้แตะเลยต้องไม่โผล่เป็น
@@ -5544,13 +6100,13 @@ function checkFormRows_(fromKey, toKey) {
           'เครื่องจักร': name,
           /* ยังไม่มีคอลัมน์ผู้ตรวจในฟอร์ม — ปล่อยว่างไว้ ไม่เดา
              วันที่ฟอร์มเพิ่มคำถามนี้ โค้ดตรงนี้รับได้ทันทีโดยไม่ต้องแก้ */
-          'ผู้ตรวจ': m.by > -1 ? String(r[m.by] || '').trim() : '',
+          'ผู้ตรวจ': String(checkCell_(r, m, 'by')).trim(),
           'ผลการตรวจ': g.bad ? 'ผิดปกติ' : (status || 'ปกติ'),
           'หมายเหตุ': status,
           __ts: ts, __sheet: x.sh.getName(), __row: idx + 2,
           __bad: g.bad, __done: g.done, __items: g.items,
-          __shift: m.shift > -1 ? String(r[m.shift] || '').trim() : '',
-          __photo: m.photo > -1 ? String(r[m.photo] || '').trim() : ''
+          __shift: String(checkCell_(r, m, 'shift')).trim(),
+          __photo: String(checkCell_(r, m, 'photo')).trim()
         });
       });
     });
@@ -5627,10 +6183,13 @@ function apiCheckScore(token, fromKey, toKey) {
   var colMach   = String(cfg_('คอลัมน์เครื่องจักร', 'เครื่องจักร'));
   var badWord   = String(cfg_('คำว่าผิดปกติ', 'ผิดปกติ'));
 
-  var by = {}, days = {}, machines = {};
+  var by = {}, days = {}, machines = {}, total = 0, unattributed = 0;
   readCheckRange_(fromKey, toKey).forEach(function (r) {
+    total++;
     var who = canonTech_(r[colBy]);                 // ชื่อผู้ตรวจต้องผ่านตารางชื่อเดิมเหมือนช่องอื่น
-    if (!who) return;
+    /* แถวที่ไม่รู้ว่าใครตรวจ ต้องไม่ถูกทิ้งเงียบ ๆ — ตัวเลขรายคนจะต่ำกว่าความจริงโดยไม่มีใครรู้ว่าทำไม
+       คืนจำนวนที่ตกหล่นไปด้วยทุกครั้ง หน้าจอแสดงเคียงตัวเลข */
+    if (!who) { unattributed++; return; }
     var rec = by[who] || (by[who] = { name: who, checks: 0, abnormal: 0, machines: {}, days: {} });
     rec.checks++;
     if (badWord && String(r[colResult] || '').indexOf(badWord) > -1) rec.abnormal++;
@@ -5640,6 +6199,7 @@ function apiCheckScore(token, fromKey, toKey) {
 
   return {
     from: fromKey, to: toKey,
+    rows: total, unattributed: unattributed,
     machines: Object.keys(machines).length,
     days: Object.keys(days).length,
     people: Object.keys(by).map(function (n) {
