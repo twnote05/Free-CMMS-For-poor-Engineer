@@ -4097,6 +4097,71 @@ console.log("OK — ผ่านทั้งหมด");
   assert.ok(/data-move/.test(pl) && !/stageRun/.test(pl), "ตัววาดต้องอ่านจากโมเดล ไม่มีกฎซ้ำ");
 }
 
+// ═══ บันทึกคุยกันในใบงาน ═══
+{
+  const SAVE = { requireAuth_: gas.requireAuth_, rowsToObjects_: gas.rowsToObjects_, partsRead_: gas.partsRead_, sheet_: gas.sheet_,
+                 verify_: gas.verify_, partSheet_: gas.partSheet_, CacheService: gas.CacheService, LockService: gas.LockService, SpreadsheetApp: gas.SpreadsheetApp };
+  const rows = [];                                                                  // แถวในชีต "บันทึกในใบงาน" (หลังหัวตาราง)
+  let user = { name: "ช่างชล", email: "c@x" }, cacheCleared = 0;
+  gas.requireAuth_ = (t) => { if (!t) throw new Error("ต้องเข้าสู่ระบบก่อน"); return user; };
+  gas.rowsToObjects_ = () => [{ ticket_id: "MT-1/2569", status: "รอซ่อม" }, { ticket_id: "MT-2/2569", status: "รอซ่อม" }];
+  gas.partsRead_ = (n) => (n === gas.SHEET_TNOTE ? rows.map((r) => ({ "เวลา": r[0], "เลขใบ": r[1], "ผู้บันทึก": r[2], "ข้อความ": r[3] })) : []);
+  gas.sheet_ = (n) => { assert.strictEqual(n, gas.SHEET_TNOTE); return { appendRow: (r) => rows.push(r) }; };
+  let made = 0; gas.partSheet_ = (n, h) => { assert.strictEqual(n, gas.SHEET_TNOTE); assert.deepStrictEqual(JSON.parse(JSON.stringify(h)), JSON.parse(JSON.stringify(gas.TNOTE_HEAD))); made++; return ""; };
+  gas.LockService = { getScriptLock: () => ({ waitLock: () => {}, releaseLock: () => {} }) };
+  gas.SpreadsheetApp = { flush() {} };
+  gas.CacheService = { getScriptCache: () => ({ get: () => null, put() {}, remove: () => { cacheCleared++; } }) };
+
+  assert.throws(() => gas.apiAddTicketNote("", "MT-1/2569", "x"), /เข้าสู่ระบบ/, "ต้องล็อกอินก่อนเขียน");
+  assert.throws(() => gas.apiTicketNotes("", "MT-1/2569"), /เข้าสู่ระบบ/, "ต้องล็อกอินก่อนอ่าน");
+  assert.throws(() => gas.apiAddTicketNote("t", "MT-1/2569", "   \n "), /ยังไม่ได้พิมพ์/, "ข้อความว่าง");
+  assert.throws(() => gas.apiAddTicketNote("t", "MT-1/2569", "ก".repeat(501)), /ยาวเกิน/, "ยาวเกินเพดาน");
+  assert.throws(() => gas.apiAddTicketNote("t", "MT-999/2569", "สวัสดี"), /ไม่พบใบ/, "เลขใบที่ไม่มีจริงต้องไม่ถูกเก็บ");
+  assert.strictEqual(rows.length, 0, "ที่ถูกปฏิเสธต้องไม่เขียนอะไรลงชีต");
+
+  const r1 = gas.apiAddTicketNote("t", "MT-1/2569", "  อะไหล่มา\nแล้ว  ");
+  assert.strictEqual(r1.text, "อะไหล่มา แล้ว", "ย่อช่องว่าง/ขึ้นบรรทัดเป็นช่องว่างเดียว ตัดหัวท้าย");
+  assert.strictEqual(r1.by, "ช่างชล", "ผู้บันทึกมาจากบัญชีที่ล็อกอิน");
+  assert.strictEqual(rows[0].length, 4); assert.strictEqual(rows[0][1], "MT-1/2569"); assert.ok(/^\d{4}-\d\d-\d\dT/.test(rows[0][0]), "เวลาเป็น ISO");
+  assert.strictEqual(cacheCleared, 1, "เพิ่มข้อความแล้วต้องล้างแคชดัชนี");
+  assert.strictEqual(made, 1, "ชีตถูกสร้างตอนข้อความแรกถ้ายังไม่มี");
+  user = { name: "=HYPERLINK(\"x\")", email: "e@x" };
+  gas.apiAddTicketNote("t", "MT-1/2569", "=1+1");
+  assert.ok(/^'=/.test(rows[1][2]) && /^'=/.test(rows[1][3]), "ขึ้นต้นด้วย = ต้องไม่กลายเป็นสูตร");
+  user = { name: "หัวหน้าเอก", email: "l@x" };
+  gas.apiAddTicketNote("t", "MT-2/2569", "ใบอื่น");
+
+  const list = gas.apiTicketNotes("t", "MT-1/2569");
+  assert.strictEqual(list.length, 2, "เห็นเฉพาะข้อความของใบนี้");
+  assert.ok(list.every((n) => n.at && n.by && n.text));
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(list.map((n) => n.at))), list.map((n) => n.at).slice().sort(), "เรียงเก่า→ใหม่");
+
+  // ดัชนีที่แนบกับรายการใบ: เฉพาะคนล็อกอิน
+  const idx = JSON.parse(JSON.stringify(gas.tnoteIndex_()));
+  assert.strictEqual(idx["MT-1/2569"].n, 2); assert.strictEqual(idx["MT-2/2569"].by, "หัวหน้าเอก");
+  const tk = [{ ticket_id: "MT-1/2569" }, { ticket_id: "MT-2/2569" }, { ticket_id: "MT-3/2569" }];
+  gas.withNotes_(tk);
+  assert.deepStrictEqual([tk[0].note_n, tk[1].note_n, tk[2].note_n], [2, 1, undefined], "ใบที่ไม่มีข้อความไม่ได้ฟิลด์");
+  gas.verify_ = () => false;                                                        // ไม่ได้ล็อกอิน = มุมมอง public
+  gas.rowsToObjects_ = () => [{ ticket_id: "MT-1/2569", machine_name: "UV 1", status: "รอซ่อม", note_n: 9 }];
+  const pub = gas.apiGetTickets("", {});
+  assert.ok(!("note_n" in pub.tickets[0]) && pub.scope === "public", "คนไม่ล็อกอินต้องไม่เห็นแม้แต่จำนวนข้อความ");
+  gas.verify_ = () => true;
+  const fullView = gas.apiGetTickets("t", {});
+  assert.strictEqual(fullView.tickets[0].note_n, 2, "คนล็อกอินเห็นจำนวนข้อความ");
+
+  // ชีตข้อความพังต้องไม่ทำให้รายการใบทั้งหน้าพัง
+  gas.partsRead_ = () => { throw new Error("sheet broken"); };
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(gas.tnoteIndex_())), {}, "อ่านชีตข้อความไม่ได้ = ไม่มีข้อความ ไม่ throw");
+  Object.assign(gas, SAVE);
+
+  const code = fs.readFileSync("gas/Code.gs", "utf8"), app = fs.readFileSync("gas/app.html", "utf8");
+  assert.ok(/partSheet_\(SHEET_TNOTE, TNOTE_HEAD\)/.test(code) && code.split("partSheet_(SHEET_TNOTE").length === 4, "setup, upgradeSheet และตอนเพิ่มข้อความแรกต้องสร้างชีต");
+  assert.ok(/function apiTicketNotes\(token, ticketId\)\s*\{\s*requireAuth_\(token\)/.test(code) && /function apiAddTicketNote\(token, ticketId, text\)\s*\{\s*var u = requireAuth_\(token\)/.test(code));
+  assert.ok(!/setValue|deleteRow|clearContent/.test(code.slice(code.indexOf("function apiAddTicketNote"), code.indexOf("function apiAddTicketNote") + 1400)), "ไม่มีทางแก้/ลบข้อความ");
+  assert.ok(/id="mNotes"/.test(app) && /gsAuth\("apiAddTicketNote"/.test(app) && /key: `note:\$\{t\.ticket_id\}:\$\{t\.note_n\}`/.test(app), "กล่องบันทึก + กระดิ่งเตือน");
+}
+
 // MT = ช่างซ่อมบำรุง ต้องมีใน RANK (ไม่งั้นได้ RANK 0 เงียบ ๆ เหมือนที่เคยเกิดกับ ADMIN) และไม่ใช่หัวหน้า
 {
   assert.strictEqual(gas.RANK.MT, gas.RANK.TECH);

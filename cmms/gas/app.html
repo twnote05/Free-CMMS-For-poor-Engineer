@@ -1632,6 +1632,18 @@ function openModal(id) {
       <div class="text-xs text-slate-500 mt-1">โดย ${esc(t.verified_by)} • ${fmtDT(t.verified_at)}</div></div>`;
   }
 
+  /* บันทึกคุยกันในใบงาน — ต้องล็อกอิน (server ก็บังคับเอง) ข้อความเพิ่มได้อย่างเดียว แก้/ลบไม่ได้ */
+  if (isUnlocked()) {
+    html += `<div class="msec msec-read" id="mNotes" data-id="${esc(t.ticket_id)}">
+      <h3>บันทึกคุยกันในใบงาน<span class="msec-tag">ทุกคนที่ล็อกอินเห็น · แก้/ลบไม่ได้</span></h3>
+      <div id="mNoteList" class="note-list" aria-live="polite"><p class="text-sm text-slate-500">กำลังโหลด…</p></div>
+      <form id="mNoteForm" class="note-form">
+        <label class="sr-only" for="mNoteText">ข้อความ</label>
+        <textarea id="mNoteText" rows="2" maxlength="500" class="inp" placeholder="พิมพ์ข้อความสั้น ๆ เช่น อะไหล่มาแล้ว · ลองเปลี่ยนแล้วยังดัง"></textarea>
+        <button type="submit" id="mNoteSend" class="btn">ส่งข้อความ</button>
+      </form></div>`;
+  }
+
   /* คู่มือที่แนะนำ — ซ่อนไว้ก่อน เติมทีหลังเมื่อข้อมูลมาและมีเล่มที่เกี่ยวข้องจริง (ไม่มีก็ไม่ขึ้นให้รก) */
   if (isUnlocked()) {
     html += `<div class="msec msec-read" id="mManuals" data-id="${esc(t.ticket_id)}" hidden>
@@ -1888,6 +1900,7 @@ function openModal(id) {
 
   $("#mBody").innerHTML = html;
   paintTicketManuals(t);   // กล่องคู่มือที่แนะนำ (เติมทีหลัง)
+  paintTicketNotes(t);     // บันทึกคุยกันในใบงาน (เติมทีหลัง)
   paintAssignNote();
   paintPartCodes();        // รายการรหัสอะไหล่ที่เคยใช้ ไว้ให้เลือกแทนการสะกดเอง
   paintCostSum();          // ยอดรวมตั้งต้น + ล็อกช่องยอดรวมถ้าใบนี้มีรายการย่อยอยู่แล้ว
@@ -2524,7 +2537,7 @@ function ticketRow(t, repeatIds, bulk) {
         bulkSel.has(t.ticket_id) ? " checked" : ""}></td>` : ""}
     <td class="td font-bold whitespace-nowrap" data-label="เลขที่" style="color:var(--brand)">${esc(t.ticket_id)}</td>
     <td class="td font-medium" data-label="เครื่องจักร">${esc(t.machine_name)}
-      ${repeatIds.has(t.ticket_id) ? `<span class="tag-repeat">ซ้ำ</span>` : ""}</td>
+      ${repeatIds.has(t.ticket_id) ? `<span class="tag-repeat">ซ้ำ</span>` : ""}${t.note_n ? `<span class="tag-note">ข้อความ ${t.note_n}</span>` : ""}</td>
     <td class="td max-w-[14rem] truncate text-slate-600" data-label="อาการ" title="${esc(symptom(t))}">
       ${esc(symptom(t))}${t.has_image ? " 📷" : ""}</td>
     <td class="td" data-label="ความสำคัญ">${priBadge(t.priority)}</td>
@@ -2675,6 +2688,10 @@ function notifItems() {
       if (t.due_at && ymd(t.due_at) < today)
         out.push({ key: `late:${t.ticket_id}:${ymd(t.due_at)}`, id: t.ticket_id, ico: "⏰",
                    text: tt(`เลยกำหนดเสร็จแล้ว — ${label}`, `Past its due date — ${label}`) });
+      /* ข้อความที่คนอื่นพิมพ์ทิ้งไว้ในใบของเรา — ของตัวเองไม่เตือนตัวเอง */
+      if (t.note_n && t.note_by && t.note_by !== ME.name)
+        out.push({ key: `note:${t.ticket_id}:${t.note_n}`, id: t.ticket_id, ico: "💬",
+                   text: tt(`${t.note_by} พิมพ์ข้อความในใบ — ${label}`, `${t.note_by} left a note — ${label}`) });
       if (backLate(t))
         out.push({ key: `back:${t.ticket_id}:${ymd(t.expect_back)}`, id: t.ticket_id, ico: "📦",
                    text: tt(`เลยกำหนดรับคืนจาก ${t.vendor || "ผู้รับซ่อมภายนอก"} — ${label}`,
@@ -7875,6 +7892,55 @@ async function paintPartsManuals(p) {
   const hits = manualSuggest(MAN.links, { partRef: partKey(p) });
   $("#partsManuals").innerHTML = hits.length
     ? `<div class="text-xs font-semibold text-slate-500 mb-1">อ่านเพิ่ม</div>` + hits.map(manLinkHtml).join("") : "";
+}
+
+/* ═══ บันทึกคุยกันในใบงาน ═══ ข้อความอยู่ในชีต "บันทึกในใบงาน" (เพิ่มได้อย่างเดียว) — โหลดตอนเปิดใบ ไม่ถามเซิร์ฟเวอร์ซ้ำเป็นระยะ */
+let NOTES = { id: "", list: [] };
+
+function drawNotes() {
+  const box = $("#mNoteList");
+  if (!box) return;
+  box.innerHTML = NOTES.list.length
+    ? NOTES.list.map((n) => `<div class="note-row"><div class="note-h"><b>${esc(n.by)}</b><span>${esc(fmtDT(n.at))}</span></div>
+        <p>${esc(n.text)}</p></div>`).join("")
+    : `<p class="text-sm text-slate-500">ยังไม่มีข้อความ — พิมพ์ทิ้งไว้ให้คนที่รับงานต่อได้</p>`;
+}
+
+/** เปิดดูแล้วถือว่าอ่านแล้ว: ตัวเลขข้อความตามที่ server นับ (ในรายการใบ) ไม่ใช่จำนวนที่แสดง ซึ่งตัดไว้ 100 ล่าสุด */
+function markNotesSeen(id) {
+  const cur = tickets.find((x) => x.ticket_id === id);
+  const n = (cur && cur.note_n) || NOTES.list.length;
+  if (!n) return;
+  seen.add(`note:${id}:${n}`);
+  saveSeen();
+  renderBell();
+}
+
+async function paintTicketNotes(t) {
+  const form = $("#mNoteForm");
+  if (!form) return;
+  const id = t.ticket_id;
+  NOTES = { id: id, list: [] };
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const ta = $("#mNoteText"), btn = $("#mNoteSend"), text = ta.value.trim();
+    if (!text || NOTES.id !== id) return;
+    btn.disabled = true;
+    try {
+      const r = await gsAuth("apiAddTicketNote", id, text);
+      ta.value = "";
+      NOTES.list.push(r);
+      const cur = tickets.find((x) => x.ticket_id === id);
+      if (cur) { cur.note_n = (cur.note_n || 0) + 1; cur.note_at = r.at; cur.note_by = r.by; }
+      drawNotes();
+      markNotesSeen(id);                  // ข้อความของตัวเองไม่ต้องเด้งเตือนตัวเอง
+    } catch (err) { toast(err.message, false); }
+    btn.disabled = false;
+  });
+  try { NOTES.list = await gsAuth("apiTicketNotes", id); } catch (e) { const b = $("#mNoteList"); if (b) b.textContent = e.message; return; }
+  if (!$("#mNotes") || $("#mNotes").dataset.id !== id) return;       // ช่างปิดหรือเปิดใบอื่นไปแล้ว ห้ามวาดทับ
+  drawNotes();
+  markNotesSeen(id);
 }
 
 function bindManuals() {

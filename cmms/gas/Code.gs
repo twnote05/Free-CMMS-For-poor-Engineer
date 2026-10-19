@@ -637,6 +637,7 @@ function setup() {
   partSheet_(SHEET_PARTS, PARTS_HEAD);
   partSheet_(SHEET_MANUAL, MANUAL_HEAD);
   partSheet_(SHEET_MANLINK, MANLINK_HEAD);
+  partSheet_(SHEET_TNOTE, TNOTE_HEAD);
 
   // ทะเบียนจริงจากเอกสาร FM-MT-01/Rev.03 — รหัสเครื่องมีอาคารอยู่ในตัว (SM-B4-EX-03)
   ensure_(SHEET_MACHINES,
@@ -813,7 +814,8 @@ function upgradeSheet() {
     partSheet_(SHEET_PARTDIAG, PARTDIAG_HEAD),
     partSheet_(SHEET_PARTS, PARTS_HEAD),
     partSheet_(SHEET_MANUAL, MANUAL_HEAD),
-    partSheet_(SHEET_MANLINK, MANLINK_HEAD)
+    partSheet_(SHEET_MANLINK, MANLINK_HEAD),
+    partSheet_(SHEET_TNOTE, TNOTE_HEAD)
   ];
   SpreadsheetApp.flush();
   clearCache();
@@ -1038,6 +1040,16 @@ function rowsToObjects_() {
  * @param {string} token   token จาก apiLogin (ไม่ส่ง = โหมด public)
  * @param {Object} options { limit, offset, status, machine, openOnly }
  */
+/** แนบจำนวน/เวลา/ผู้พิมพ์ข้อความล่าสุดของแต่ละใบ — ใช้ทำป้าย "ข้อความ N" และเตือนที่กระดิ่ง (ไม่ส่งตัวข้อความ) */
+function withNotes_(rows) {
+  var idx = tnoteIndex_();
+  rows.forEach(function (t) {
+    var o = idx[String(t.ticket_id)];
+    if (o) { t.note_n = o.n; t.note_at = o.at; t.note_by = o.by; }
+  });
+  return rows;
+}
+
 function apiGetTickets(token, options) {
   var full = verify_(token);
   var opt = options || {};
@@ -1064,7 +1076,7 @@ function apiGetTickets(token, options) {
     offset: offset,
     returned: page.length,
     hasMore: offset + page.length < total,
-    tickets: full ? page : page.map(function (t) {
+    tickets: full ? withNotes_(page) : page.map(function (t) {
       var o = {};
       PUBLIC_FIELDS.forEach(function (k) { if (k in t) o[k] = t[k]; });
       o.has_image = t.has_image;
@@ -1936,6 +1948,73 @@ function apiManuals(token) {
                diagram: str(l['แผนภาพ']), ref: str(l['ชิ้นส่วน']), machine: m ? canonical_(m) : '', note: str(l['หมายเหตุ']) };
     });
   return { books: books, links: links };
+}
+
+/* ═══ บันทึกคุยกันในใบงาน ═══
+   ข้อความสั้น ๆ ที่คนในระบบทิ้งไว้ที่ใบแจ้งซ่อม — "อะไหล่มาแล้ว" "ลองเปลี่ยนแล้วยังดัง"
+   หนึ่งข้อความ = หนึ่งแถวในชีต เพิ่มได้อย่างเดียว ไม่มีทั้งแก้และลบ (ไม่มีฟังก์ชันไหนเขียนทับ) เพื่อให้ใช้เป็นหลักฐานทบทวนงานได้
+   ต้องล็อกอิน ทั้งอ่านและเขียน — ผู้ที่ไม่ได้ล็อกอินไม่เห็นแม้แต่ว่าใบไหนมีข้อความ
+   ผู้บันทึกมาจากบัญชีที่ล็อกอิน (ฝั่ง server) ไม่ใช่ค่าที่หน้าเว็บส่งมา — เครื่องกลางหลายคนใช้ร่วมกันก็ยังแยกคนได้ตามที่ล็อกอิน */
+var SHEET_TNOTE = 'บันทึกในใบงาน';
+var TNOTE_HEAD  = ['เวลา', 'เลขใบ', 'ผู้บันทึก', 'ข้อความ'];
+var TNOTE_MAX   = 500;
+var CACHE_KEY_TNOTE = 'tnote_v1';
+
+/** ใบไหนมีข้อความกี่ข้อความ ล่าสุดเมื่อไหร่ ใครพิมพ์ — แคชไว้ เพราะ apiGetTickets ถูกเรียกทุกครั้งที่เปิดหน้า
+    ตอนเพิ่มข้อความแล้วล้างแคชทันที จึงไม่ค้างของเก่า */
+function tnoteIndex_() {
+  try {
+    var hit = CacheService.getScriptCache().get(CACHE_KEY_TNOTE);
+    if (hit) return JSON.parse(hit);
+  } catch (e) {}
+  var idx = {};
+  try {                                            // ชีตข้อความเสียหายหรือยังไม่ถูกสร้าง ต้องไม่ทำให้รายการใบทั้งหน้าพัง
+    partsRead_(SHEET_TNOTE).forEach(function (r) {
+      var id = String(r['เลขใบ'] || '').trim();
+      if (!id) return;
+      var o = idx[id] || (idx[id] = { n: 0, at: '', by: '' });
+      o.n++;
+      var at = String(r['เวลา'] || '');
+      if (at >= o.at) { o.at = at; o.by = String(r['ผู้บันทึก'] || ''); }
+    });
+  } catch (e) { return {}; }
+  try { CacheService.getScriptCache().put(CACHE_KEY_TNOTE, JSON.stringify(idx), CACHE_SEC); } catch (e) {}
+  return idx;
+}
+
+function apiTicketNotes(token, ticketId) {
+  requireAuth_(token);
+  var id = String(ticketId || '').trim();
+  if (!id) throw new Error('ไม่ระบุเลขใบ');
+  return partsRead_(SHEET_TNOTE)
+    .filter(function (r) { return String(r['เลขใบ'] || '').trim() === id; })
+    .map(function (r) { return { at: String(r['เวลา'] || ''), by: String(r['ผู้บันทึก'] || ''), text: String(r['ข้อความ'] || '') }; })
+    .sort(function (a, b) { return a.at < b.at ? -1 : a.at > b.at ? 1 : 0; })
+    .slice(-100);                                  // ใบที่คุยยาวมากแสดงล่าสุด 100 ข้อความ ที่เหลืออยู่ในชีตครบ
+}
+
+function apiAddTicketNote(token, ticketId, text) {
+  var u = requireAuth_(token);
+  var id = String(ticketId || '').trim();
+  var msg = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
+  if (!msg) throw new Error('ยังไม่ได้พิมพ์ข้อความ');
+  if (msg.length > TNOTE_MAX) throw new Error('ข้อความยาวเกิน ' + TNOTE_MAX + ' ตัวอักษร — แบ่งเป็นหลายข้อความ');
+  /* ใบต้องมีอยู่จริง — เลขใบที่หน้าเว็บส่งมาเป็นแค่ข้อความ เชื่อไม่ได้ ไม่งั้นจะมีข้อความลอยที่ไม่มีใบรองรับ */
+  var exists = rowsToObjects_().some(function (t) { return String(t.ticket_id) === id; });
+  if (!exists) throw new Error('ไม่พบใบแจ้งซ่อม ' + id);
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var row = { at: new Date().toISOString(), by: String(u.name || u.email || ''), text: msg };
+    partSheet_(SHEET_TNOTE, TNOTE_HEAD);              // ระบบเก่าที่ยังไม่ได้รัน upgradeSheet() ก็ใช้ได้ทันที — สร้างชีตให้ตอนข้อความแรก
+    sheet_(SHEET_TNOTE).appendRow([row.at, id, deFormula_(row.by), deFormula_(msg)]);
+    SpreadsheetApp.flush();
+    try { CacheService.getScriptCache().remove(CACHE_KEY_TNOTE); } catch (e) {}
+    return row;
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /** ค่าที่หน้าเว็บส่งมาเป็นแค่ข้อความ เชื่อไม่ได้ — ตรวจกับชีตแล้วสร้างค่าที่จะเก็บเอง
