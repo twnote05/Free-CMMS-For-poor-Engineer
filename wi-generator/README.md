@@ -4,7 +4,7 @@
 
 > Built the lazy way, for lazy factory engineers.
 
-**20 kinds of standard factory document, in a single HTML file you double-click to open.**
+**21 kinds of standard factory document, in a single HTML file you double-click to open.**
 No Python, no install, no internet, no server.
 
 Everything runs in the browser on your own machine — nothing leaves the computer. Hand one file to a colleague and they are working.
@@ -61,7 +61,7 @@ Pick a department first, then the document types inside it.
 |---|---|
 | **Technicians** | Work instruction · OPL · safety signs · Q-Point · check sheet · master setting sheet |
 | **Engineering** | Routing sheet · BOM · time study · capacity · line balancing · SMED · flowchart / VSM / layout · FMEA · **control plan** · X̄-R control chart · **gage R&R (MSA)** |
-| **Maintenance** | Tool & jig register · skill matrix (OJT) |
+| **Maintenance** | CIL standard (TPM) · tool & jig register · skill matrix (OJT) |
 | **R&D** | Mass production approval form |
 
 ## What it does for you
@@ -90,6 +90,7 @@ Taken from the standards, not invented here.
 | SMED | Changeover time counts **internal** work only (machine stopped), per SMED |
 | Gage R&R | AIAG MSA average-range method: `EV = R̄̄ × K1` · `AV = √((X̄diff × K2)² − EV²/(n·r))` · `GRR = √(EV²+AV²)` · `PV = Rp × K3` · `ndc = 1.41 × PV/GRR` |
 | Master setting sheet | `lower = nominal − |−tol|` · `upper = nominal + |+tol|` |
+| CIL | `minutes/day = minutes per round ÷ every N days`, summed and compared against the time budget |
 | Control plan | No formulas, but flags rows with no control method or reaction plan — the finding auditors raise most often |
 | Production approval | No formulas — a hand-off form from R&D to production: three approval outcomes, reference documents, pilot-run summary and four sign-off blocks (prints portrait) |
 

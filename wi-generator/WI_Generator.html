@@ -1067,6 +1067,7 @@ const TAB_META = {
   SET:   ['🎛️', 'ค่าตั้งเครื่อง', 'Master Setting Sheet'],
   CP:    ['🛡️', 'Control Plan', 'แผนควบคุมกระบวนการ'],
   MSA:   ['📐', 'Gage R&R', 'ตรวจระบบการวัด (MSA)'],
+  CIL:   ['🧼', 'CIL Standard', 'สะอาด / ตรวจ / หล่อลื่น'],
   ROUTE: ['🧭', 'Routing Sheet', 'ลำดับขั้นการผลิต'],
   BOM:   ['🧱', 'BOM', 'รายการวัตถุดิบ'],
   TIME:  ['⏱️', 'Time Study', 'จับเวลาหาเวลามาตรฐาน'],
@@ -1084,7 +1085,7 @@ const DEPT = [
   ['ช่างเทคนิค', 'เอกสารที่ใช้หน้างาน', ['WI', 'OPL', 'SIGN', 'QP', 'CHECK', 'SET']],
   ['วิศวกรรม', 'วิเคราะห์และปรับปรุงกระบวนการ',
    ['ROUTE', 'BOM', 'TIME', 'CAP', 'LINE', 'SMED', 'DIAG', 'FMEA', 'CP', 'QC', 'MSA']],
-  ['ซ่อมบำรุง', 'เครื่องมือและกำลังคน', ['EQUIP', 'SKILL']],
+  ['ซ่อมบำรุง', 'มาตรฐาน เครื่องมือ และกำลังคน', ['CIL', 'EQUIP', 'SKILL']],
   ['R&D', 'ส่งมอบงานให้ฝ่ายผลิต', ['APV']],
 ];
 
@@ -1517,6 +1518,21 @@ const bomQty = (r, ps) => {
 /* คอลัมน์ที่แสดงจริง — บางตารางซ่อนช่องที่เกินขนาดกลุ่มตัวอย่าง */
 const visCols = (t, ps) => t.cols.filter(c => !c.only || c.only(ps));
 
+/* CIL (TPM ขั้นที่ 3) — เก็บความถี่เป็น "ทุกกี่วัน" ตัวเลขตัวเดียว จะได้คำนวณงบเวลาได้
+   แล้วค่อยแปลงกลับเป็นคำที่ช่างอ่านรู้เรื่องตอนพิมพ์ */
+const CIL_WORD = { 1: 'ทุกวัน / ทุกกะ', 7: 'ทุกสัปดาห์', 14: 'ทุก 2 สัปดาห์', 30: 'ทุกเดือน',
+                   90: 'ทุก 3 เดือน', 180: 'ทุก 6 เดือน', 365: 'ทุกปี' };
+const cilFreq = r => { const d = Math.round(N(r.every));
+  return d <= 0 ? '-' : (CIL_WORD[d] || ('ทุก ' + d + ' วัน')); };
+/* นาทีต่อวันของงานหนึ่งรายการ ใช้รวมเป็นงบเวลาทั้งแผ่น */
+const cilPerDay = r => { const d = N(r.every); return d > 0 ? N(r.min) / d : 0; };
+/* ประเภทงาน : C ทำความสะอาด, I ตรวจ, L หล่อลื่น — รับทั้งตัวอักษรอังกฤษและคำไทย */
+const cilKind = r => { const v = String(r.kind || '').trim().toUpperCase();
+  if (/^C|สะอาด|ทำความ/.test(v)) return 'C';
+  if (/^L|หล่อ|จาระบี|น้ำมัน/.test(v)) return 'L';
+  if (/^I|ตรวจ|เช็ก|เช็ค/.test(v)) return 'I';
+  return ''; };
+
 /* ค่าคงที่ Gage R&R วิธี Average-Range (AIAG MSA) — K1 ตามจำนวนครั้งที่วัดซ้ำ,
    K2 ตามจำนวนผู้วัด (ตรึงไว้ 2 คน), K3 ตามจำนวนชิ้นงาน */
 const MSA_K1 = { 2: 0.8862, 3: 0.5908 };
@@ -1813,6 +1829,48 @@ const TABLES = {
         rows.push(['Cpk', F(cpk, 2) + (cpk >= 1.33 ? ' (ผ่านเกณฑ์ ≥1.33)'
                           : cpk >= 1.00 ? ' (พอใช้ — ควรปรับปรุง)' : ' (ไม่ผ่าน ต้องแก้ไข)')]);
       }
+      return rows;
+    },
+  },
+
+  /* CIL — ใบมาตรฐานชั่วคราวของ TPM ขั้นที่ 3 : ช่างคุมเครื่องเองได้ด้วยมาตรฐานแผ่นเดียว
+     CMMS ทำ "เช็กลิสต์รายวัน" ส่วนแผ่นนี้คือตัวที่นิยามว่าเช็กลิสต์นั้นต้องมีอะไรบ้าง */
+  CIL: {
+    title: 'CIL STANDARD (มาตรฐานทำความสะอาด ตรวจ หล่อลื่น — TPM)',
+    pars: [{ id: 'cilmc', l: 'เครื่องจักร / สายการผลิต', v: '' },
+           { id: 'cilbudget', l: 'เวลาที่จัดสรรให้ต่อวัน (นาที)', v: 15 }],
+    cols: [
+      { k: 'point',  h: 'จุด / ตำแหน่ง',          w: 13, t: 'text' },
+      { k: 'kind',   h: 'ประเภท (C/I/L)',          w: 7,  t: 'text' },
+      { k: 'std',    h: 'สภาพที่ถูกต้อง / เกณฑ์',  w: 14, t: 'text' },
+      { k: 'method', h: 'วิธีทำ',                  w: 13, t: 'text' },
+      { k: 'tool',   h: 'เครื่องมือ / สารหล่อลื่น', w: 11, t: 'text' },
+      { k: 'every',  h: 'ทุกกี่วัน',               w: 6,  t: 'num' },
+      { k: 'freq',   h: 'ความถี่', w: 9, t: 'calc', text: true, f: r => cilFreq(r) },
+      { k: 'min',    h: 'เวลา (นาที)',             w: 6,  t: 'num' },
+      { k: 'pd',     h: 'นาที/วัน', w: 7, t: 'calc', dec: 2, f: r => cilPerDay(r) },
+      { k: 'who',    h: 'ผู้รับผิดชอบ',            w: 8,  t: 'text' },
+    ],
+    /* ไม่ได้นิยาม "สภาพที่ถูกต้อง" = ช่างไม่รู้ว่าแบบไหนเรียกผิดปกติ ยังไม่ใช่มาตรฐาน */
+    hi: r => (String(r.point || '').trim() && !String(r.std || '').trim()) ? 'mid' : false,
+    sum: (cs, ps) => {
+      const live = cs.filter(r => String(r.point || '').trim());
+      const cnt = k => live.filter(r => cilKind(r) === k).length;
+      const perDay = live.reduce((a, r) => a + cilPerDay(r), 0);
+      const budget = N(ps.cilbudget);
+      const noStd = live.filter(r => !String(r.std || '').trim()).length;
+      const noKind = live.filter(r => !cilKind(r)).length;
+      const rows = [['เครื่องจักร / สาย', ps.cilmc || '-'],
+        ['จำนวนจุดทั้งหมด', live.length + ' จุด'],
+        ['แยกตามประเภท', 'ทำความสะอาด ' + cnt('C') + ' · ตรวจ ' + cnt('I')
+                        + ' · หล่อลื่น ' + cnt('L')
+                        + (noKind ? '  (ยังไม่ระบุประเภท ' + noKind + ')' : '')],
+        ['เวลารวมเฉลี่ย', F(perDay, 1) + ' นาที/วัน']];
+      if (budget > 0) rows.push(['เทียบเวลาที่จัดสรร',
+        F(budget, 0) + ' นาที/วัน → ' + (perDay > budget
+          ? 'เกิน ' + F(perDay - budget, 1) + ' นาที  ← ต้องตัดงานหรือยืดความถี่ ไม่งั้นช่างทำไม่ครบ'
+          : 'เหลือ ' + F(budget - perDay, 1) + ' นาที')]);
+      if (noStd) rows.push(['ยังไม่ระบุสภาพที่ถูกต้อง', noStd + ' จุด  ← ต้องเติมก่อนใช้งาน']);
       return rows;
     },
   },
