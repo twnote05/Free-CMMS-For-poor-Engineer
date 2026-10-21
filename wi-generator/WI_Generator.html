@@ -1064,6 +1064,9 @@ const TAB_META = {
   SIGN:  ['⚠️', 'ป้ายความปลอดภัย', 'ห้าม / เตือน / บังคับ'],
   QP:    ['🔍', 'Q-Point', 'จุดควบคุมคุณภาพ'],
   CHECK: ['✔️', 'Check Sheet', 'นับของเสีย + พาเรโต'],
+  SET:   ['🎛️', 'ค่าตั้งเครื่อง', 'Master Setting Sheet'],
+  CP:    ['🛡️', 'Control Plan', 'แผนควบคุมกระบวนการ'],
+  MSA:   ['📐', 'Gage R&R', 'ตรวจระบบการวัด (MSA)'],
   ROUTE: ['🧭', 'Routing Sheet', 'ลำดับขั้นการผลิต'],
   BOM:   ['🧱', 'BOM', 'รายการวัตถุดิบ'],
   TIME:  ['⏱️', 'Time Study', 'จับเวลาหาเวลามาตรฐาน'],
@@ -1078,9 +1081,9 @@ const TAB_META = {
   APV:   ['✅', 'ใบอนุมัติผลิต', 'R&D → ฝ่ายผลิต'],
 };
 const DEPT = [
-  ['ช่างเทคนิค', 'เอกสารที่ใช้หน้างาน', ['WI', 'OPL', 'SIGN', 'QP', 'CHECK']],
+  ['ช่างเทคนิค', 'เอกสารที่ใช้หน้างาน', ['WI', 'OPL', 'SIGN', 'QP', 'CHECK', 'SET']],
   ['วิศวกรรม', 'วิเคราะห์และปรับปรุงกระบวนการ',
-   ['ROUTE', 'BOM', 'TIME', 'CAP', 'LINE', 'SMED', 'DIAG', 'FMEA', 'QC']],
+   ['ROUTE', 'BOM', 'TIME', 'CAP', 'LINE', 'SMED', 'DIAG', 'FMEA', 'CP', 'QC', 'MSA']],
   ['ซ่อมบำรุง', 'เครื่องมือและกำลังคน', ['EQUIP', 'SKILL']],
   ['R&D', 'ส่งมอบงานให้ฝ่ายผลิต', ['APV']],
 ];
@@ -1514,6 +1517,18 @@ const bomQty = (r, ps) => {
 /* คอลัมน์ที่แสดงจริง — บางตารางซ่อนช่องที่เกินขนาดกลุ่มตัวอย่าง */
 const visCols = (t, ps) => t.cols.filter(c => !c.only || c.only(ps));
 
+/* ค่าคงที่ Gage R&R วิธี Average-Range (AIAG MSA) — K1 ตามจำนวนครั้งที่วัดซ้ำ,
+   K2 ตามจำนวนผู้วัด (ตรึงไว้ 2 คน), K3 ตามจำนวนชิ้นงาน */
+const MSA_K1 = { 2: 0.8862, 3: 0.5908 };
+const MSA_K2 = 0.7071;                         // ผู้วัด 2 คน
+const MSA_K3 = { 2: 0.7071, 3: 0.5231, 4: 0.4467, 5: 0.4030, 6: 0.3742,
+                 7: 0.3534, 8: 0.3375, 9: 0.3249, 10: 0.3146 };
+const msaT = ps => Math.min(3, Math.max(2, Math.round(N(ps && ps.trials)) || 2));
+const msaKeys = (who, ps) => ['1', '2', '3'].slice(0, msaT(ps)).map(i => who + i);
+/* พิสัยของผู้วัดคนหนึ่งในชิ้นงานหนึ่ง — ต้องวัดครบอย่างน้อย 2 ครั้งถึงจะนับ */
+const msaRange = (r, who, ps) => { const a = nums(r, msaKeys(who, ps));
+  return a.length >= 2 ? Math.max(...a) - Math.min(...a) : null; };
+
 /* ค่าคงที่แผนภูมิควบคุม X̄-R ตามขนาดกลุ่มตัวอย่าง n (ตาราง SPC มาตรฐาน) : [A2, D3, D4, d2] */
 const SPC = { 2:[1.880,0,3.267,1.128], 3:[1.023,0,2.574,1.693], 4:[0.729,0,2.282,2.059],
               5:[0.577,0,2.114,2.326], 6:[0.483,0,2.004,2.534], 7:[0.419,0.076,1.924,2.704],
@@ -1798,6 +1813,131 @@ const TABLES = {
         rows.push(['Cpk', F(cpk, 2) + (cpk >= 1.33 ? ' (ผ่านเกณฑ์ ≥1.33)'
                           : cpk >= 1.00 ? ' (พอใช้ — ควรปรับปรุง)' : ' (ไม่ผ่าน ต้องแก้ไข)')]);
       }
+      return rows;
+    },
+  },
+
+  /* Control Plan — ตัวที่ต่อจาก Process Flow และ FMEA บอกว่าแต่ละจุดคุมด้วยอะไร */
+  CP: {
+    title: 'CONTROL PLAN (แผนควบคุมกระบวนการ)',
+    pars: [{ id: 'cpkind', l: 'ระยะของแผน (Prototype / Pre-launch / Production)', v: 'Production' }],
+    cols: [
+      { k: 'proc',   h: 'ขั้นตอน / กระบวนการ',      w: 12, t: 'text' },
+      { k: 'mc',     h: 'เครื่องจักร / Jig',         w: 8,  t: 'text' },
+      { k: 'char',   h: 'ลักษณะที่ต้องคุม',          w: 13, t: 'text' },
+      { k: 'cc',     h: 'จุดวิกฤต',                  w: 5,  t: 'text' },
+      { k: 'spec',   h: 'สเปก / ค่าที่ยอมรับ',        w: 11, t: 'text' },
+      { k: 'method', h: 'วิธีวัด / เครื่องมือ',       w: 10, t: 'text' },
+      { k: 'size',   h: 'จำนวนตัวอย่าง',             w: 6,  t: 'num' },
+      { k: 'freq',   h: 'ความถี่',                   w: 7,  t: 'text' },
+      { k: 'ctrl',   h: 'วิธีควบคุม',                w: 11, t: 'text' },
+      { k: 'react',  h: 'แผนตอบสนองเมื่อหลุด',       w: 13, t: 'text' },
+    ],
+    /* แถวที่ยังไม่มีวิธีควบคุมหรือแผนตอบสนอง = แผนที่ใช้งานจริงไม่ได้ ชี้ไว้ให้เห็น */
+    hi: r => (!String(r.ctrl || '').trim() || !String(r.react || '').trim()) ? 'mid' : false,
+    sum: (cs, ps) => {
+      const has = (r, k) => String(r[k] || '').trim() !== '';
+      const noCtrl = cs.filter(r => has(r, 'char') && !has(r, 'ctrl')).length;
+      const noReact = cs.filter(r => has(r, 'char') && !has(r, 'react')).length;
+      const noSpec = cs.filter(r => has(r, 'char') && !has(r, 'spec')).length;
+      return [['ระยะของแผน', ps.cpkind || '-'],
+              ['จำนวนจุดควบคุม', cs.filter(r => has(r, 'char')).length],
+              ['จุดวิกฤต (CC/SC)', cs.filter(r => has(r, 'cc')).length],
+              ['ยังไม่ระบุสเปก', noSpec + ' จุด'],
+              ['ยังไม่ระบุวิธีควบคุม', noCtrl + ' จุด' + (noCtrl ? '  ← ต้องเติมก่อนใช้งาน' : '')],
+              ['ยังไม่ระบุแผนตอบสนอง', noReact + ' จุด' + (noReact ? '  ← ต้องเติมก่อนใช้งาน' : '')]];
+    },
+  },
+
+  /* ตารางค่ามาตรฐานการตั้งเครื่อง — ขอบบน-ล่างคำนวณให้ ไม่ต้องคิดเอง */
+  SET: {
+    title: 'MASTER SETTING SHEET (ตารางค่ามาตรฐานการตั้งเครื่อง)',
+    pars: [{ id: 'setmc', l: 'เครื่องจักร / สายการผลิต', v: '' },
+           { id: 'setmodel', l: 'รุ่นงาน / สูตร', v: '' }],
+    cols: [
+      { k: 'zone', h: 'จุด / โซน',        w: 11, t: 'text' },
+      { k: 'par',  h: 'พารามิเตอร์',      w: 18, t: 'text' },
+      { k: 'unit', h: 'หน่วย',            w: 6,  t: 'text' },
+      { k: 'std',  h: 'ค่ามาตรฐาน',       w: 8,  t: 'num' },
+      { k: 'tolm', h: '- Tol',            w: 6,  t: 'num' },
+      { k: 'tolp', h: '+ Tol',            w: 6,  t: 'num' },
+      { k: 'lo',   h: 'ต่ำสุดที่ยอมรับ', w: 8, t: 'calc', dec: 2,
+        f: r => N(r.std) - Math.abs(N(r.tolm)) },
+      { k: 'up',   h: 'สูงสุดที่ยอมรับ', w: 8, t: 'calc', dec: 2,
+        f: r => N(r.std) + Math.abs(N(r.tolp)) },
+      { k: 'who',  h: 'ผู้ตั้ง / ผู้ตรวจ', w: 9, t: 'text' },
+      { k: 'note', h: 'หมายเหตุ',          w: 12, t: 'text' },
+    ],
+    /* ไม่ใส่ค่าเผื่อ = ช่างไม่รู้ว่าคลาดได้แค่ไหน ถือว่ายังไม่ใช่มาตรฐาน */
+    hi: r => (String(r.par || '').trim() && !N(r.tolm) && !N(r.tolp)) ? 'mid' : false,
+    sum: (cs, ps) => {
+      const live = cs.filter(r => String(r.par || '').trim());
+      const noTol = live.filter(r => !N(r.tolm) && !N(r.tolp)).length;
+      return [['เครื่องจักร / สาย', ps.setmc || '-'],
+              ['รุ่นงาน / สูตร', ps.setmodel || '-'],
+              ['จำนวนพารามิเตอร์', live.length],
+              ['ยังไม่ระบุค่าเผื่อ', noTol + ' รายการ' + (noTol ? '  ← ยังใช้เป็นมาตรฐานไม่ได้' : '')]];
+    },
+  },
+
+  /* Gage R&R วิธี Average-Range : ผู้วัด 2 คน วัดซ้ำ 2-3 ครั้ง */
+  MSA: {
+    title: 'GAGE R&R (การวิเคราะห์ระบบการวัด — MSA)',
+    pars: [{ id: 'trials', l: 'วัดซ้ำกี่ครั้งต่อชิ้น (2 หรือ 3)', v: 2 },
+           { id: 'gage', l: 'เครื่องมือวัดที่ใช้', v: '' },
+           { id: 'tol', l: 'ช่วงสเปก USL-LSL (ไม่ใส่ก็ได้)', v: '' }],
+    cols: [
+      { k: 'pc', h: 'ชิ้นงานที่', w: 12, t: 'text' },
+      { k: 'a1', h: 'A ครั้งที่ 1', w: 8, t: 'num' },
+      { k: 'a2', h: 'A ครั้งที่ 2', w: 8, t: 'num' },
+      { k: 'a3', h: 'A ครั้งที่ 3', w: 8, t: 'num', only: ps => msaT(ps) >= 3 },
+      { k: 'b1', h: 'B ครั้งที่ 1', w: 8, t: 'num' },
+      { k: 'b2', h: 'B ครั้งที่ 2', w: 8, t: 'num' },
+      { k: 'b3', h: 'B ครั้งที่ 3', w: 8, t: 'num', only: ps => msaT(ps) >= 3 },
+      { k: 'ra', h: 'พิสัย A', w: 8, t: 'calc', dec: 3,
+        f: (r, ps) => { const v = msaRange(r, 'a', ps); return v == null ? 0 : v; } },
+      { k: 'rb', h: 'พิสัย B', w: 8, t: 'calc', dec: 3,
+        f: (r, ps) => { const v = msaRange(r, 'b', ps); return v == null ? 0 : v; } },
+      { k: 'pavg', h: 'ค่าเฉลี่ยของชิ้น', w: 11, t: 'calc', dec: 3,
+        f: (r, ps) => avgOf(nums(r, msaKeys('a', ps).concat(msaKeys('b', ps)))) },
+    ],
+    hi: (r, ps) => { const need = msaT(ps) * 2;
+      const got = nums(r, msaKeys('a', ps).concat(msaKeys('b', ps))).length;
+      return String(r.pc || '').trim() && got < need ? 'mid' : false; },
+    sum: (cs, ps) => {
+      const t = msaT(ps);
+      const live = cs.filter(r => nums(r, msaKeys('a', ps).concat(msaKeys('b', ps))).length > 0);
+      const n = live.length;
+      if (n < 2) return [['ยังมีข้อมูลไม่พอ', 'ต้องมีชิ้นงานอย่างน้อย 2 ชิ้น']];
+      const avgNN = a => { const v = a.filter(x => x != null); return v.length ? avgOf(v) : 0; };
+      const rbA = avgNN(live.map(r => msaRange(r, 'a', ps)));
+      const rbB = avgNN(live.map(r => msaRange(r, 'b', ps)));
+      const rbb = (rbA + rbB) / 2;
+      const EV = rbb * (MSA_K1[t] || MSA_K1[2]);
+      const allA = live.reduce((a, r) => a.concat(nums(r, msaKeys('a', ps))), []);
+      const allB = live.reduce((a, r) => a.concat(nums(r, msaKeys('b', ps))), []);
+      const xdiff = Math.abs(avgOf(allA) - avgOf(allB));
+      const AV = Math.sqrt(Math.max(0, Math.pow(xdiff * MSA_K2, 2) - EV * EV / (n * t)));
+      const GRR = Math.sqrt(EV * EV + AV * AV);
+      const pavg = live.map(r => avgOf(nums(r, msaKeys('a', ps).concat(msaKeys('b', ps)))));
+      const PV = (Math.max(...pavg) - Math.min(...pavg)) * (MSA_K3[Math.min(10, n)] || MSA_K3[10]);
+      const TV = Math.sqrt(GRR * GRR + PV * PV);
+      const pct = TV > 0 ? 100 * GRR / TV : 0;
+      const verdict = pct < 10 ? ' (ใช้ได้)' : pct <= 30 ? ' (พอรับได้ — ดูความสำคัญของงาน)'
+                                             : ' (ไม่ผ่าน ต้องแก้ระบบการวัดก่อน)';
+      const rows = [['เครื่องมือวัด', ps.gage || '-'],
+        ['จำนวนชิ้น / ผู้วัด / ครั้ง', n + ' ชิ้น · 2 คน · ' + t + ' ครั้ง'],
+        ['EV (ความซ้ำของเครื่องมือ)', F(EV, 4)],
+        ['AV (ความต่างระหว่างผู้วัด)', F(AV, 4)],
+        ['GRR', F(GRR, 4)],
+        ['PV (ความต่างของชิ้นงาน)', F(PV, 4)],
+        ['TV (ความผันแปรรวม)', F(TV, 4)],
+        ['%GRR เทียบ TV', F(pct, 1) + ' %' + verdict]];
+      const tol = N(ps.tol);
+      if (tol > 0) rows.push(['%GRR เทียบช่วงสเปก', F(100 * GRR / tol, 1) + ' %']);
+      rows.push(['ndc (จำนวนระดับที่แยกออก)',
+        GRR > 0 ? Math.floor(1.41 * PV / GRR) + (1.41 * PV / GRR >= 5 ? ' (ผ่านเกณฑ์ ≥5)' : ' (ต่ำกว่า 5 — แยกชิ้นงานไม่ออก)')
+                : 'คำนวณไม่ได้ (GRR = 0)']);
       return rows;
     },
   },
