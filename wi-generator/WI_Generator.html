@@ -208,6 +208,17 @@ button:focus-visible,.themebtn:focus-visible,.tabs button:focus-visible{outline:
 /* ---------- แท็บเลือกประเภทเอกสาร ---------- */
 .docnav{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
   box-shadow:var(--sh);padding:11px 12px 12px;margin-bottom:14px}
+/* เมนูแบ่งเป็น 2 โซน : โซนบนเลือกส่วนงาน โซนล่างเลือกเอกสารของส่วนงานนั้น */
+.navzone{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:11px 12px;margin:0 0 10px;box-shadow:var(--sh)}
+.navzone h3{margin:0 0 9px;font-size:12px;font-weight:700;color:var(--txt3);
+  display:flex;align-items:center;gap:7px}
+.navzone h3 i{font-style:normal;flex:none;width:19px;height:19px;border-radius:50%;
+  background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;
+  font-size:11px;font-weight:700}
+.navzone h3 b{color:var(--txt2);font-weight:700}
+.navzone .deptbar,.navzone .tabs{margin:0}
+
 /* แถบเลือกส่วนงาน (ชั้นบน) — เลือกแล้วด้านล่างจะแตกเป็นเอกสารของส่วนงานนั้น */
 .deptbar{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));
   grid-auto-rows:1fr;gap:6px;margin:0 0 10px}
@@ -1087,7 +1098,11 @@ function buildNav() {
     return `<button data-t="${id}"${id === docType ? ' class="on"' : ''}>${ico} ${esc(name)}`
          + `<br><small>${esc(sub)}</small></button>`;
   }).join('');
-  $('nav').innerHTML = `<div class="deptbar">${dept}</div><div class="tabs">${docs}</div>`;
+  $('nav').innerHTML =
+    `<div class="navzone"><h3><i>1</i>เลือกส่วนงาน</h3>
+       <div class="deptbar">${dept}</div></div>
+     <div class="navzone"><h3><i>2</i>เลือกเอกสารของ <b>${esc(DEPT[navDept][0])}</b></h3>
+       <div class="tabs">${docs}</div></div>`;
 }
 
 function switchTab(e) {
