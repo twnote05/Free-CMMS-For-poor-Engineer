@@ -1075,7 +1075,10 @@ $('steps').addEventListener('click', e => {
   else return;
   render();
 });
-$('clear').onclick = () => { items = []; render(); };
+$('clear').onclick = () => {
+  if (hasWork() && !confirm('ล้างงานที่ทำค้างไว้ทั้งหมด ใช่หรือไม่?')) return;
+  items = []; clearDraft(); render();
+};
 document.querySelectorAll('.card input').forEach(el => el.addEventListener('input', paginate));
 function setPageCss() {
   const orient = FORMS[docType]
@@ -1435,6 +1438,7 @@ const apv = {
 };
 
 function renderApvEditor() {
+  fillForm('apvCard', apv);
   $('apvAttach').innerHTML = apv.attach.map((a, i) => `<tr>
       <td class="c"><input type="checkbox" data-a="${i}" data-k="on"${a.on ? ' checked' : ''}></td>
       <td><input data-a="${i}" data-k="name" value="${esc(a.name)}"></td>
@@ -1556,6 +1560,19 @@ function bindForm(cardId, obj, tbNames, redraw) {
   });
 }
 
+/* เขียนค่าจากก้อนข้อมูลกลับลงช่องในการ์ด — ช่องพวกนี้ไม่มี id จึงไม่ได้ถูกกู้คืนมาเองตอนเปิดใหม่
+   เรียกเฉพาะตอนสลับแท็บ / เพิ่ม-ลบแถว / ล้าง ไม่ได้เรียกระหว่างพิมพ์ ค่าที่พิมพ์อยู่จึงไม่ถูกทับ */
+function fillForm(cardId, obj) {
+  $(cardId).querySelectorAll('[data-f]').forEach(el => {
+    const v = obj[el.dataset.f];
+    if (el.type === 'radio') el.checked = String(v) === el.value;
+    else el.value = v == null ? '' : v;
+  });
+  $(cardId).querySelectorAll('[data-g]').forEach(el => {
+    el.value = (obj.signs || [])[+el.dataset.g] || '';
+  });
+}
+
 /* วาดตารางย่อยในการ์ด — cols คือ [คีย์, placeholder] */
 const formRows = (tbIdx, rows, cols) => rows.map((r, i) => '<tr>'
   + cols.map(([k, ph]) => `<td><input data-tb="${tbIdx}" data-row="${i}" data-k="${k}"`
@@ -1563,13 +1580,19 @@ const formRows = (tbIdx, rows, cols) => rows.map((r, i) => '<tr>'
   + `<td class="c"><button class="del" data-tb="${tbIdx}" data-rm="${i}">ลบ</button></td></tr>`).join('');
 
 function renderEcrEditor() {
+  fillForm('ecrCard', ecr);
   $('ecrDocs').innerHTML = formRows(0, ecr.docs,
     [['name', 'เช่น WI รีดพื้น'], ['no', ''], ['rOld', ''], ['rNew', '']]);
 }
 function renderTrialEditor() {
+  fillForm('trialCard', trial);
   $('trialPars').innerHTML = formRows(0, trial.pars, [['name', ''], ['old', ''], ['tryv', '']]);
   $('trialChecks').innerHTML = formRows(1, trial.checks, [['item', ''], ['how', ''], ['n', '']]);
 }
+/* ค่าตั้งต้นของฟอร์ม เก็บไว้เทียบว่าผู้ใช้แก้อะไรไปแล้วบ้าง — เช็กแค่ว่า "ช่องว่างไหม"
+   ไม่ได้ เพราะฟอร์มมีค่าตั้งต้นที่เป็นข้อความอยู่แล้ว เช่น ผลอนุมัติและประเภทการเปลี่ยนแปลง */
+const FORM0 = JSON.stringify([apv, ecr, trial]);
+
 bindForm('ecrCard', ecr, ['docs'], renderEcrEditor);
 bindForm('trialCard', trial, ['pars', 'checks'], renderTrialEditor);
 
@@ -2878,6 +2901,7 @@ function paginate() {
       if (a) a.textContent = i + 1;
       if (b) b.textContent = pg.length;
     });
+    saveDraft();
     $('msg').textContent = (docType === 'SKILL'
         ? skill.people.length + ' คน · ' + skill.skills.length + ' ทักษะ'
         : TABLES[docType] ? curRows().length + ' แถว'
@@ -2951,6 +2975,7 @@ function paginate() {
   });
   $('msg').textContent = items.length + ' ขั้นตอน · ' + pages.length + ' หน้า';
   fitStage();
+  saveDraft();
 }
 
 /* ย่อเอกสารให้พอดีจอ (ตอนพิมพ์ใช้ขนาดจริง) */
@@ -3205,18 +3230,33 @@ function xlSheet(wb, name, widths, paper, portrait) {
 }
 
 /** หัวเอกสาร 2 แถวเหมือนที่เห็นบนหน้าจอ เขียนซ้ำทุกหน้าพร้อมเลขหน้า */
+/* ความกว้างคอลัมน์ของ Excel -> พิกเซลโดยประมาณ ใช้คำนวณกรอบวางโลโก้ */
+const xlPx = (ws, c1, c2) => { let px = 0;
+  for (let c = c1; c <= c2; c++) px += Math.round((ws.getColumn(c).width || 8) * 7 + 5);
+  return px; };
+
 function xlHead(ws, wb, h, n, r, title, pageNo, total) {
   let c0 = 1;
-  if (h.logoXl) {
-    ws.mergeCells(r, 1, r + 1, 2);
+  /* โลโก้กินคอลัมน์ได้เท่าที่ยังเหลือที่ให้ ชื่อเรื่อง / เลขเอกสาร / เลขหน้า อย่างน้อย 3 ช่อง
+     ชีตที่แคบมากจะไม่วางโลโก้เลย — หัวเอกสารครบสำคัญกว่าโลโก้ */
+  const lw = h.logoXl ? (n - 2 >= 3 ? 2 : (n - 1 >= 3 ? 1 : 0)) : 0;
+  if (lw) {
+    ws.mergeCells(r, 1, r + 1, lw);
     xput(ws, r, 1, null, { align: XC });
-    [[r, 2], [r + 1, 1], [r + 1, 2]].forEach(([rr, cc]) => { ws.getCell(rr, cc).border = XBOX; });
+    for (let rr = r; rr <= r + 1; rr++)
+      for (let cc = 1; cc <= lw; cc++) ws.getCell(rr, cc).border = XBOX;
     const id = wb.addImage({ base64: h.logoXl, extension: 'png' });
-    ws.addImage(id, { tl: { col: 0, row: r - 1 }, br: { col: 2, row: r + 1 }, editAs: 'oneCell' });
-    c0 = 3;
+    /* กำหนดขนาดรูปเองตามกรอบจริงของชีตนี้ แทนการยึด tl-br ซึ่งยืดรูปให้เต็มช่อง
+       ทำให้โลโก้ไม่เพี้ยนสัดส่วนไม่ว่าชีตจะคอลัมน์กว้างแค่ไหน */
+    const AR = h.logoAR || 3.75;            // สัดส่วนผืนโลโก้ที่ prepLogo วาดมา
+    const bw = xlPx(ws, 1, lw) - 6, bh = Math.round((30 + 34) * 4 / 3) - 6;
+    let iw = bw, ih = Math.round(bw / AR);
+    if (ih > bh) { ih = bh; iw = Math.round(bh * AR); }
+    ws.addImage(id, { tl: { col: 0.08, row: r - 1 + 0.08 }, ext: { width: iw, height: ih } });
+    c0 = lw + 1;
   }
   const w = n - c0 + 1;
-  const p1 = Math.min(n - 2, c0 + Math.max(0, Math.round(w * 0.45) - 1));
+  const p1 = Math.max(c0, Math.min(n - 2, c0 + Math.max(0, Math.round(w * 0.45) - 1)));
   const p2 = Math.min(n - 1, Math.max(p1 + 1, p1 + Math.round(w * 0.3)));
   xspan(ws, r, c0, p1, title, { align: XC, font: { bold: true, size: 18 } });
   xspan(ws, r, p1 + 1, p2, 'เอกสารหมายเลข ' + (h.docno || '-'), { align: XC });
@@ -3741,7 +3781,7 @@ $('xls').onclick = async () => {
   $('msg').textContent = 'กำลังสร้างไฟล์ Excel...';
   try {
     const h = header(), box = IMG_BOX[$('paper').value];
-    if (h.logo) h.logoXl = await prepLogo(h.logo);
+    if (h.logo) { h.logoXl = await prepLogo(h.logo); h.logoAR = LOGO_W / LOGO_H; }
     if (h.ppe.length) h.ppeStrip = await ppeStripImage(h.ppe);
     const steps = await Promise.all(items.map(async it => ({ desc: it.desc.trim(),
       ctl: it.ctl.trim(), warn: it.warn.trim(), img: await resize(it.file, box) })));
@@ -3765,7 +3805,7 @@ async function exportOther() {
   $('msg').textContent = 'กำลังสร้างไฟล์ Excel...';
   try {
     const h = header(), paper = $('paper').value;
-    if (h.logo) h.logoXl = await prepLogo(h.logo);
+    if (h.logo) { h.logoXl = await prepLogo(h.logo); h.logoAR = LOGO_W / LOGO_H; }
     let kind = 'TABLE', d;
     if (TABLES[docType]) d = await dataTABLE();
     else if (docType === 'QP') d = await dataQP(paper);
@@ -4019,6 +4059,67 @@ $('edSave').onclick = () => {
   apply();
 })();
 
+/* ---------------------- กันงานหายตอนปิดหน้า ----------------------
+   โปรแกรมไม่มีเซิร์ฟเวอร์ ปิดแท็บหรือกด F5 คืองานหายหมด จึงเก็บ "ข้อความ" ที่กรอกไว้
+   ลงเครื่องอัตโนมัติ แล้วกู้คืนให้ตอนเปิดใหม่
+   รูปเก็บไม่ได้ (เป็นไฟล์จริง ไม่ใช่ข้อความ) จึงบอกผู้ใช้ตรง ๆ ว่าต้องใส่รูปใหม่ */
+const DRAFT_KEY = 'wi_draft';
+const draftFields = () => [...document.querySelectorAll('.card [id]')]
+  .filter(el => /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && el.type !== 'file');
+
+let draftTimer = 0;
+function saveDraft() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    try {
+      const fields = {};
+      draftFields().forEach(el => { fields[el.id] = el.value; });
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(
+        { t: Date.now(), docType, fields, rowData, parData, skill, apv, ecr, trial }));
+    } catch (_) { }          // โควตาเต็มก็ปล่อยไป ดีกว่าทำให้โปรแกรมสะดุด
+  }, 700);
+}
+
+/* มีงานค้างอยู่จริงไหม — ใช้ทั้งตอนเตือนก่อนปิดและตอนตัดสินใจกู้คืน
+   ห้ามนับการ "เปิดดูเฉย ๆ" เป็นงาน เพราะแค่สลับแท็บตารางก็สร้างแถวเปล่ากับค่าตั้งต้นขึ้นมาแล้ว */
+let fields0 = '';
+const fieldsNow = () => draftFields().map(el => el.value).join('\u0001');
+function hasWork() {
+  const rows = o => Object.keys(o).some(k => (o[k] || []).some(r =>
+    Object.keys(r).some(j => String(r[j] == null ? '' : r[j]).trim())));
+  return items.length > 0
+      || rows(rowData)
+      || (skill.people || []).some(p => (p.name || '').trim())
+      || JSON.stringify([apv, ecr, trial]) !== FORM0
+      || (fields0 !== '' && fieldsNow() !== fields0);
+}
+
+function loadDraft() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (_) { }
+  if (!d || !d.fields) return null;
+  Object.keys(d.fields).forEach(id => { if ($(id)) $(id).value = d.fields[id]; });
+  Object.assign(rowData, d.rowData || {});
+  Object.assign(parData, d.parData || {});
+  [[skill, d.skill], [apv, d.apv], [ecr, d.ecr], [trial, d.trial]]
+    .forEach(([dst, src]) => { if (src) Object.assign(dst, src); });
+  if (d.docType && TAB_META[d.docType]) docType = d.docType;
+  return d.t || 0;
+}
+
+const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY); } catch (_) { } };
+
+/* เตือนก่อนปิด เฉพาะตอนมีงานค้างจริง ไม่งั้นจะกวนคนที่แค่เปิดดู */
+window.addEventListener('beforeunload', e => {
+  if (!hasWork()) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+/* ลากไฟล์พลาดออกนอกกรอบ เบราว์เซอร์จะเปิดไฟล์นั้นแทนแล้วงานหายทั้งหน้า */
+['dragover', 'drop'].forEach(ev =>
+  window.addEventListener(ev, e => { if (!e.target.closest('#drop')) e.preventDefault(); }));
+
 /* favicon ใช้ไอคอนตัวเดียวกับบนหัวโปรแกรม จะได้ไม่ต้องดูแลสองชุด */
 document.head.insertAdjacentHTML('beforeend',
   '<link rel="icon" href="data:image/svg+xml,' + encodeURIComponent($('appicon').outerHTML) + '">');
@@ -4026,8 +4127,15 @@ document.head.insertAdjacentHTML('beforeend',
 Object.entries(CONFIG.fields).forEach(([id, v]) => { if ($(id)) $(id).value = v; });
 initPositions();
 renderPPE();
+fields0 = fieldsNow();                // ค่าตั้งต้นของช่องกรอก ก่อนกู้งานค้าง
+const draftAt = loadDraft();          // กู้งานค้างก่อนวาดหน้าแรก
 buildNav();
 render();
+if (draftAt && hasWork()) {
+  const ago = Math.round((Date.now() - draftAt) / 60000);
+  $('msg').textContent = 'กู้งานที่ค้างไว้แล้ว' + (ago > 0 ? ' (ค้างไว้ ' + ago + ' นาทีก่อน)' : '')
+    + ' — รูปภาพเก็บไม่ได้ ต้องใส่ใหม่ · กด "ล้าง" ถ้าจะเริ่มใหม่';
+}
 </script>
 </body>
 </html>

@@ -386,13 +386,38 @@ for (const k of Object.keys(TABLES)) {
 
 /* ---- ตัวสร้างไฟล์ Excel (ข้ามถ้ายังไม่ได้ลง exceljs) ---- */
 let xl = 'ข้าม (ยังไม่ได้ติดตั้ง exceljs — รัน npm i exceljs ถ้าต้องการตรวจส่วนนี้ด้วย)';
+let xlSkipped = true;
 try {
   const ExcelJS = require('exceljs');
   const xsrc = html.slice(html.indexOf('const XFONT ='),
     html.indexOf('\n}', html.indexOf('async function buildAnyWorkbook')) + 2);
-  const build = new Function('ExcelJS', xsrc + ';return buildAnyWorkbook;')(ExcelJS);
+  const X = new Function('ExcelJS', xsrc +
+    ';return {buildAnyWorkbook, xlOPL, xlTable, xlForm, xlApv, xlHead, xlSheet};')(ExcelJS);
+  xlSkipped = false;
   const h = { subject: 'ทดสอบ', docno: 'T-1', rev: '0', date: '', dept: '', owner: '',
               signs: [{}, {}, {}] };
+  /* PNG 1x1 ใช้แทนโลโก้ ไม่ต้องมีไฟล์จริง */
+  const PNG1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const hLogo = Object.assign({}, h, { logoXl: PNG1 });
+
+  const apvD = { product: 'พื้น SPC', partno: 'P-1', rdEng: 'ก', lot: 'L1',
+    status: [['', 'อนุมัติ'], ['✓', 'มีเงื่อนไข'], ['', 'ไม่อนุมัติ']], cond: 'เฉพาะ Lot แรก',
+    attach: [{ on: true, name: 'BOM', no: 'B-1', rev: '00' }],
+    tests: [{ item: 'ความหนา', spec: '4.0', result: '4.03', ok: 'ผ่าน' }],
+    defect: '1.8 %', obs: '-',
+    signs: [{ role: 'R&D Manager', th: 'ผู้ส่งมอบ', name: 'ก' },
+            { role: 'Production', th: 'ผู้รับมอบ', name: 'ข' },
+            { role: 'QA', th: 'คุณภาพ', name: 'ค' },
+            { role: 'Plant Director', th: 'บริหาร', name: 'ง' }] };
+  const formD = { sheet: 'ECR', title: 'ใบขอเปลี่ยนแปลง', blocks: [
+    ['pair', 'ผลิตภัณฑ์', 'พื้น SPC', 'Part No.', 'P-1'],
+    ['head', '1. ประเภท'],
+    ['pick', [['✓', 'แก้แบบ'], ['', 'เปลี่ยนวัตถุดิบ']]],
+    ['note', 'ของเดิม', 'ใช้ผง A', 44],
+    ['table', ['ชื่อเอกสาร', 'เลขที่', 'Rev'], [['WI รีด', 'W-1', '02']], [4, 2, 2]],
+    ['signs', [{ role: 'R&D', th: 'ผู้ขอ', name: 'ก' }, { role: 'QA', th: 'คุณภาพ', name: 'ข' }]] ] };
+  const oplD = { kindText: 'พื้นฐาน', trainer: 'ก', rows: 8, cells: [{ desc: 'ก', img: null }] };
+
   const jobs = {
     TABLE: ['TABLE', { sheet: 'T', title: 'ตาราง', groups: [[0, 1]], sum: [['รวม', '1']],
       cols: [{ h: 'AP', w: 10 }, { h: 'RPN', w: 10, num: true }],
@@ -400,17 +425,42 @@ try {
     SKILL: ['SKILL', { skills: ['ก', 'ข'], min: 2, can: [2, 0], by: 'หัวหน้า',
       people: [{ name: 'ก', pos: 'ช่าง', lv: [2, 0], ok: 1 }],
       legend: [[0, 'ยังไม่ได้อบรม']], sum: [['จำนวนพนักงาน', '1 คน']] }],
-    OPL:  ['OPL',  { kindText: 'พื้นฐาน', trainer: 'ก', rows: 8, cells: [{ desc: 'ก', img: null }] }],
+    OPL:  ['OPL',  oplD],
     DIAG: ['DIAG', { title: 'VSM', per: 1, sign: true, items: [{ desc: 'ก', img: null }] }],
     SIGN: ['SIGN', { items: [{ kind: 'ห้าม', band: 'FFD7182A', fg: 'FF000000',
                                th: 'ห้ามสูบบุหรี่', en: 'NO SMOKING', img: null }] }],
+    APV:  ['APV',  apvD],
+    FORM: ['FORM', formD],
   };
   const sizes = [];
   for (const [name, [kind, d]] of Object.entries(jobs)) {
-    sizes.push(build(ExcelJS, kind, h, d, 'A4').then(b => {
-      if (b.byteLength < 3000) fails.push('Excel ' + name + ' เล็กผิดปกติ: ' + b.byteLength);
-      return name + ' ' + b.byteLength;
+    for (const paper of ['A4', 'A3']) {
+      sizes.push(X.buildAnyWorkbook(ExcelJS, kind, h, d, paper).then(b => {
+        if (b.byteLength < 3000) fails.push('Excel ' + name + ' ' + paper + ' เล็กผิดปกติ: ' + b.byteLength);
+        return paper === 'A4' ? name + ' ' + b.byteLength : null;
+      }));
+    }
+    // ใส่โลโก้แล้วต้องสร้างได้เหมือนกัน (เคยพังเพราะ prepLogo ล้มแล้วลากทั้ง export ไปด้วย)
+    sizes.push(X.buildAnyWorkbook(ExcelJS, kind, hLogo, d, 'A4').then(b => {
+      if (b.byteLength < 3000) fails.push('Excel ' + name + ' +โลโก้ เล็กผิดปกติ: ' + b.byteLength);
+      return null;
     }));
+  }
+
+  /* ---- หัวเอกสารต้องไม่หายเมื่อมีโลโก้ ----
+     xlHead แบ่งคอลัมน์ให้ ชื่อเรื่อง / เลขเอกสาร / เลขหน้า ถ้าชีตมีไม่กี่คอลัมน์
+     และมีโลโก้กินไป 2 คอลัมน์ ช่วงของชื่อเรื่องอาจกลับหัวกลับหางจนถูกเขียนทับ */
+  const cellsOf = ws => { const out = []; ws.eachRow(r => r.eachCell(c =>
+    out.push(String(c.value == null ? '' : c.value)))); return out; };
+  for (const [name, n, write] of [['OPL', 4, wb => X.xlOPL(wb, hLogo, oplD, 'A4')],
+                                  ['FORM', 8, wb => X.xlForm(wb, hLogo, formD, 'A4')],
+                                  ['APV', 8, wb => X.xlApv(wb, hLogo, apvD, 'A4')]]) {
+    const ws = write(new ExcelJS.Workbook());
+    const txt = cellsOf(ws).join(' | ');
+    if (!/ONE POINT|ใบขอเปลี่ยนแปลง|MASS PRODUCTION/.test(txt))
+      fails.push('Excel ' + name + ' +โลโก้ : ชื่อเอกสารหายจากหัวกระดาษ (' + n + ' คอลัมน์)');
+    if (!/เรื่อง/.test(txt))
+      fails.push('Excel ' + name + ' +โลโก้ : บรรทัด "เรื่อง" หายจากหัวกระดาษ');
   }
   xl = sizes;
 } catch (e) {
@@ -418,9 +468,11 @@ try {
 }
 
 Promise.all(Array.isArray(xl) ? xl : []).then(done => {
-  if (done.length) console.log('สร้างไฟล์ Excel ได้:', done.join(' | '));
+  const names = done.filter(Boolean);
+  if (names.length) console.log('สร้างไฟล์ Excel ได้:', names.join(' | '));
   else console.log('ตัวสร้าง Excel:', xl);
+  const note = xlSkipped ? ' (ยังไม่ได้ตรวจส่วน Excel — ลง exceljs ก่อน)' : '';
   console.log(fails.length ? 'ไม่ผ่าน ' + fails.length + ' ข้อ\n' + fails.join('\n')
-                           : 'ผ่านทั้งหมด');
+                           : 'ผ่านทั้งหมด' + note);
   process.exit(fails.length ? 1 : 0);
 });
