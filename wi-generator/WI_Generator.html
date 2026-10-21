@@ -591,6 +591,104 @@ button:focus-visible,.themebtn:focus-visible,.tabs button:focus-visible{outline:
     <p class="hint">เอกสารนี้พิมพ์เป็น <b>แนวตั้ง</b> เสมอ (A4/A3 ตามที่เลือกด้านล่าง)</p>
   </div>
 
+  <div class="card only-ECR" id="ecrCard" hidden>
+    <h2>ใบขอเปลี่ยนแปลงแบบ / กระบวนการ (ECR)</h2>
+    <div class="grid2">
+      <div class="f"><label>ผลิตภัณฑ์ / ชิ้นงาน</label><input data-f="product"></div>
+      <div class="f"><label>รหัสสินค้า (Part No.)</label><input data-f="partno"></div>
+      <div class="f"><label>Rev ปัจจุบัน</label><input data-f="revOld"></div>
+      <div class="f"><label>Rev ใหม่ที่จะเป็น</label><input data-f="revNew"></div>
+    </div>
+    <div class="grid2" style="margin-top:10px">
+      <div class="f"><label>ประเภทการเปลี่ยนแปลง</label>
+        <select data-f="type"><option value="design">แก้แบบ / ขนาด</option>
+          <option value="material">เปลี่ยนวัตถุดิบ</option>
+          <option value="process">เปลี่ยนกระบวนการ / เครื่องจักร</option>
+          <option value="doc">แก้เอกสารอย่างเดียว</option></select></div>
+      <div class="f"><label>เหตุผล</label>
+        <select data-f="why"><option value="quality">ปัญหาคุณภาพ</option>
+          <option value="cost">ลดต้นทุน</option><option value="customer">ลูกค้าขอ</option>
+          <option value="safety">ความปลอดภัย</option><option value="other">อื่น ๆ</option></select></div>
+    </div>
+    <div class="f"><label>รายละเอียดเหตุผล</label><textarea data-f="whyNote" rows="2"></textarea></div>
+    <div class="f"><label>ของเดิมเป็นอย่างไร</label><textarea data-f="before" rows="2"></textarea></div>
+    <div class="f"><label>จะเปลี่ยนเป็นอย่างไร</label><textarea data-f="after" rows="2"></textarea></div>
+
+    <h2 style="margin-top:14px">เอกสารที่ต้องแก้ตาม</h2>
+    <table class="rowgrid"><thead><tr><th>ชื่อเอกสาร</th><th style="width:20%">เลขที่</th>
+      <th style="width:12%">Rev เดิม</th><th style="width:12%">Rev ใหม่</th><th style="width:8%"></th></tr></thead>
+      <tbody id="ecrDocs"></tbody></table>
+    <button class="ghost" data-addtb="0" style="margin-top:6px">+ เพิ่มเอกสาร</button>
+
+    <h2 style="margin-top:14px">ผลกระทบ</h2>
+    <div class="grid2">
+      <div class="f"><label>ของคงเหลือในสต็อก</label><input data-f="impStock"></div>
+      <div class="f"><label>งานระหว่างผลิต (WIP)</label><input data-f="impWip"></div>
+      <div class="f"><label>แม่พิมพ์ / Jig / เครื่องมือ</label><input data-f="impJig"></div>
+      <div class="f"><label>ต้นทุน</label><input data-f="impCost"></div>
+      <div class="f"><label>ต้องให้ลูกค้าอนุมัติหรือไม่</label><input data-f="impCustomer"></div>
+      <div class="f"><label>ต้องทดลอง / ทวนสอบอะไรก่อน</label><input data-f="verify"></div>
+      <div class="f"><label>วันที่เริ่มมีผล</label><input data-f="effDate"></div>
+      <div class="f"><label>เริ่มที่ Lot / Serial</label><input data-f="effLot"></div>
+    </div>
+
+    <h2 style="margin-top:14px">ผู้ลงนาม</h2>
+    <div class="grid2">
+      <div class="f"><label>ผู้ขอเปลี่ยนแปลง</label><input data-g="0" placeholder="ชื่อ"></div>
+      <div class="f"><label>R&amp;D / Engineering</label><input data-g="1" placeholder="ชื่อ"></div>
+      <div class="f"><label>Production</label><input data-g="2" placeholder="ชื่อ"></div>
+      <div class="f"><label>QA / QC</label><input data-g="3" placeholder="ชื่อ"></div>
+    </div>
+  </div>
+
+  <div class="card only-TRIAL" id="trialCard" hidden>
+    <h2>ใบขอทดลองผลิต</h2>
+    <div class="grid2">
+      <div class="f"><label>ผลิตภัณฑ์ / โครงการ</label><input data-f="product"></div>
+      <div class="f"><label>รหัสสินค้า (Part No.)</label><input data-f="partno"></div>
+      <div class="f"><label>ผู้ขอทดลอง</label><input data-f="reqBy"></div>
+      <div class="f"><label>วันที่ต้องการทดลอง</label><input data-f="wantDate"></div>
+    </div>
+    <div class="f"><label>วัตถุประสงค์</label>
+      <select data-f="purpose"><option value="formula">สูตร / ส่วนผสมใหม่</option>
+        <option value="material">วัตถุดิบใหม่ หรือเปลี่ยนผู้ขาย</option>
+        <option value="machine">เครื่องจักร / แม่พิมพ์ใหม่</option>
+        <option value="param">ปรับพารามิเตอร์</option>
+        <option value="other">อื่น ๆ</option></select></div>
+    <div class="f"><label>เปลี่ยนจากของเดิมอย่างไร</label><textarea data-f="change" rows="2"></textarea></div>
+    <div class="grid2">
+      <div class="f"><label>จำนวนที่จะผลิต</label><input data-f="qty"></div>
+      <div class="f"><label>สาย / เครื่องจักร</label><input data-f="line"></div>
+      <div class="f"><label>กะ / ช่วงเวลา</label><input data-f="shift"></div>
+      <div class="f"><label>ผู้ควบคุมการทดลอง</label><input data-f="leader"></div>
+    </div>
+
+    <h2 style="margin-top:14px">พารามิเตอร์ที่จะใช้</h2>
+    <table class="rowgrid"><thead><tr><th>พารามิเตอร์</th><th style="width:24%">ค่าเดิม</th>
+      <th style="width:24%">ค่าที่จะลอง</th><th style="width:8%"></th></tr></thead>
+      <tbody id="trialPars"></tbody></table>
+    <button class="ghost" data-addtb="0" style="margin-top:6px">+ เพิ่มพารามิเตอร์</button>
+
+    <h2 style="margin-top:14px">ข้อมูลที่ต้องเก็บ</h2>
+    <table class="rowgrid"><thead><tr><th>หัวข้อ</th><th style="width:30%">วิธีวัด</th>
+      <th style="width:16%">จำนวนตัวอย่าง</th><th style="width:8%"></th></tr></thead>
+      <tbody id="trialChecks"></tbody></table>
+    <button class="ghost" data-addtb="1" style="margin-top:6px">+ เพิ่มหัวข้อ</button>
+
+    <div class="grid2" style="margin-top:10px">
+      <div class="f"><label>ความเสี่ยง / ข้อควรระวัง</label><input data-f="risk"></div>
+      <div class="f"><label>ของที่ได้จะจัดการอย่างไร</label>
+        <input data-f="disposal" placeholder="เช่น กักรอผลตรวจ ห้ามปนกับของขาย"></div>
+    </div>
+
+    <h2 style="margin-top:14px">ผู้ลงนาม</h2>
+    <div class="grid3">
+      <div class="f"><label>R&amp;D (ผู้ขอ)</label><input data-g="0" placeholder="ชื่อ"></div>
+      <div class="f"><label>Production</label><input data-g="1" placeholder="ชื่อ"></div>
+      <div class="f"><label>QA / QC</label><input data-g="2" placeholder="ชื่อ"></div>
+    </div>
+  </div>
+
   <div class="card" id="parCard" hidden>
     <h2 id="parTitle">พารามิเตอร์</h2>
     <div id="parBody" class="grid2"></div>
@@ -915,10 +1013,9 @@ function render() {
     paginate();
     return;
   }
-  if (docType === 'APV') {                  // ใบอนุมัติผลิตเป็นฟอร์ม ไม่มีรายการรูป
-    renderApvEditor();
-    $('msg').textContent = 'เอกสารแนบ ' + apv.attach.filter(a => a.on).length
-      + ' รายการ · หัวข้อทดสอบ ' + apv.tests.filter(t => t.item.trim()).length + ' หัวข้อ';
+  if (FORMS[docType]) {                     // เอกสารที่เป็นฟอร์ม ไม่มีรายการรูป
+    (docType === 'APV' ? renderApvEditor : FORMS[docType].editor)();
+    $('msg').textContent = FORMS[docType].msg();
     $('xls').disabled = false; $('print').disabled = false;
     $('parCard').hidden = true;
     paginate();
@@ -981,7 +1078,7 @@ $('steps').addEventListener('click', e => {
 $('clear').onclick = () => { items = []; render(); };
 document.querySelectorAll('.card input').forEach(el => el.addEventListener('input', paginate));
 function setPageCss() {
-  const orient = docType === 'APV'
+  const orient = FORMS[docType]
     || (docType === 'SIGN' && $('signOrient').value === 'portrait') ? 'portrait' : 'landscape';
   $('pagecss').textContent = '@page{size:' + $('paper').value + ' ' + orient + '}';
 }
@@ -1028,6 +1125,12 @@ const DOC_INFO = {
   APV:  { h1: 'ใบอนุมัติผลิต (Mass Production Approval)',
           sub: 'R&D ส่งมอบงานให้ฝ่ายผลิต — สรุปผลทดลองผลิต เอกสารอ้างอิง และลายเซ็นอนุมัติ 4 ฝ่าย',
           drop: '' },
+  ECR:  { h1: 'ใบขอเปลี่ยนแปลงแบบ / กระบวนการ (ECR)',
+          sub: 'ขอแก้แบบ วัตถุดิบ หรือกระบวนการ พร้อมผลกระทบและเอกสารที่ต้องแก้ตาม',
+          drop: '' },
+  TRIAL: { h1: 'ใบขอทดลองผลิต (Trial Run Request)',
+          sub: 'ขอลองผลิตก่อนขออนุมัติจริง — ตั้งพารามิเตอร์ วางแผนเก็บข้อมูล และจัดการของที่ได้',
+          drop: '' },
   SIGN: { h1: 'สร้างป้ายความปลอดภัย',
           sub: 'ป้ายห้าม / เตือน / บังคับ / ภาวะปลอดภัย / อุปกรณ์ดับเพลิง ตามรูปทรงและสีมาตรฐาน ISO 3864',
           drop: 'รูปสัญลักษณ์ของแต่ละป้าย (ไม่ใส่ก็ได้)' },
@@ -1068,6 +1171,7 @@ const TAB_META = {
   CP:    ['🛡️', 'Control Plan', 'แผนควบคุมกระบวนการ'],
   MSA:   ['📐', 'Gage R&R', 'ตรวจระบบการวัด (MSA)'],
   CIL:   ['🧼', 'CIL Standard', 'สะอาด / ตรวจ / หล่อลื่น'],
+  LOTO:  ['🔒', 'LOTO', 'ตัดแยกพลังงานก่อนซ่อม'],
   ROUTE: ['🧭', 'Routing Sheet', 'ลำดับขั้นการผลิต'],
   BOM:   ['🧱', 'BOM', 'รายการวัตถุดิบ'],
   TIME:  ['⏱️', 'Time Study', 'จับเวลาหาเวลามาตรฐาน'],
@@ -1080,13 +1184,15 @@ const TAB_META = {
   EQUIP: ['🧰', 'ทะเบียนอุปกรณ์', 'Jig / Fixture / Gauge'],
   SKILL: ['👥', 'Skill Matrix', 'ตารางทักษะ + OJT'],
   APV:   ['✅', 'ใบอนุมัติผลิต', 'R&D → ฝ่ายผลิต'],
+  TRIAL: ['🧪', 'ใบขอทดลองผลิต', 'ขอลองก่อนอนุมัติจริง'],
+  ECR:   ['📝', 'ECR / ECN', 'ขอเปลี่ยนแบบหรือกระบวนการ'],
 };
 const DEPT = [
   ['ช่างเทคนิค', 'เอกสารที่ใช้หน้างาน', ['WI', 'OPL', 'SIGN', 'QP', 'CHECK', 'SET']],
   ['วิศวกรรม', 'วิเคราะห์และปรับปรุงกระบวนการ',
    ['ROUTE', 'BOM', 'TIME', 'CAP', 'LINE', 'SMED', 'DIAG', 'FMEA', 'CP', 'QC', 'MSA']],
-  ['ซ่อมบำรุง', 'มาตรฐาน เครื่องมือ และกำลังคน', ['CIL', 'EQUIP', 'SKILL']],
-  ['R&D', 'ส่งมอบงานให้ฝ่ายผลิต', ['APV']],
+  ['ซ่อมบำรุง', 'มาตรฐาน ความปลอดภัย และกำลังคน', ['CIL', 'LOTO', 'EQUIP', 'SKILL']],
+  ['R&D', 'ขอทดลอง เปลี่ยนแปลง และส่งมอบงาน', ['TRIAL', 'ECR', 'APV']],
 ];
 
 let navDept = 0;                     // ส่วนงานที่กำลังเปิดดูอยู่ ไม่ใช่ของเอกสารที่กำลังทำ
@@ -1120,7 +1226,7 @@ function switchTab(e) {
                             drop: '' });
   $('h1').textContent = info.h1; $('sub').textContent = info.sub;
   $('drop').style.display =
-    (TABLES[docType] || docType === 'SKILL' || docType === 'APV') ? 'none' : '';
+    (TABLES[docType] || docType === 'SKILL' || FORMS[docType]) ? 'none' : '';
   if (!TABLES[docType]) $('drop').querySelector('span').textContent = info.drop;
   document.querySelectorAll('[class*="only-"]').forEach(el => {
     el.hidden = !el.className.split(/\s+/).includes('only-' + docType);
@@ -1241,6 +1347,72 @@ function paginateQP(h, size, stage) {
 }
 
 /* =======================================================================
+   โครงหน้าของเอกสารที่เป็น "ฟอร์ม" — ใบอนุมัติผลิต / ECR / ใบขอทดลองผลิต ใช้ร่วมกัน
+   ทุกตัวพิมพ์แนวตั้ง และต้องไม่ปล่อยให้เนื้อหาล้นแล้วถูก overflow:hidden ตัดทิ้งเงียบ ๆ
+   ======================================================================= */
+function formPage(h, size, title) {
+  const page = () => newPage(h, size, title, true);
+  let body = page();
+  const over = () => body.scrollHeight > body.clientHeight + 1;
+  const add = html => body.insertAdjacentHTML('beforeend', html);
+
+  /* ใส่ก้อนหนึ่งลงหน้าปัจจุบัน ถ้าล้นก็ถอดออกแล้วขึ้นหน้าใหม่ */
+  const block = html => {
+    const n = body.children.length;
+    add(html);
+    if (over() && n > 1) {
+      [...body.children].slice(n).forEach(el => el.remove());
+      body = page(); add(html);
+    }
+  };
+
+  /* ตารางยาว ๆ ใส่ทีละแถว ล้นเมื่อไหร่ขึ้นหน้าใหม่พร้อมเขียนหัวตารางซ้ำให้ */
+  const list = (ttl, headHtml, rows, rowHtml) => {
+    let tb;
+    const start = suffix => {
+      add(`<div class="apv-h">${ttl}${suffix}</div>
+           <table class="apvlist"><thead>${headHtml}</thead><tbody></tbody></table>`);
+      const all = body.querySelectorAll('.apvlist');
+      tb = all[all.length - 1].querySelector('tbody');
+    };
+    const n = body.children.length;
+    start('');
+    if (over() && n > 1) {                       // หัวข้อ + หัวตารางยังไม่พอที่ด้วยซ้ำ
+      [...body.children].slice(n).forEach(el => el.remove());
+      body = page(); start('');
+    }
+    rows.forEach(r => {
+      tb.insertAdjacentHTML('beforeend', rowHtml(r));
+      if (over() && tb.rows.length > 1) {
+        tb.lastElementChild.remove();
+        body = page(); start(' (ต่อ)');
+        tb.insertAdjacentHTML('beforeend', rowHtml(r));
+      }
+    });
+  };
+  return { add, block, list };
+}
+
+/* ชิ้นส่วนย่อยของฟอร์ม ใช้ซ้ำได้ทุกใบ */
+const fCell = (l, v) => `<td class="apv-l">${l}</td><td class="apv-v">${esc(v) || '&nbsp;'}</td>`;
+const fHead = t => `<div class="apv-h">${t}</div>`;
+const fNote = (l, v) => `<div class="apv-note"><b>${l} :</b> ${nl(v)}</div>`;
+/* รายการให้ติ๊กเลือก — cur คือค่าที่เลือกอยู่ */
+const fPick = (opts, cur) => `<div class="apv-box">${opts.map(([k, t, d]) =>
+  `<div class="apv-opt"><i class="opl-box">${cur === k ? '✓' : ''}</i>
+     <span><b>${t}</b>${d ? ' — ' + d : ''}</span></div>`).join('')}</div>`;
+/* แถวลงนาม — แบ่งช่องเท่า ๆ กันตามจำนวนผู้ลงนาม */
+const fSign = list => `<table class="sign apvsign"><tr>${list.map(sg =>
+  `<td><b>${esc(sg.role)}</b><br>${esc(sg.th)}<br><br>….....................................<br>
+    ( ${esc(sg.name) || '.....................................'} )<br>
+    วันที่ ......... / ......... / .........</td>`).join('')}</tr></table>`;
+/* แปลงรายชื่อบทบาท 'EN|ไทย' + ชื่อที่กรอก ให้อยู่ในรูปที่ fSign และ Excel ใช้ได้ */
+const fRoles = (roles, names) => roles.map((r, i) => {
+  const [en, th] = r.split('|');
+  return { role: en, th, name: (names || [])[i] || '' };
+});
+
+/* =======================================================================
    ใบอนุมัติผลิต (Mass Production Approval) — เอกสารส่งมอบงานของแผนก R&D
    ฟอร์มล้วน ไม่มีรูป จึงมีตัวจัดหน้าและตัวเขียน Excel ของตัวเอง
    ======================================================================= */
@@ -1296,64 +1468,15 @@ $('apvCard').addEventListener('click', e => {
   renderApvEditor(); paginate();
 });
 
-function apvSignRow() {
-  return `<table class="sign apvsign"><tr>${APV_ROLE.map((role, i) => {
-    const [en, th] = role.split('|');
-    return `<td><b>${en}</b><br>${th}<br><br>….....................................<br>
-      ( ${esc(apv.signs[i]) || '.....................................'} )<br>
-      วันที่ ......... / ......... / .........</td>`;
-  }).join('')}</tr></table>`;
-}
-
 function paginateAPV(h, size, stage) {
-  const page = () => newPage(h, size, 'ใบอนุมัติผลิต (MASS PRODUCTION APPROVAL)', true);
-  let body = page();
-  const over = () => body.scrollHeight > body.clientHeight + 1;
-  const add = html => body.insertAdjacentHTML('beforeend', html);
-
-  /* ใส่ก้อนหนึ่งลงหน้าปัจจุบัน ถ้าล้นก็ถอดออกแล้วขึ้นหน้าใหม่ ไม่ปล่อยให้โดนตัดทิ้ง */
-  const block = html => {
-    const n = body.children.length;
-    add(html);
-    if (over() && n > 1) {
-      [...body.children].slice(n).forEach(el => el.remove());
-      body = page(); add(html);
-    }
-  };
-
-  /* ตารางยาว ๆ ใส่ทีละแถว ล้นเมื่อไหร่ขึ้นหน้าใหม่พร้อมเขียนหัวตารางซ้ำให้ */
-  const list = (title, headHtml, rows, rowHtml) => {
-    let tb;
-    const start = suffix => {
-      add(`<div class="apv-h">${title}${suffix}</div>
-           <table class="apvlist"><thead>${headHtml}</thead><tbody></tbody></table>`);
-      const all = body.querySelectorAll('.apvlist');
-      tb = all[all.length - 1].querySelector('tbody');
-    };
-    const n = body.children.length;
-    start('');
-    if (over() && n > 1) {                       // หัวข้อ + หัวตารางยังไม่พอที่ด้วยซ้ำ
-      [...body.children].slice(n).forEach(el => el.remove());
-      body = page(); start('');
-    }
-    rows.forEach(r => {
-      tb.insertAdjacentHTML('beforeend', rowHtml(r));
-      if (over() && tb.rows.length > 1) {
-        tb.lastElementChild.remove();
-        body = page(); start(' (ต่อ)');
-        tb.insertAdjacentHTML('beforeend', rowHtml(r));
-      }
-    });
-  };
-
-  const cell = (l, v) => `<td class="apv-l">${l}</td><td class="apv-v">${esc(v) || '&nbsp;'}</td>`;
+  const { add, block, list } = formPage(h, size, 'ใบอนุมัติผลิต (MASS PRODUCTION APPROVAL)');
   add(`<table class="apvtab">
-      <tr>${cell('ชื่อโครงการ / ผลิตภัณฑ์', apv.product)}${cell('รหัสสินค้า (Part No. / SKU)', apv.partno)}</tr>
-      <tr>${cell('ผู้รับผิดชอบ (R&D)', apv.rdEng)}${cell('Lot ทดลองผลิต', apv.lot)}</tr>
+      <tr>${fCell('ชื่อโครงการ / ผลิตภัณฑ์', apv.product)}${fCell('รหัสสินค้า (Part No. / SKU)', apv.partno)}</tr>
+      <tr>${fCell('ผู้รับผิดชอบ (R&D)', apv.rdEng)}${fCell('Lot ทดลองผลิต', apv.lot)}</tr>
     </table>`);
 
-  block(`<div class="apv-h">1. ผลการอนุมัติ (Approval Status)</div>
-     <div class="apv-box">${APV_ST.map(([k, t, dsc]) =>
+  block(fHead('1. ผลการอนุมัติ (Approval Status)')
+    + `<div class="apv-box">${APV_ST.map(([k, t, dsc]) =>
       `<div class="apv-opt"><i class="opl-box">${apv.status === k ? '✓' : ''}</i>
          <span><b>${t}</b> — ${dsc}</span></div>`).join('')}
        <div class="apv-cond"><b>เงื่อนไข / เหตุผล :</b> ${nl(apv.cond)}</div></div>`);
@@ -1378,7 +1501,161 @@ function paginateAPV(h, size, stage) {
   block(`<div class="apv-note"><b>อัตราของเสีย :</b> ${esc(apv.defect) || '–'}
      &nbsp;&nbsp;|&nbsp;&nbsp; <b>ข้อสังเกต :</b> ${esc(apv.obs) || '–'}</div>`);
 
-  block(`<div class="apv-h">4. ลงนามอนุมัติ (Sign-off)</div>` + apvSignRow());
+  block(fHead('4. ลงนามอนุมัติ (Sign-off)') + fSign(fRoles(APV_ROLE, apv.signs)));
+}
+
+/* =======================================================================
+   ECR / ECN — ใบขอเปลี่ยนแปลงแบบหรือกระบวนการ (ISO 9001 ข้อ 8.5.6 ควบคุมการเปลี่ยนแปลง)
+   ======================================================================= */
+const ECR_TYPE = { design: 'แก้แบบ / ขนาด', material: 'เปลี่ยนวัตถุดิบ',
+                   process: 'เปลี่ยนกระบวนการ / เครื่องจักร', doc: 'แก้เอกสารอย่างเดียว' };
+const ECR_WHY = { quality: 'ปัญหาคุณภาพ', cost: 'ลดต้นทุน', customer: 'ลูกค้าขอ',
+                  safety: 'ความปลอดภัย', other: 'อื่น ๆ' };
+const ECR_ROLE = ['Requester|ผู้ขอเปลี่ยนแปลง', 'R&D / Engineering|ผู้ประเมินทางเทคนิค',
+                  'Production|ผู้รับไปปฏิบัติ', 'QA / QC|ผู้อนุมัติด้านคุณภาพ'];
+const ecr = {
+  product: '', partno: '', revOld: '', revNew: '', type: 'design', why: 'quality',
+  whyNote: '', before: '', after: '',
+  docs: [0, 0, 0].map(() => ({ name: '', no: '', rOld: '', rNew: '' })),
+  impStock: '', impWip: '', impJig: '', impCost: '', impCustomer: '',
+  verify: '', effDate: '', effLot: '', signs: ['', '', '', ''],
+};
+
+/* =======================================================================
+   ใบขอทดลองผลิต — เอกสารที่มาก่อนใบอนุมัติผลิต
+   ======================================================================= */
+const TRIAL_PURPOSE = { formula: 'สูตร / ส่วนผสมใหม่', material: 'วัตถุดิบใหม่ หรือเปลี่ยนผู้ขาย',
+                        machine: 'เครื่องจักร / แม่พิมพ์ใหม่', param: 'ปรับพารามิเตอร์', other: 'อื่น ๆ' };
+const TRIAL_ROLE = ['R&D|ผู้ขอทดลอง', 'Production|ผู้จัดสายผลิต', 'QA / QC|ผู้ตรวจคุณภาพ'];
+const trial = {
+  product: '', partno: '', reqBy: '', wantDate: '', purpose: 'formula', change: '',
+  qty: '', line: '', shift: '', leader: '',
+  pars: [0, 0, 0].map(() => ({ name: '', old: '', tryv: '' })),
+  checks: [0, 0].map(() => ({ item: '', how: '', n: '' })),
+  risk: '', disposal: '', signs: ['', '', ''],
+};
+
+/* ผูกช่องกรอกของการ์ดฟอร์มเข้ากับก้อนข้อมูล — ใช้ได้ทั้ง ECR และใบขอทดลองผลิต
+   data-f = ช่องเดี่ยว · data-g = ชื่อผู้ลงนาม · data-tb + data-row + data-k = ช่องในตารางย่อย */
+function bindForm(cardId, obj, tbNames, redraw) {
+  const card = $(cardId);
+  card.addEventListener('input', e => {
+    const d = e.target.dataset;
+    if (d.f !== undefined) obj[d.f] = e.target.value;
+    else if (d.g !== undefined) obj.signs[+d.g] = e.target.value;
+    else if (d.row !== undefined) obj[tbNames[+d.tb]][+d.row][d.k] = e.target.value;
+    else return;
+    paginate();                       // ไม่วาดการ์ดใหม่ เคอร์เซอร์จะได้ไม่เด้ง
+  });
+  card.addEventListener('click', e => {
+    const d = e.target.dataset;
+    if (d.rm !== undefined) obj[tbNames[+d.tb]].splice(+d.rm, 1);
+    else if (d.addtb !== undefined) obj[tbNames[+d.addtb]].push({});
+    else return;
+    redraw(); paginate();
+  });
+}
+
+/* วาดตารางย่อยในการ์ด — cols คือ [คีย์, placeholder] */
+const formRows = (tbIdx, rows, cols) => rows.map((r, i) => '<tr>'
+  + cols.map(([k, ph]) => `<td><input data-tb="${tbIdx}" data-row="${i}" data-k="${k}"`
+      + ` value="${esc(r[k] || '')}"${ph ? ` placeholder="${ph}"` : ''}></td>`).join('')
+  + `<td class="c"><button class="del" data-tb="${tbIdx}" data-rm="${i}">ลบ</button></td></tr>`).join('');
+
+function renderEcrEditor() {
+  $('ecrDocs').innerHTML = formRows(0, ecr.docs,
+    [['name', 'เช่น WI รีดพื้น'], ['no', ''], ['rOld', ''], ['rNew', '']]);
+}
+function renderTrialEditor() {
+  $('trialPars').innerHTML = formRows(0, trial.pars, [['name', ''], ['old', ''], ['tryv', '']]);
+  $('trialChecks').innerHTML = formRows(1, trial.checks, [['item', ''], ['how', ''], ['n', '']]);
+}
+bindForm('ecrCard', ecr, ['docs'], renderEcrEditor);
+bindForm('trialCard', trial, ['pars', 'checks'], renderTrialEditor);
+
+/* เอกสารที่เป็นฟอร์ม : พิมพ์แนวตั้ง ไม่มีรายการรูป และมีการ์ดกรอกของตัวเอง */
+const FORMS = {
+  APV:   { editor: () => {}, msg: () => 'เอกสารแนบ ' + apv.attach.filter(a => a.on).length
+             + ' รายการ · หัวข้อทดสอบ ' + apv.tests.filter(t => t.item.trim()).length + ' หัวข้อ' },
+  ECR:   { editor: () => renderEcrEditor(), msg: () => 'เอกสารที่ต้องแก้ตาม '
+             + ecr.docs.filter(d => String(d.name || '').trim()).length + ' ฉบับ' },
+  TRIAL: { editor: () => renderTrialEditor(), msg: () => 'พารามิเตอร์ '
+             + trial.pars.filter(p => String(p.name || '').trim()).length + ' ตัว · หัวข้อเก็บข้อมูล '
+             + trial.checks.filter(c => String(c.item || '').trim()).length + ' หัวข้อ' },
+};
+
+function paginateECR(h, size, stage) {
+  const { add, block, list } = formPage(h, size, 'ใบขอเปลี่ยนแปลง (ENGINEERING CHANGE REQUEST)');
+  add(`<table class="apvtab">
+      <tr>${fCell('ผลิตภัณฑ์ / ชิ้นงาน', ecr.product)}${fCell('รหัสสินค้า (Part No.)', ecr.partno)}</tr>
+      <tr>${fCell('Rev ปัจจุบัน', ecr.revOld)}${fCell('Rev ใหม่ที่จะเป็น', ecr.revNew)}</tr>
+    </table>`);
+
+  block(fHead('1. ประเภทและเหตุผล')
+    + fPick(Object.keys(ECR_TYPE).map(k => [k, ECR_TYPE[k], '']), ecr.type)
+    + `<div class="apv-box" style="border-top:0">
+         <b>เหตุผล :</b> ${esc(ECR_WHY[ecr.why] || '-')}
+         <div class="apv-cond">${nl(ecr.whyNote)}</div></div>`);
+
+  block(fHead('2. ของเดิม → ของใหม่')
+    + `<table class="apvtab"><tr>
+         <td class="apv-l" style="width:14%">ของเดิม</td><td>${nl(ecr.before)}</td></tr>
+       <tr><td class="apv-l">จะเปลี่ยนเป็น</td><td>${nl(ecr.after)}</td></tr></table>`);
+
+  const docs = ecr.docs.filter(d => String(d.name || '').trim() || String(d.no || '').trim());
+  list('3. เอกสารที่ต้องแก้ตาม',
+    `<tr><th>ชื่อเอกสาร</th><th style="width:24%">เลขที่</th>
+       <th style="width:12%">Rev เดิม</th><th style="width:12%">Rev ใหม่</th></tr>`,
+    docs.length ? docs : [{}],
+    d => `<tr><td>${esc(d.name) || '&nbsp;'}</td><td>${esc(d.no) || '&nbsp;'}</td>
+       <td class="c">${esc(d.rOld) || '&nbsp;'}</td><td class="c">${esc(d.rNew) || '&nbsp;'}</td></tr>`);
+
+  block(fHead('4. ผลกระทบและการทวนสอบ')
+    + `<table class="apvtab">
+       <tr>${fCell('ของคงเหลือในสต็อก', ecr.impStock)}${fCell('งานระหว่างผลิต', ecr.impWip)}</tr>
+       <tr>${fCell('แม่พิมพ์ / Jig', ecr.impJig)}${fCell('ต้นทุน', ecr.impCost)}</tr>
+       <tr>${fCell('ลูกค้าต้องอนุมัติ', ecr.impCustomer)}${fCell('ต้องทวนสอบก่อน', ecr.verify)}</tr>
+       <tr>${fCell('วันที่เริ่มมีผล', ecr.effDate)}${fCell('เริ่มที่ Lot / Serial', ecr.effLot)}</tr>
+     </table>`);
+
+  block(fHead('5. ลงนาม') + fSign(fRoles(ECR_ROLE, ecr.signs)));
+}
+
+function paginateTRIAL(h, size, stage) {
+  const { add, block, list } = formPage(h, size, 'ใบขอทดลองผลิต (TRIAL RUN REQUEST)');
+  add(`<table class="apvtab">
+      <tr>${fCell('ผลิตภัณฑ์ / โครงการ', trial.product)}${fCell('รหัสสินค้า (Part No.)', trial.partno)}</tr>
+      <tr>${fCell('ผู้ขอทดลอง', trial.reqBy)}${fCell('วันที่ต้องการทดลอง', trial.wantDate)}</tr>
+    </table>`);
+
+  block(fHead('1. วัตถุประสงค์')
+    + fPick(Object.keys(TRIAL_PURPOSE).map(k => [k, TRIAL_PURPOSE[k], '']), trial.purpose)
+    + `<div class="apv-note"><b>เปลี่ยนจากของเดิมอย่างไร :</b> ${nl(trial.change)}</div>`);
+
+  block(fHead('2. แผนการทดลอง')
+    + `<table class="apvtab">
+       <tr>${fCell('จำนวนที่จะผลิต', trial.qty)}${fCell('สาย / เครื่องจักร', trial.line)}</tr>
+       <tr>${fCell('กะ / ช่วงเวลา', trial.shift)}${fCell('ผู้ควบคุมการทดลอง', trial.leader)}</tr>
+     </table>`);
+
+  const ps = trial.pars.filter(p => String(p.name || '').trim());
+  list('3. พารามิเตอร์ที่จะใช้',
+    `<tr><th>พารามิเตอร์</th><th style="width:26%">ค่าเดิม</th><th style="width:26%">ค่าที่จะลอง</th></tr>`,
+    ps.length ? ps : [{}],
+    p => `<tr><td>${esc(p.name) || '&nbsp;'}</td><td>${esc(p.old) || '&nbsp;'}</td>
+       <td>${esc(p.tryv) || '&nbsp;'}</td></tr>`);
+
+  const cks = trial.checks.filter(c => String(c.item || '').trim());
+  list('4. ข้อมูลที่ต้องเก็บระหว่างทดลอง',
+    `<tr><th>หัวข้อ</th><th style="width:34%">วิธีวัด</th><th style="width:18%">จำนวนตัวอย่าง</th></tr>`,
+    cks.length ? cks : [{}],
+    c => `<tr><td>${esc(c.item) || '&nbsp;'}</td><td>${esc(c.how) || '&nbsp;'}</td>
+       <td class="c">${esc(c.n) || '&nbsp;'}</td></tr>`);
+
+  block(fNote('ความเสี่ยง / ข้อควรระวัง', trial.risk)
+    + fNote('ของที่ได้จะจัดการอย่างไร', trial.disposal));
+
+  block(fHead('5. ลงนาม') + fSign(fRoles(TRIAL_ROLE, trial.signs)));
 }
 
 /* =======================================================================
@@ -1829,6 +2106,45 @@ const TABLES = {
         rows.push(['Cpk', F(cpk, 2) + (cpk >= 1.33 ? ' (ผ่านเกณฑ์ ≥1.33)'
                           : cpk >= 1.00 ? ' (พอใช้ — ควรปรับปรุง)' : ' (ไม่ผ่าน ต้องแก้ไข)')]);
       }
+      return rows;
+    },
+  },
+
+  /* LOTO — ขั้นตอนตัดแยกพลังงานรายเครื่อง ตามหลัก Lock-Out / Tag-Out
+     หัวใจอยู่ที่ "วิธีพิสูจน์ว่าพลังงานเป็นศูนย์" แถวที่ไม่มีช่องนี้คือแถวที่ฆ่าคนได้ */
+  LOTO: {
+    title: 'LOCK-OUT / TAG-OUT (ขั้นตอนตัดแยกพลังงาน)',
+    pars: [{ id: 'lotomc', l: 'เครื่องจักร / อุปกรณ์', v: '' },
+           { id: 'lotowork', l: 'งานที่จะทำ (เช่น เปลี่ยนใบมีด)', v: '' }],
+    cols: [
+      { k: 'src',    h: 'แหล่งพลังงาน',            w: 10, t: 'text' },
+      { k: 'loc',    h: 'ตำแหน่งอุปกรณ์ตัดแยก',    w: 13, t: 'text' },
+      { k: 'dev',    h: 'ชนิดอุปกรณ์',             w: 10, t: 'text' },
+      { k: 'act',    h: 'วิธีตัดแยก',              w: 12, t: 'text' },
+      { k: 'lock',   h: 'จุดคล้องกุญแจ / เลขแท็ก', w: 9,  t: 'text' },
+      { k: 'stored', h: 'พลังงานตกค้าง + วิธีปล่อย', w: 13, t: 'text' },
+      { k: 'verify', h: 'วิธีพิสูจน์ว่าเป็นศูนย์',  w: 14, t: 'text' },
+      { k: 'who',    h: 'ผู้รับผิดชอบ',            w: 8,  t: 'text' },
+    ],
+    /* ไม่มีวิธีพิสูจน์ = ไม่รู้ว่าตัดจริงหรือยัง ขึ้นแดงไม่ใช่เหลือง */
+    hi: r => !!(String(r.src || '').trim() && !String(r.verify || '').trim()),
+    sum: (cs, ps) => {
+      const live = cs.filter(r => String(r.src || '').trim());
+      const miss = k => live.filter(r => !String(r[k] || '').trim()).length;
+      const noVerify = miss('verify'), noStored = miss('stored'), noLock = miss('lock');
+      const rows = [['เครื่องจักร / อุปกรณ์', ps.lotomc || '-'],
+        ['งานที่จะทำ', ps.lotowork || '-'],
+        ['จำนวนแหล่งพลังงาน', live.length + ' แหล่ง'],
+        ['แหล่งที่ระบุไว้', live.map(r => String(r.src).trim()).join(' · ') || '-']];
+      if (noVerify) rows.push(['⚠ ยังไม่ระบุวิธีพิสูจน์',
+        noVerify + ' แหล่ง  ← ห้ามใช้เอกสารนี้จนกว่าจะเติมครบ']);
+      if (noStored) rows.push(['ยังไม่ระบุพลังงานตกค้าง', noStored + ' แหล่ง']);
+      if (noLock) rows.push(['ยังไม่ระบุจุดคล้องกุญแจ', noLock + ' แหล่ง']);
+      if (!noVerify && !noStored && !noLock && live.length)
+        rows.push(['ความครบถ้วน', 'ครบทุกช่อง พร้อมใช้งาน']);
+      rows.push(['ลำดับที่ต้องทำ',
+        'แจ้งผู้เกี่ยวข้อง → หยุดเครื่องตามขั้นตอน → ตัดแยกทุกแหล่งข้างต้น → คล้องกุญแจ+แขวนแท็ก'
+        + ' → ปล่อยพลังงานตกค้าง → พิสูจน์ว่าเป็นศูนย์ → เริ่มงาน']);
       return rows;
     },
   },
@@ -2553,7 +2869,8 @@ function paginate() {
   if (docType !== 'WI') {                      // เอกสารประเภทอื่นมีตัวจัดหน้าของตัวเอง
     (TABLES[docType] ? paginateTABLE
       : { QP: paginateQP, OPL: paginateOPL, SIGN: paginateSIGN, DIAG: paginateDIAG,
-          SKILL: paginateSKILL, APV: paginateAPV }[docType])(h, size, stage);
+          SKILL: paginateSKILL, APV: paginateAPV, ECR: paginateECR,
+          TRIAL: paginateTRIAL }[docType])(h, size, stage);
     waitImages(stage);
     const pg = stage.querySelectorAll('.page');
     pg.forEach((p, i) => {
@@ -3213,12 +3530,109 @@ function dataAPV() {
   };
 }
 
+/* ตัวเขียน Excel ของเอกสารที่เป็นฟอร์ม — รับเนื้อหาเป็นข้อมูล ใช้ร่วมกันได้ทุกใบ
+   8 คอลัมน์เท่ากัน ลงตัวทั้งคู่ป้าย-ค่า (2+2+2+2) และช่องลงนาม 2-4 ช่อง */
+function xlForm(wb, h, d, paper) {
+  const n = 8;
+  const ws = xlSheet(wb, d.sheet, [7, 13, 13, 13, 13, 13, 13, 13], paper, true);
+  let r = xlHead(ws, wb, h, n, 1, d.title, 1, 1);
+  const sp = (c1, c2, v, o) => xspan(ws, r, c1, c2, v, o);
+  const BOLD = { align: XM, font: { bold: true }, fill: 'FFF2F2F2' };
+
+  for (const b of d.blocks) {
+    if (b[0] === 'head') {
+      sp(1, n, b[1], { align: XM, font: { bold: true }, fill: 'FFE8E8E8' });
+      ws.getRow(r).height = 20; r++;
+    } else if (b[0] === 'pair') {
+      sp(1, 2, b[1], BOLD); sp(3, 4, b[2], { align: XM });
+      sp(5, 6, b[3], BOLD); sp(7, n, b[4], { align: XM });
+      ws.getRow(r).height = 22; r++;
+    } else if (b[0] === 'note') {
+      sp(1, 2, b[1], BOLD); sp(3, n, b[2], { align: XM });
+      ws.getRow(r).height = b[3] || 38; r++;
+    } else if (b[0] === 'pick') {
+      b[1].forEach(([mark, text]) => {
+        xput(ws, r, 1, mark, { align: XC, font: { bold: true } });
+        sp(2, n, text, { align: XM });
+        ws.getRow(r).height = 20; r++;
+      });
+    } else if (b[0] === 'table') {
+      const bounds = []; let c = 1;
+      b[3].forEach(k => { bounds.push([c, c + k - 1]); c += k; });
+      b[1].forEach((t, i) => sp(bounds[i][0], bounds[i][1], t, { align: XC, font: { bold: true }, fill: 'FFF2F2F2' }));
+      ws.getRow(r).height = 20; r++;
+      b[2].forEach(row => {
+        row.forEach((v, i) => sp(bounds[i][0], bounds[i][1], v, { align: XM }));
+        ws.getRow(r).height = 22; r++;
+      });
+    } else if (b[0] === 'signs') {
+      const k = Math.max(1, Math.floor(n / b[1].length));
+      b[1].forEach((sg, i) => sp(i * k + 1, i === b[1].length - 1 ? n : (i + 1) * k,
+        sg.role + '\n(' + sg.th + ')\n\n….....................................\n( '
+        + (sg.name || '.....................................') + ' )\nวันที่ ......... / ......... / .........',
+        { align: { horizontal: 'center', vertical: 'bottom', wrapText: true } }));
+      ws.getRow(r).height = 104; r++;
+    }
+  }
+  return ws;
+}
+
+function dataECR() {
+  const docs = ecr.docs.filter(d => String(d.name || '').trim() || String(d.no || '').trim());
+  return { sheet: 'ECR', title: 'ใบขอเปลี่ยนแปลง (ENGINEERING CHANGE REQUEST)', blocks: [
+    ['pair', 'ผลิตภัณฑ์ / ชิ้นงาน', ecr.product, 'รหัสสินค้า (Part No.)', ecr.partno],
+    ['pair', 'Rev ปัจจุบัน', ecr.revOld, 'Rev ใหม่ที่จะเป็น', ecr.revNew],
+    ['head', '1. ประเภทและเหตุผล'],
+    ['pick', Object.keys(ECR_TYPE).map(k => [ecr.type === k ? '✓' : '', ECR_TYPE[k]])],
+    ['note', 'เหตุผล', (ECR_WHY[ecr.why] || '-') + (ecr.whyNote ? '\n' + ecr.whyNote : ''), 38],
+    ['head', '2. ของเดิม → ของใหม่'],
+    ['note', 'ของเดิม', ecr.before, 44],
+    ['note', 'จะเปลี่ยนเป็น', ecr.after, 44],
+    ['head', '3. เอกสารที่ต้องแก้ตาม'],
+    ['table', ['ชื่อเอกสาร', 'เลขที่', 'Rev เดิม', 'Rev ใหม่'],
+      (docs.length ? docs : [{}]).map(d => [d.name || '', d.no || '', d.rOld || '', d.rNew || '']),
+      [3, 2, 2, 1]],
+    ['head', '4. ผลกระทบและการทวนสอบ'],
+    ['pair', 'ของคงเหลือในสต็อก', ecr.impStock, 'งานระหว่างผลิต', ecr.impWip],
+    ['pair', 'แม่พิมพ์ / Jig', ecr.impJig, 'ต้นทุน', ecr.impCost],
+    ['pair', 'ลูกค้าต้องอนุมัติ', ecr.impCustomer, 'ต้องทวนสอบก่อน', ecr.verify],
+    ['pair', 'วันที่เริ่มมีผล', ecr.effDate, 'เริ่มที่ Lot / Serial', ecr.effLot],
+    ['head', '5. ลงนาม'],
+    ['signs', fRoles(ECR_ROLE, ecr.signs)],
+  ] };
+}
+
+function dataTRIAL() {
+  const ps = trial.pars.filter(p => String(p.name || '').trim());
+  const cks = trial.checks.filter(c => String(c.item || '').trim());
+  return { sheet: 'TRIAL', title: 'ใบขอทดลองผลิต (TRIAL RUN REQUEST)', blocks: [
+    ['pair', 'ผลิตภัณฑ์ / โครงการ', trial.product, 'รหัสสินค้า (Part No.)', trial.partno],
+    ['pair', 'ผู้ขอทดลอง', trial.reqBy, 'วันที่ต้องการทดลอง', trial.wantDate],
+    ['head', '1. วัตถุประสงค์'],
+    ['pick', Object.keys(TRIAL_PURPOSE).map(k => [trial.purpose === k ? '✓' : '', TRIAL_PURPOSE[k]])],
+    ['note', 'เปลี่ยนจากของเดิมอย่างไร', trial.change, 44],
+    ['head', '2. แผนการทดลอง'],
+    ['pair', 'จำนวนที่จะผลิต', trial.qty, 'สาย / เครื่องจักร', trial.line],
+    ['pair', 'กะ / ช่วงเวลา', trial.shift, 'ผู้ควบคุมการทดลอง', trial.leader],
+    ['head', '3. พารามิเตอร์ที่จะใช้'],
+    ['table', ['พารามิเตอร์', 'ค่าเดิม', 'ค่าที่จะลอง'],
+      (ps.length ? ps : [{}]).map(p => [p.name || '', p.old || '', p.tryv || '']), [4, 2, 2]],
+    ['head', '4. ข้อมูลที่ต้องเก็บระหว่างทดลอง'],
+    ['table', ['หัวข้อ', 'วิธีวัด', 'จำนวนตัวอย่าง'],
+      (cks.length ? cks : [{}]).map(c => [c.item || '', c.how || '', c.n || '']), [3, 3, 2]],
+    ['note', 'ความเสี่ยง / ข้อควรระวัง', trial.risk, 38],
+    ['note', 'ของที่ได้จะจัดการอย่างไร', trial.disposal, 38],
+    ['head', '5. ลงนาม'],
+    ['signs', fRoles(TRIAL_ROLE, trial.signs)],
+  ] };
+}
+
 /** ทางเข้าเดียวของการสร้างไฟล์ทุกประเภท */
 async function buildAnyWorkbook(ExcelJSLib, kind, h, d, paper) {
   const wb = new ExcelJSLib.Workbook();
   wb.creator = 'โปรแกรมสร้างเอกสารสำหรับวิศวกรโรงงาน';
   ({ TABLE: xlTable, SKILL: xlSkill, OPL: xlOPL, DIAG: xlDiag, SIGN: xlSigns,
-     APV: xlApv })[kind](wb, h, d, paper);
+     APV: xlApv, FORM: xlForm })[kind](wb, h, d, paper);
   return wb.xlsx.writeBuffer();
 }
 
@@ -3359,6 +3773,8 @@ async function exportOther() {
     else if (docType === 'OPL') { kind = 'OPL'; d = await dataOPL(); }
     else if (docType === 'DIAG') { kind = 'DIAG'; d = await dataDIAG(); }
     else if (docType === 'APV') { kind = 'APV'; d = dataAPV(); }
+    else if (docType === 'ECR') { kind = 'FORM'; d = dataECR(); }
+    else if (docType === 'TRIAL') { kind = 'FORM'; d = dataTRIAL(); }
     else { kind = 'SIGN'; d = await dataSIGN(); }
     const buf = await buildAnyWorkbook(ExcelJS, kind, h, d, paper);
     saveXlsx(buf, docType + '_' + (h.docno || 'Generated') + '.xlsx');
