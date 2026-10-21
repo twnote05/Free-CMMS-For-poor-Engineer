@@ -17,7 +17,7 @@
 :root{
   color-scheme:light;
   --bg:#F5F7FA; --surface:#FFFFFF; --surface-2:#F1F4F8; --surface-3:#E7EDF5;
-  --txt:#111720; --txt2:#5A6573; --txt3:#8A94A2;
+  --txt:#111720; --txt2:#5A6573; --txt3:#64707F;
   --line:#E3E8EF; --line-2:#D3DAE4;
   --accent:#2563EB; --accent-2:#1D4FD8; --accent-soft:#E8F0FE; --on-accent:#fff;
   --danger:#DC2626; --danger-soft:#FDECEC;
@@ -34,7 +34,7 @@
   :root:not([data-theme="light"]){
   color-scheme:dark;
   --bg:#0D1117; --surface:#161B22; --surface-2:#1C232D; --surface-3:#262D38;
-  --txt:#E6EDF3; --txt2:#9BA7B4; --txt3:#6E7B8A;
+  --txt:#E6EDF3; --txt2:#9BA7B4; --txt3:#828E9C;
   --line:#232B36; --line-2:#2E3744;
   --accent:#4D8DFF; --accent-2:#6BA1FF; --accent-soft:#152337; --on-accent:#08111F;
   --danger:#FF7B72; --danger-soft:#2D1618;
@@ -46,7 +46,7 @@
 :root[data-theme="dark"]{
   color-scheme:dark;
   --bg:#0D1117; --surface:#161B22; --surface-2:#1C232D; --surface-3:#262D38;
-  --txt:#E6EDF3; --txt2:#9BA7B4; --txt3:#6E7B8A;
+  --txt:#E6EDF3; --txt2:#9BA7B4; --txt3:#828E9C;
   --line:#232B36; --line-2:#2E3744;
   --accent:#4D8DFF; --accent-2:#6BA1FF; --accent-soft:#152337; --on-accent:#08111F;
   --danger:#FF7B72; --danger-soft:#2D1618;
@@ -69,7 +69,7 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--font);font
   font-weight:700;font-size:13px;letter-spacing:.5px;box-shadow:var(--sh)}
 .brandtxt{min-width:0;line-height:1.28}
 .brandtxt b{display:block;font-size:15px;letter-spacing:-.1px}
-.brandtxt span{color:var(--txt3);font-size:11.5px}
+.brandtxt span{color:var(--txt3);font-size:12px}
 .themebtn{flex:none;margin-left:auto;width:36px;height:36px;border-radius:10px;border:1px solid var(--line);
   background:var(--surface);color:var(--txt2);font-size:15px;cursor:pointer;line-height:1;
   transition:background .15s,border-color .15s}
@@ -80,7 +80,7 @@ h1{font-size:21px;margin:0 0 3px;letter-spacing:-.3px;font-weight:700}
 
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
   box-shadow:var(--sh);padding:15px 16px;margin-bottom:13px}
-.card h2{font-size:11px;margin:0 0 12px;color:var(--txt3);font-weight:700;
+.card h2{font-size:12px;margin:0 0 12px;color:var(--txt3);font-weight:700;
   letter-spacing:.6px;text-transform:uppercase}
 label{display:block;font-size:12px;color:var(--txt2);margin-bottom:5px;font-weight:500}
 input,textarea,select{width:100%;font-family:var(--font);font-size:13px;padding:9px 11px;
@@ -95,7 +95,7 @@ input[type=file]{padding:7px 9px;font-size:12px;color:var(--txt2)}
 .f{margin-bottom:11px}
 .f:last-child{margin-bottom:0}
 .posx{margin-top:7px}
-.hint{font-size:11.5px;color:var(--txt3);margin:6px 0 0;line-height:1.5}
+.hint{font-size:12.5px;color:var(--txt3);margin:6px 0 0;line-height:1.5}
 
 /* ---------- ช่องลากรูปเข้ามาวาง ---------- */
 .drop{border:1.5px dashed var(--line-2);border-radius:var(--r);padding:26px 18px;text-align:center;
@@ -210,18 +210,20 @@ button:focus-visible,.themebtn:focus-visible,.tabs button:focus-visible{outline:
 /* ---------- แท็บเลือกประเภทเอกสาร ---------- */
 .docnav{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
   box-shadow:var(--sh);padding:11px 12px 12px;margin-bottom:14px}
-.navgrp{font-size:10.5px;color:var(--txt3);font-weight:700;letter-spacing:.6px;
+.navgrp{font-size:12px;color:var(--txt3);font-weight:700;letter-spacing:.6px;
   text-transform:uppercase;margin:0 0 7px;padding:0 2px}
 .navgrp+.tabs{margin-bottom:0}
+.navgrp span{font-weight:400;letter-spacing:0;text-transform:none}
+#nav .tabs:not(:last-child){margin-bottom:14px}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
-.tabs button{flex:1;min-width:88px;background:var(--surface-2);border:1px solid transparent;
+.tabs button{flex:1 1 120px;min-width:88px;max-width:250px;background:var(--surface-2);border:1px solid transparent;
   border-radius:var(--r-sm);padding:9px 8px;font-size:12px;font-weight:600;cursor:pointer;
   font-family:var(--font);color:var(--txt2);line-height:1.35;
   transition:background .15s,color .15s,box-shadow .15s}
-.tabs button small{display:block;font-size:10px;font-weight:400;color:var(--txt3);margin-top:1px}
+.tabs button small{display:block;font-size:12px;font-weight:400;color:var(--txt3);margin-top:1px}
 .tabs button:hover:not(.on){background:var(--surface-3);color:var(--txt)}
 .tabs button.on{background:var(--accent);color:var(--on-accent);box-shadow:var(--sh)}
-.tabs button.on small{color:var(--on-accent);opacity:.75}
+.tabs button.on small{color:var(--on-accent);opacity:.92}
 
 /* ---------- Q-Point ---------- */
 .qptab td,.qptab th{font-size:.9em}
@@ -259,8 +261,24 @@ button:focus-visible,.themebtn:focus-visible,.tabs button:focus-visible{outline:
 .rulenote{font-size:.8em;line-height:1.35;padding:2px 4px;color:#000}
 .diagempty{flex:1;display:grid;place-items:center;color:#999;font-size:.9em}
 
+/* ---------- ใบอนุมัติผลิต (R&D) ---------- */
+.apvtab{width:100%;border-collapse:collapse;font-size:.85em}
+.apvtab td{border:1px solid #000;padding:3px 5px}
+.apv-l{background:#F2F2F2;font-weight:700;width:22%}
+.apv-v{width:28%}
+.apv-h{font-weight:700;font-size:.85em;background:#E8E8E8;border:1px solid #000;border-top:0;
+  padding:2px 5px}
+.apv-box{border:1px solid #000;border-top:0;padding:4px 5px;font-size:.85em}
+.apv-opt{display:flex;align-items:flex-start;gap:5px;margin-bottom:2px}
+.apv-cond{border-top:1px dashed #666;margin-top:3px;padding-top:3px;min-height:9mm}
+.apvlist{width:100%;border-collapse:collapse;font-size:.8em;border-top:0}
+.apvlist th,.apvlist td{border:1px solid #000;padding:3px 5px}
+.apvlist th{background:#F2F2F2}
+.apvlist td.c{text-align:center}
+.apv-note{border:1px solid #000;border-top:0;padding:3px 5px;font-size:.8em;min-height:11mm}
+.apvsign td{width:25%}
+
 /* ---------- ตารางเอกสาร IE ---------- */
-.tabs.ie button{flex:none;min-width:0;padding:7px 11px;font-size:11.5px}
 .rowgrid{width:100%;border-collapse:separate;border-spacing:0;font-size:11.5px;background:var(--surface)}
 .rowgrid th{background:var(--surface-2);padding:7px 5px;border-bottom:1px solid var(--line);
   font-weight:600;color:var(--txt2);font-size:10.5px;position:sticky;top:0;z-index:1;white-space:nowrap}
@@ -320,9 +338,9 @@ button:focus-visible,.themebtn:focus-visible,.tabs button:focus-visible{outline:
 .skdel{color:var(--danger);cursor:pointer;font-weight:700;padding:0 2px}
 .skills-edit{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
 .skchip{display:flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--line-2);
-  border-radius:var(--r-sm);padding:5px 9px;font-size:11.5px}
-.skchip input{border:0;font-size:11.5px;width:100px;padding:2px;background:transparent;color:var(--txt)}
-.skchip input:focus{box-shadow:none;outline:0}
+  border-radius:var(--r-sm);padding:5px 9px;font-size:12px}
+.skchip input{border:0;font-size:12px;width:100px;padding:2px;background:transparent;color:var(--txt)}
+.skchip input:focus{box-shadow:none;outline:2px solid var(--accent);outline-offset:1px}
 
 .mx{border-collapse:collapse;width:100%;table-layout:auto}
 .mx th,.mx td{border:1px solid #000;padding:2px 4px;font-size:.78em}
@@ -361,6 +379,12 @@ button:focus-visible,.themebtn:focus-visible,.tabs button:focus-visible{outline:
   /* พิมพ์พื้นสีหัวตารางออกมาด้วย ไม่ต้องไปติ๊ก Background graphics เอง */
   .page th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+/* เครื่องที่ตั้งค่าขอให้ลดการเคลื่อนไหว (เมาเร็ว/ไวต่อการขยับ) ให้ตัดทรานซิชันทิ้ง */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;
+    animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
 </style>
 <style id="pagecss">@page{size:A4 landscape}</style>
 </head>
@@ -382,28 +406,7 @@ button:focus-visible,.themebtn:focus-visible,.tabs button:focus-visible{outline:
   <p class="sub" id="sub">ใส่รูป + พิมพ์ข้อความ → หน้าเอกสาร เลขหน้า และขนาดรูป จัดให้อัตโนมัติ</p>
 
   <nav class="docnav">
-  <div class="navgrp">เอกสารงานมาตรฐาน</div>
-  <div class="tabs" id="tabs">
-    <button data-t="WI" class="on">📄 WI<br><small>วิธีปฏิบัติงาน</small></button>
-    <button data-t="QP">🔍 Q-Point<br><small>จุดควบคุมคุณภาพ</small></button>
-    <button data-t="OPL">💡 OPL<br><small>บทเรียนหนึ่งจุด</small></button>
-    <button data-t="SIGN">⚠️ ป้าย<br><small>ห้าม/เตือน/บังคับ</small></button>
-    <button data-t="DIAG">🗺️ ผังงาน<br><small>Flow/VSM/Layout</small></button>
-  </div>
-  <div class="navgrp">เอกสารวิศวกรรมอุตสาหการ (IE)</div>
-  <div class="tabs ie" id="tabsIE">
-    <button data-t="ROUTE">Routing Sheet</button>
-    <button data-t="BOM">BOM</button>
-    <button data-t="TIME">Time Study</button>
-    <button data-t="CAP">Capacity</button>
-    <button data-t="LINE">Line Balancing</button>
-    <button data-t="CHECK">Check Sheet</button>
-    <button data-t="QC">QC Chart (X̄-R)</button>
-    <button data-t="FMEA">FMEA</button>
-    <button data-t="SMED">Setup / SMED</button>
-    <button data-t="EQUIP">ทะเบียนอุปกรณ์</button>
-    <button data-t="SKILL">Skill Matrix (OJT)</button>
-  </div>
+  <div id="nav"></div>
   </nav>
 
   <div class="card">
@@ -478,6 +481,52 @@ button:focus-visible,.themebtn:focus-visible,.tabs button:focus-visible{outline:
           <option value="landscape">แนวนอน</option></select></div>
     </div>
     <p class="hint">รูปสัญลักษณ์ใช้รูปที่อัปเข้ามาในแต่ละป้าย (หรือเว้นว่างก็ได้) สีและรูปทรงเป็นไปตาม ISO 3864</p>
+  </div>
+
+  <div class="card only-APV" id="apvCard" hidden>
+    <h2>ใบอนุมัติผลิต</h2>
+    <div class="grid2">
+      <div class="f"><label>ชื่อโครงการ / ผลิตภัณฑ์</label><input data-f="product"></div>
+      <div class="f"><label>รหัสสินค้า (Part No. / SKU)</label><input data-f="partno"></div>
+      <div class="f"><label>ผู้รับผิดชอบโครงการ (R&amp;D)</label><input data-f="rdEng"></div>
+      <div class="f"><label>Lot ทดลองผลิต</label><input data-f="lot"></div>
+    </div>
+
+    <h2 style="margin-top:14px">ผลการอนุมัติ</h2>
+    <div class="f"><label><input type="radio" name="apvst" data-f="status" value="approved" checked>
+      อนุมัติ (Approved)</label></div>
+    <div class="f"><label><input type="radio" name="apvst" data-f="status" value="cond">
+      อนุมัติแบบมีเงื่อนไข (Conditionally Approved)</label></div>
+    <div class="f"><label><input type="radio" name="apvst" data-f="status" value="reject">
+      ไม่อนุมัติ (Rejected)</label></div>
+    <div class="f"><label>เงื่อนไข / เหตุผล</label>
+      <textarea data-f="cond" rows="2" placeholder="เช่น ผลิตได้เฉพาะ Lot แรก 5,000 ตร.ม. และต้องเฝ้าระวังอุณหภูมิโซน 3"></textarea></div>
+
+    <h2 style="margin-top:14px">เอกสารแนบและมาตรฐานอ้างอิง</h2>
+    <table class="rowgrid"><thead><tr><th style="width:8%">แนบ</th><th>ชื่อเอกสาร</th>
+      <th style="width:22%">เลขที่</th><th style="width:12%">Rev</th><th style="width:8%"></th></tr></thead>
+      <tbody id="apvAttach"></tbody></table>
+    <button id="apvAddA" class="ghost" style="margin-top:6px">+ เพิ่มเอกสารแนบ</button>
+
+    <h2 style="margin-top:14px">สรุปผลการทดลองผลิต</h2>
+    <table class="rowgrid"><thead><tr><th>หัวข้อทดสอบ</th><th>เกณฑ์</th><th>ผลที่ได้</th>
+      <th style="width:18%">สรุป</th><th style="width:8%"></th></tr></thead>
+      <tbody id="apvTests"></tbody></table>
+    <button id="apvAddS" class="ghost" style="margin-top:6px">+ เพิ่มหัวข้อทดสอบ</button>
+    <div class="grid2" style="margin-top:10px">
+      <div class="f"><label>อัตราของเสีย (Defect Rate)</label>
+        <input data-f="defect" placeholder="เช่น 1.8 % จาก 2,000 ชิ้น"></div>
+      <div class="f"><label>ข้อสังเกต / ข้อควรระวัง</label><input data-f="obs"></div>
+    </div>
+
+    <h2 style="margin-top:14px">ผู้ลงนาม</h2>
+    <div class="grid2">
+      <div class="f"><label>R&amp;D Manager</label><input data-g="0" placeholder="ชื่อ"></div>
+      <div class="f"><label>Production / Process Eng. Manager</label><input data-g="1" placeholder="ชื่อ"></div>
+      <div class="f"><label>QA / QC Manager</label><input data-g="2" placeholder="ชื่อ"></div>
+      <div class="f"><label>Plant / Factory Director</label><input data-g="3" placeholder="ชื่อ"></div>
+    </div>
+    <p class="hint">เอกสารนี้พิมพ์เป็น <b>แนวตั้ง</b> เสมอ (A4/A3 ตามที่เลือกด้านล่าง)</p>
   </div>
 
   <div class="card" id="parCard" hidden>
@@ -605,7 +654,7 @@ button:focus-visible,.themebtn:focus-visible,.tabs button:focus-visible{outline:
    โปรแกรมสร้างเอกสารสำหรับวิศวกรโรงงาน  —  ไฟล์เดียวจบ ไม่ต้องติดตั้งอะไร
    16 ประเภทเอกสาร : WI, Q-Point, OPL, ป้ายความปลอดภัย, ผังงาน, Skill Matrix
                      และเอกสาร IE อีก 10 ชนิด (Routing ... Equipment)
-   - ฟอร์ม Master อยู่ในโปรแกรมเอง (อ้างอิงรูปแบบ FM-WI ของแผนก)
+   - ฟอร์ม Master อยู่ในโปรแกรมเอง (ใช้รูปแบบฟอร์ม WI มาตรฐาน)
    - แบ่งหน้า A4/A3 + ใส่เลขหน้า "หน้า x/y" ให้อัตโนมัติ ทั้งบนจอ ตอนพิมพ์ และใน Excel
    - ย่อรูปให้พอดีช่องเอง ไม่ต้องจัดรูปเอง
    - Export .xlsx ได้ทุกประเภทให้ DCC เก็บ/แก้ไขต่อ (เป็นเซลล์จริง ไม่ใช่รูปเอกสาร)
@@ -662,23 +711,26 @@ let ppeLib = [];                  // [{id,label,url}]
 try { ppeLib = JSON.parse(localStorage.getItem('wi_ppe_lib') || '[]'); } catch (_) { }
 const savePPE = () => { try { localStorage.setItem('wi_ppe_lib', JSON.stringify(ppeLib)); } catch (_) { } };
 
+/** ย่อให้พอดีกรอบ คงสัดส่วนเดิม — ปกติไม่ขยายรูปที่เล็กอยู่แล้ว (grow=true ให้ขยายได้) */
+const fitBox = (img, W, H, grow) => {
+  const k = Math.min(W / img.width, H / img.height, grow ? Infinity : 1);
+  return { w: Math.max(1, Math.round(img.width * k)), h: Math.max(1, Math.round(img.height * k)) };
+};
+
+/** วาดลงผืนผ้าใบ CW x CH จัดกึ่งกลาง — ไม่ส่ง bg มา = พื้นหลังโปร่งใส */
+const paint = (img, w, h, CW, CH, bg) => {
+  const cv = Object.assign(document.createElement('canvas'), { width: CW, height: CH });
+  const g = cv.getContext('2d');
+  if (bg) { g.fillStyle = bg; g.fillRect(0, 0, CW, CH); }
+  g.drawImage(img, Math.round((CW - w) / 2), Math.round((CH - h) / 2), w, h);
+  return cv;
+};
+
 /** ย่อไอคอนให้เล็กก่อนเก็บ เพื่อไม่ให้พื้นที่เก็บในเครื่องเต็ม (คงสัดส่วนเดิม พื้นหลังโปร่งใส) */
-function shrinkIcon(file) {
-  return new Promise((ok, no) => {
-    const r = new FileReader();
-    r.onload = () => {
-      const im = new Image();
-      im.onload = () => {
-        const k = Math.min(PPE_ICON_PX / im.width, PPE_ICON_PX / im.height, 1);
-        const w = Math.round(im.width * k), h = Math.round(im.height * k);
-        const cv = Object.assign(document.createElement('canvas'), { width: w, height: h });
-        cv.getContext('2d').drawImage(im, 0, 0, w, h);
-        ok(cv.toDataURL('image/png'));
-      };
-      im.onerror = no; im.src = r.result;
-    };
-    r.onerror = no; r.readAsDataURL(file);
-  });
+async function shrinkIcon(file) {
+  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  const { w, h } = fitBox(bmp, PPE_ICON_PX, PPE_ICON_PX);
+  return paint(bmp, w, h, w, h).toDataURL('image/png');
 }
 const POSITIONS = CONFIG.positions, DEFAULT_POS = CONFIG.defaultPos;
 
@@ -801,6 +853,15 @@ function render() {
     paginate();
     return;
   }
+  if (docType === 'APV') {                  // ใบอนุมัติผลิตเป็นฟอร์ม ไม่มีรายการรูป
+    renderApvEditor();
+    $('msg').textContent = 'เอกสารแนบ ' + apv.attach.filter(a => a.on).length
+      + ' รายการ · หัวข้อทดสอบ ' + apv.tests.filter(t => t.item.trim()).length + ' หัวข้อ';
+    $('xls').disabled = false; $('print').disabled = false;
+    $('parCard').hidden = true;
+    paginate();
+    return;
+  }
   if (TABLES[docType]) {                    // เอกสาร IE ใช้ตารางกรอกข้อมูลแทนการ์ดรูป
     renderGrid();
     $('msg').textContent = curRows().length + ' แถว';
@@ -858,7 +919,8 @@ $('steps').addEventListener('click', e => {
 $('clear').onclick = () => { items = []; render(); };
 document.querySelectorAll('.card input').forEach(el => el.addEventListener('input', paginate));
 function setPageCss() {
-  const orient = (docType === 'SIGN' && $('signOrient').value === 'portrait') ? 'portrait' : 'landscape';
+  const orient = docType === 'APV'
+    || (docType === 'SIGN' && $('signOrient').value === 'portrait') ? 'portrait' : 'landscape';
   $('pagecss').textContent = '@page{size:' + $('paper').value + ' ' + orient + '}';
 }
 $('paper').onchange = () => { setPageCss(); paginate(); };
@@ -873,9 +935,9 @@ $('diagKind').onchange = () => {
 addEventListener('resize', fitStage);
 
 /* ---------------------- ชิ้นส่วนเอกสาร ---------------------- */
-function newPage(h, size, title) {
+function newPage(h, size, title, portrait) {
   const p = document.createElement('div');
-  p.className = 'page' + (size === 'A3' ? ' a3' : '');
+  p.className = 'page' + (size === 'A3' ? ' a3' : '') + (portrait ? ' portrait' : '');
   p.innerHTML = '<div class="pgbody">' + headTable(h, title || 'วิธีปฏิบัติงาน') + '</div>';
   $('stage').appendChild(p);
   return p.firstChild;      // .pgbody
@@ -901,6 +963,9 @@ const DOC_INFO = {
   DIAG: { h1: 'จัดผังงาน / เลย์เอาต์ ลงหน้ากระดาษ',
           sub: 'วาดผังจากโปรแกรมอื่นแล้วอัปรูปมาวาง — ได้หัวเอกสาร เลขหน้า และช่องลงนามให้อัตโนมัติ',
           drop: 'รูปผังที่ export มาจาก Visio / draw.io / AutoCAD (PNG, JPG)' },
+  APV:  { h1: 'ใบอนุมัติผลิต (Mass Production Approval)',
+          sub: 'R&D ส่งมอบงานให้ฝ่ายผลิต — สรุปผลทดลองผลิต เอกสารอ้างอิง และลายเซ็นอนุมัติ 4 ฝ่าย',
+          drop: '' },
   SIGN: { h1: 'สร้างป้ายความปลอดภัย',
           sub: 'ป้ายห้าม / เตือน / บังคับ / ภาวะปลอดภัย / อุปกรณ์ดับเพลิง ตามรูปทรงและสีมาตรฐาน ISO 3864',
           drop: 'รูปสัญลักษณ์ของแต่ละป้าย (ไม่ใส่ก็ได้)' },
@@ -929,17 +994,57 @@ function signShapeSvg(kind) {
   return `<svg viewBox="0 0 100 100"><rect x="2" y="12" width="96" height="76" rx="3" fill="${k.color}"/></svg>`;
 }
 
+/* ---------------------- แถบเลือกเอกสาร แยกตามแผนกที่ดูแล ----------------------
+   ย้ายเอกสารข้ามแผนก = ย้ายรหัสในลิสต์ของ DEPT เท่านั้น ไม่ต้องแตะที่อื่น */
+const TAB_META = {
+  WI:    ['📄', 'WI', 'วิธีปฏิบัติงาน'],
+  OPL:   ['💡', 'OPL', 'บทเรียนหนึ่งจุด'],
+  SIGN:  ['⚠️', 'ป้ายความปลอดภัย', 'ห้าม / เตือน / บังคับ'],
+  QP:    ['🔍', 'Q-Point', 'จุดควบคุมคุณภาพ'],
+  CHECK: ['✔️', 'Check Sheet', 'นับของเสีย + พาเรโต'],
+  ROUTE: ['🧭', 'Routing Sheet', 'ลำดับขั้นการผลิต'],
+  BOM:   ['🧱', 'BOM', 'รายการวัตถุดิบ'],
+  TIME:  ['⏱️', 'Time Study', 'จับเวลาหาเวลามาตรฐาน'],
+  CAP:   ['📈', 'Capacity', 'กำลังการผลิต'],
+  LINE:  ['⚖️', 'Line Balancing', 'จัดสมดุลสายการผลิต'],
+  SMED:  ['🔁', 'Setup / SMED', 'ลดเวลาเปลี่ยนรุ่น'],
+  DIAG:  ['🗺️', 'ผังงาน', 'Flow / VSM / Layout'],
+  FMEA:  ['🛡️', 'FMEA', 'วิเคราะห์ความเสี่ยง'],
+  QC:    ['📊', 'QC Chart', 'แผนภูมิควบคุม X̄-R'],
+  EQUIP: ['🧰', 'ทะเบียนอุปกรณ์', 'Jig / Fixture / Gauge'],
+  SKILL: ['👥', 'Skill Matrix', 'ตารางทักษะ + OJT'],
+  APV:   ['✅', 'ใบอนุมัติผลิต', 'R&D → ฝ่ายผลิต'],
+};
+const DEPT = [
+  ['ช่างเทคนิค', 'เอกสารที่ใช้หน้างาน', ['WI', 'OPL', 'SIGN', 'QP', 'CHECK']],
+  ['วิศวกรรม', 'วิเคราะห์และปรับปรุงกระบวนการ',
+   ['ROUTE', 'BOM', 'TIME', 'CAP', 'LINE', 'SMED', 'DIAG', 'FMEA', 'QC']],
+  ['ซ่อมบำรุง', 'เครื่องมือและกำลังคน', ['EQUIP', 'SKILL']],
+  ['R&D', 'ส่งมอบงานให้ฝ่ายผลิต', ['APV']],
+];
+
+function buildNav() {
+  $('nav').innerHTML = DEPT.map(([dept, caption, ids]) =>
+    `<div class="navgrp">${dept} <span>· ${caption}</span></div>
+     <div class="tabs">${ids.map(id => {
+      const [ico, name, sub] = TAB_META[id];
+      return `<button data-t="${id}"${id === docType ? ' class="on"' : ''}>${ico} ${esc(name)}`
+           + `<br><small>${esc(sub)}</small></button>`;
+    }).join('')}</div>`).join('');
+}
+
 function switchTab(e) {
   const b = e.target.closest('[data-t]'); if (!b) return;
   docType = b.dataset.t;
-  [...$('tabs').children, ...$('tabsIE').children].forEach(x => x.classList.toggle('on', x === b));
+  $('nav').querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x === b));
   const info = DOC_INFO[docType]
     || (TABLES[docType] ? { h1: TABLES[docType].title, sub: 'กรอกข้อมูลในตาราง ระบบคำนวณและจัดหน้าให้', drop: '' }
                         : { h1: 'ตารางทักษะพนักงาน (Skill Matrix)',
                             sub: 'คลิกที่ช่องเพื่อเลื่อนระดับทักษะ — ระบบชี้ทักษะเสี่ยงและช่องที่ต้องเข้า OJT ให้',
                             drop: '' });
   $('h1').textContent = info.h1; $('sub').textContent = info.sub;
-  $('drop').style.display = (TABLES[docType] || docType === 'SKILL') ? 'none' : '';
+  $('drop').style.display =
+    (TABLES[docType] || docType === 'SKILL' || docType === 'APV') ? 'none' : '';
   if (!TABLES[docType]) $('drop').querySelector('span').textContent = info.drop;
   document.querySelectorAll('[class*="only-"]').forEach(el => {
     el.hidden = !el.className.split(/\s+/).includes('only-' + docType);
@@ -949,10 +1054,10 @@ function switchTab(e) {
     el.hidden = el.className.split(/\s+/).includes('hide-' + docType);
   });
   $('xls').style.display = '';                 // ทุกประเภทส่งออก Excel ให้ DCC เก็บได้
+  setPageCss();                                // แต่ละประเภทใช้แนวกระดาษไม่เหมือนกัน
   render();
 }
-$('tabs').onclick = switchTab;
-$('tabsIE').onclick = switchTab;
+$('nav').onclick = switchTab;
 
 /* ---------------------- ช่องกรอกของแต่ละประเภท ---------------------- */
 function stepFields(it, i) {
@@ -969,7 +1074,7 @@ function stepFields(it, i) {
   if (docType === 'OPL') return `
     <textarea data-desc="${i}" rows="4" placeholder="คำอธิบายภาพนี้ (สั้น กระชับ)">${esc(it.desc)}</textarea>`;
   if (docType === 'DIAG') return `
-    <textarea data-desc="${i}" rows="3" placeholder="คำอธิบายใต้ผัง เช่น สายการผลิต Ext3 ก่อนปรับปรุง">${esc(it.desc)}</textarea>`;
+    <textarea data-desc="${i}" rows="3" placeholder="คำอธิบายใต้ผัง เช่น สายการผลิต A ก่อนปรับปรุง">${esc(it.desc)}</textarea>`;
   if (docType === 'SIGN') return `
     <select data-kind="${i}" style="margin-bottom:6px">
       ${Object.entries(SIGN_KIND).map(([k, v]) =>
@@ -1053,6 +1158,147 @@ function paginateQP(h, size, stage) {
       body = newPage(h, size, 'Q-POINT (จุดควบคุมคุณภาพ)'); start(); tbody.appendChild(tr);
     }
   });
+}
+
+/* =======================================================================
+   ใบอนุมัติผลิต (Mass Production Approval) — เอกสารส่งมอบงานของแผนก R&D
+   ฟอร์มล้วน ไม่มีรูป จึงมีตัวจัดหน้าและตัวเขียน Excel ของตัวเอง
+   ======================================================================= */
+const APV_ST = [
+  ['approved', 'อนุมัติ (Approved)', 'ผลิตตามมาตรฐานที่กำหนดได้ทันที'],
+  ['cond', 'อนุมัติแบบมีเงื่อนไข (Conditionally Approved)', 'ผลิตได้ตามเงื่อนไขที่ระบุด้านล่าง'],
+  ['reject', 'ไม่อนุมัติ (Rejected)', 'ต้องแก้ไขปัญหาและเสนอขออนุมัติใหม่'],
+];
+const APV_ROLE = ['R&D Manager|ผู้ส่งมอบงาน', 'Production / Process Eng. Manager|ผู้รับมอบและอนุมัติการผลิต',
+                  'QA / QC Manager|ผู้อนุมัติมาตรฐานคุณภาพ', 'Plant / Factory Director|ผู้อนุมัติระดับบริหาร'];
+const APV_DOC = ['BOM / ข้อกำหนดวัตถุดิบ', 'แบบวิศวกรรม / Technical Spec',
+                 'สเปกการตั้งเครื่อง (Master Setting Sheet)',
+                 'พารามิเตอร์กระบวนการ (Temp / Pressure / Speed)',
+                 'มาตรฐานตรวจรับ QA/QC / Limit Sample'];
+const apv = {
+  product: '', partno: '', rdEng: '', lot: '', status: 'approved', cond: '',
+  attach: APV_DOC.map(name => ({ on: true, name, no: '', rev: '' })),
+  tests: [0, 0, 0, 0].map(() => ({ item: '', spec: '', result: '', ok: '' })),
+  defect: '', obs: '', signs: ['', '', '', ''],
+};
+
+function renderApvEditor() {
+  $('apvAttach').innerHTML = apv.attach.map((a, i) => `<tr>
+      <td class="c"><input type="checkbox" data-a="${i}" data-k="on"${a.on ? ' checked' : ''}></td>
+      <td><input data-a="${i}" data-k="name" value="${esc(a.name)}"></td>
+      <td><input data-a="${i}" data-k="no" value="${esc(a.no)}"></td>
+      <td><input data-a="${i}" data-k="rev" value="${esc(a.rev)}"></td>
+      <td class="c"><button class="del" data-arm="${i}" title="ลบ">ลบ</button></td></tr>`).join('');
+  $('apvTests').innerHTML = apv.tests.map((t, i) => `<tr>
+      <td><input data-s="${i}" data-k="item" value="${esc(t.item)}"></td>
+      <td><input data-s="${i}" data-k="spec" value="${esc(t.spec)}"></td>
+      <td><input data-s="${i}" data-k="result" value="${esc(t.result)}"></td>
+      <td><input data-s="${i}" data-k="ok" value="${esc(t.ok)}" placeholder="ผ่าน / ไม่ผ่าน"></td>
+      <td class="c"><button class="del" data-srm="${i}" title="ลบ">ลบ</button></td></tr>`).join('');
+}
+
+$('apvCard').addEventListener('input', e => {
+  const d = e.target.dataset;
+  if (d.a !== undefined) apv.attach[+d.a][d.k] = d.k === 'on' ? e.target.checked : e.target.value;
+  else if (d.s !== undefined) apv.tests[+d.s][d.k] = e.target.value;
+  else if (d.g !== undefined) apv.signs[+d.g] = e.target.value;
+  else if (d.f !== undefined) apv[d.f] = e.target.value;
+  else return;
+  paginate();                      // ไม่วาดการ์ดใหม่ เคอร์เซอร์จะได้ไม่เด้ง
+});
+$('apvCard').addEventListener('click', e => {
+  const d = e.target.dataset;
+  if (d.arm !== undefined) apv.attach.splice(+d.arm, 1);
+  else if (d.srm !== undefined) apv.tests.splice(+d.srm, 1);
+  else if (e.target.id === 'apvAddA') apv.attach.push({ on: true, name: '', no: '', rev: '' });
+  else if (e.target.id === 'apvAddS') apv.tests.push({ item: '', spec: '', result: '', ok: '' });
+  else return;
+  renderApvEditor(); paginate();
+});
+
+function apvSignRow() {
+  return `<table class="sign apvsign"><tr>${APV_ROLE.map((role, i) => {
+    const [en, th] = role.split('|');
+    return `<td><b>${en}</b><br>${th}<br><br>….....................................<br>
+      ( ${esc(apv.signs[i]) || '.....................................'} )<br>
+      วันที่ ......... / ......... / .........</td>`;
+  }).join('')}</tr></table>`;
+}
+
+function paginateAPV(h, size, stage) {
+  const page = () => newPage(h, size, 'ใบอนุมัติผลิต (MASS PRODUCTION APPROVAL)', true);
+  let body = page();
+  const over = () => body.scrollHeight > body.clientHeight + 1;
+  const add = html => body.insertAdjacentHTML('beforeend', html);
+
+  /* ใส่ก้อนหนึ่งลงหน้าปัจจุบัน ถ้าล้นก็ถอดออกแล้วขึ้นหน้าใหม่ ไม่ปล่อยให้โดนตัดทิ้ง */
+  const block = html => {
+    const n = body.children.length;
+    add(html);
+    if (over() && n > 1) {
+      [...body.children].slice(n).forEach(el => el.remove());
+      body = page(); add(html);
+    }
+  };
+
+  /* ตารางยาว ๆ ใส่ทีละแถว ล้นเมื่อไหร่ขึ้นหน้าใหม่พร้อมเขียนหัวตารางซ้ำให้ */
+  const list = (title, headHtml, rows, rowHtml) => {
+    let tb;
+    const start = suffix => {
+      add(`<div class="apv-h">${title}${suffix}</div>
+           <table class="apvlist"><thead>${headHtml}</thead><tbody></tbody></table>`);
+      const all = body.querySelectorAll('.apvlist');
+      tb = all[all.length - 1].querySelector('tbody');
+    };
+    const n = body.children.length;
+    start('');
+    if (over() && n > 1) {                       // หัวข้อ + หัวตารางยังไม่พอที่ด้วยซ้ำ
+      [...body.children].slice(n).forEach(el => el.remove());
+      body = page(); start('');
+    }
+    rows.forEach(r => {
+      tb.insertAdjacentHTML('beforeend', rowHtml(r));
+      if (over() && tb.rows.length > 1) {
+        tb.lastElementChild.remove();
+        body = page(); start(' (ต่อ)');
+        tb.insertAdjacentHTML('beforeend', rowHtml(r));
+      }
+    });
+  };
+
+  const cell = (l, v) => `<td class="apv-l">${l}</td><td class="apv-v">${esc(v) || '&nbsp;'}</td>`;
+  add(`<table class="apvtab">
+      <tr>${cell('ชื่อโครงการ / ผลิตภัณฑ์', apv.product)}${cell('รหัสสินค้า (Part No. / SKU)', apv.partno)}</tr>
+      <tr>${cell('ผู้รับผิดชอบ (R&D)', apv.rdEng)}${cell('Lot ทดลองผลิต', apv.lot)}</tr>
+    </table>`);
+
+  block(`<div class="apv-h">1. ผลการอนุมัติ (Approval Status)</div>
+     <div class="apv-box">${APV_ST.map(([k, t, dsc]) =>
+      `<div class="apv-opt"><i class="opl-box">${apv.status === k ? '✓' : ''}</i>
+         <span><b>${t}</b> — ${dsc}</span></div>`).join('')}
+       <div class="apv-cond"><b>เงื่อนไข / เหตุผล :</b> ${nl(apv.cond)}</div></div>`);
+
+  const atts = apv.attach.filter(a => a.on || a.name.trim());
+  list('2. เอกสารแนบและมาตรฐานอ้างอิง (Attachments &amp; References)',
+    `<tr><th style="width:8%">แนบ</th><th>ชื่อเอกสาร</th>
+       <th style="width:24%">เลขที่เอกสาร</th><th style="width:10%">Rev</th></tr>`,
+    atts.length ? atts : [{ on: false, name: '', no: '', rev: '' }],
+    a => `<tr><td class="c"><i class="opl-box">${a.on ? '✓' : ''}</i></td>
+       <td>${esc(a.name) || '&nbsp;'}</td><td>${esc(a.no) || '&nbsp;'}</td>
+       <td class="c">${esc(a.rev) || '&nbsp;'}</td></tr>`);
+
+  const ts = apv.tests.filter(t => t.item.trim() || t.spec.trim() || t.result.trim());
+  list('3. สรุปผลการทดลองผลิต (Pilot Run / Trial Summary)',
+    `<tr><th>หัวข้อทดสอบ</th><th style="width:24%">เกณฑ์</th>
+       <th style="width:24%">ผลที่ได้</th><th style="width:14%">สรุป</th></tr>`,
+    ts.length ? ts : [{ item: '', spec: '', result: '', ok: '' }],
+    t => `<tr><td>${esc(t.item) || '&nbsp;'}</td><td>${esc(t.spec) || '&nbsp;'}</td>
+       <td>${esc(t.result) || '&nbsp;'}</td><td class="c">${esc(t.ok) || '&nbsp;'}</td></tr>`);
+
+  block(`<div class="apv-note"><b>อัตราของเสีย :</b> ${esc(apv.defect) || '–'}
+     &nbsp;&nbsp;|&nbsp;&nbsp; <b>ข้อสังเกต :</b> ${esc(apv.obs) || '–'}</div>`);
+
+  block(`<div class="apv-h">4. ลงนามอนุมัติ (Sign-off)</div>` + apvSignRow());
 }
 
 /* =======================================================================
@@ -1179,6 +1425,11 @@ const XCOL = ['x1','x2','x3','x4','x5','x6','x7','x8','x9','x10'];  // ช่อ
 const xKeys = ps => XCOL.slice(0, Math.min(10, Math.max(2, Math.round(N(ps && ps.nsub)) || 5)));
 /* ค่า z ของระดับความเชื่อมั่นที่ใช้ในงานศึกษาเวลา */
 const ZCONF = { 90: 1.645, 95: 1.960, 99: 2.576 };
+/* รองรับแค่ 90/95/99 — ปัดค่าที่กรอกเข้าตัวที่ใกล้ที่สุด แล้วใช้ค่าที่ปัดแล้วทั้งตอนคำนวณและตอนพิมพ์
+   ไม่งั้นเอกสารจะอ้างความเชื่อมั่นที่ไม่ได้ใช้คำนวณจริง */
+const confOf = v => [90, 95, 99].reduce((a, b) =>
+  Math.abs(b - N(v)) < Math.abs(a - N(v)) ? b : a);
+const precOf = v => N(v) || 5;                      // 0 หรือเว้นว่าง = ใช้ค่าตั้งต้น 5 %
 /* จำนวนที่ต้องเบิกจริงเมื่อเผื่อของเสีย : ผลิตดี q ชิ้น ต้องตั้งต้น q / (1 - %ของเสีย) */
 const bomQty = (r, ps) => {
   const sc = N(r.scrap);
@@ -1309,8 +1560,8 @@ const TABLES = {
         f: (r, ps) => {
           const a = nums(r, OBS), m = avgOf(a);
           if (a.length < 2 || m <= 0) return 0;
-          const z = ZCONF[Math.round(N(ps.conf))] || ZCONF[95];
-          const e = (N(ps.prec) || 5) / 100;
+          const z = ZCONF[confOf(ps.conf)];
+          const e = precOf(ps.prec) / 100;
           return Math.ceil(Math.pow(z * sdOf(a) / (e * m), 2));
         } },
     ],
@@ -1325,7 +1576,8 @@ const TABLES = {
       return [['Standard Time รวม', F(st) + ' วินาที (' + F(st / 60) + ' นาที)'],
               ['Allowance ที่ใช้', ps.allow + ' % ของ Normal Time'],
               ['สูตร', 'NT = เวลาเฉลี่ย x Rating ,  ST = NT x (1 + Allowance)'],
-              ['ความแม่นยำที่ตั้งไว้', '±' + ps.prec + ' % ที่ความเชื่อมั่น ' + ps.conf + ' %'],
+              ['ความแม่นยำที่ตั้งไว้',
+               '±' + precOf(ps.prec) + ' % ที่ความเชื่อมั่น ' + confOf(ps.conf) + ' %'],
               ['จำนวนรอบที่จับ', short ? '⚠ ยังไม่พอ ' + short + ' องค์ประกอบ (ดูช่อง "รอบที่ควรจับ")'
                                        : 'เพียงพอทุกองค์ประกอบ'],
               ['กำลังผลิตที่ได้', st > 0 ? F(3600 / st, 0) + ' ชิ้น/ชม.' : '-']];
@@ -1682,11 +1934,20 @@ function rowCalc(t, r, ps, i, all) {
   return o;
 }
 
-$('steps').addEventListener('input', e => {
+/* ช่องในตาราง IE กับช่องพารามิเตอร์อยู่คนละกิ่งของ DOM จึงผูกตัวเดียวกันไว้ทั้งสองที่ */
+const ieEdit = e => {
   if (!TABLES[docType]) return;
   const d = e.target.dataset;
-  if (d.par !== undefined) { curPars()[d.par] = e.target.value; renderGrid(); paginate(); }
-  else if (d.r !== undefined) { curRows()[+d.r][d.k] = e.target.value; refreshCalcCells(); paginate(); }
+  if (d.par !== undefined) curPars()[d.par] = e.target.value;
+  else if (d.r !== undefined) curRows()[+d.r][d.k] = e.target.value;
+  else return;
+  refreshCalcCells(); paginate();      // ไม่วาดตารางใหม่ เคอร์เซอร์จะได้ไม่เด้งตอนพิมพ์
+};
+$('steps').addEventListener('input', ieEdit, true);
+$('parBody').addEventListener('input', ieEdit, true);
+/* ออกจากช่องแล้วค่อยวาดใหม่ เผื่อค่าที่เพิ่งเปลี่ยนทำให้คอลัมน์ที่ต้องแสดงเปลี่ยนไปด้วย */
+$('parBody').addEventListener('change', () => {
+  if (TABLES[docType]) { renderGrid(); paginate(); }
 }, true);
 $('steps').addEventListener('change', e => {
   if (!TABLES[docType] || e.target.dataset.r === undefined) return;
@@ -1833,9 +2094,10 @@ function paginateTABLE(h, size, stage) {
     + (t.chart ? `<div class="chartbox">${
         t.chart === 'balance' ? chartBalance(rs, ps) : chartXbar(rs, ps)}</div>` : '')
     + signRow(h);
+  const nBefore = body.children.length;               // นับไว้ก่อน จะได้ถอดเฉพาะชิ้นที่เพิ่งใส่
   body.insertAdjacentHTML('beforeend', tail);
   if (body.scrollHeight > body.clientHeight + 1) {      // ท้ายเอกสารล้น -> ย้ายไปหน้าใหม่
-    [...body.children].slice(-3).forEach(el => el.remove());
+    [...body.children].slice(nBefore).forEach(el => el.remove());
     body = newPage(h, size, t.title);
     body.insertAdjacentHTML('beforeend', tail);
   }
@@ -1991,9 +2253,10 @@ function paginateSKILL(h, size, stage) {
 
   const tail = `<div class="iesum">${skSummary().map(([k, v]) =>
       `<span><b>${k} :</b> ${v}</span>`).join('')}</div>` + signRow(h);
+  const nBefore = body.children.length;
   body.insertAdjacentHTML('beforeend', tail);
   if (body.scrollHeight > body.clientHeight + 1) {
-    [...body.children].slice(-2).forEach(el => el.remove());
+    [...body.children].slice(nBefore).forEach(el => el.remove());
     body = newPage(h, size, 'SKILL MATRIX (ตารางทักษะพนักงาน / OJT)');
     body.insertAdjacentHTML('beforeend', tail);
   }
@@ -2016,7 +2279,7 @@ function paginate() {
   if (docType !== 'WI') {                      // เอกสารประเภทอื่นมีตัวจัดหน้าของตัวเอง
     (TABLES[docType] ? paginateTABLE
       : { QP: paginateQP, OPL: paginateOPL, SIGN: paginateSIGN, DIAG: paginateDIAG,
-          SKILL: paginateSKILL }[docType])(h, size, stage);
+          SKILL: paginateSKILL, APV: paginateAPV }[docType])(h, size, stage);
     waitImages(stage);
     const pg = stage.querySelectorAll('.page');
     pg.forEach((p, i) => {
@@ -2147,25 +2410,17 @@ async function ppeStripImage(urls) {
 async function prepLogo(dataUrl) {
   const img = new Image();
   await new Promise((ok, no) => { img.onload = ok; img.onerror = no; img.src = dataUrl; });
-  const k = Math.min((LOGO_W - 10) / img.width, (LOGO_H - 6) / img.height);
-  const w = Math.round(img.width * k), hh = Math.round(img.height * k);
-  const cv = Object.assign(document.createElement('canvas'), { width: LOGO_W, height: LOGO_H });
-  const g = cv.getContext('2d');
-  g.fillStyle = '#fff'; g.fillRect(0, 0, LOGO_W, LOGO_H);
-  g.drawImage(img, Math.round((LOGO_W - w) / 2), Math.round((LOGO_H - hh) / 2), w, hh);
-  return cv.toDataURL('image/png').split(',')[1];
+  const { w, h } = fitBox(img, LOGO_W - 10, LOGO_H - 6, true);   // โลโก้เล็กให้ขยายเต็มช่องได้
+  return paint(img, w, h, LOGO_W, LOGO_H, '#fff').toDataURL('image/png').split(',')[1];
 }
 
 async function resize(file, box, wpx) {
   const W = wpx || XL_IMG_W;
   const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
-  const k = Math.min(W / bmp.width, box.h / bmp.height, 1);          // ไม่ขยายรูปที่เล็กอยู่แล้ว
-  const w = Math.max(1, Math.round(bmp.width * k)), h = Math.max(1, Math.round(bmp.height * k));
+  const { w, h } = fitBox(bmp, W, box.h);
   const H = h + 8;                                                   // เว้นขอบบน-ล่างอย่างละ 4px
-  const cv = Object.assign(document.createElement('canvas'), { width: W, height: H });
-  const g = cv.getContext('2d');
-  g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
-  g.drawImage(bmp, Math.round((W - w) / 2), 4, w, h);
+  const cv = paint(bmp, w, h, W, H, '#fff');
+  bmp.close();                      // คืนแรมทันที ไม่ต้องรอ GC — สำคัญตอนย่อหลายรูปพร้อมกัน
   return { b64: cv.toDataURL('image/jpeg', 0.9).split(',')[1], hh: H };
 }
 
@@ -2595,11 +2850,101 @@ function xlSigns(wb, h, d, paper) {
   return ws;
 }
 
+/* ใบอนุมัติผลิต : 8 คอลัมน์ ลงตัวกับช่องลงนาม 4 ช่อง (ช่องละ 2 คอลัมน์) */
+function xlApv(wb, h, d, paper) {
+  const n = 8, widths = [7, 13, 13, 13, 13, 13, 13, 13];
+  const ws = xlSheet(wb, 'APPROVAL', widths, paper, true);        // ฟอร์มนี้เป็นแนวตั้งเสมอ
+  let r = xlHead(ws, wb, h, n, 1, 'ใบอนุมัติผลิต (MASS PRODUCTION APPROVAL)', 1, 1);
+
+  const pair = (l1, v1, l2, v2) => {
+    xspan(ws, r, 1, 2, l1, { align: XM, font: { bold: true }, fill: 'FFF2F2F2' });
+    xspan(ws, r, 3, 4, v1, { align: XM });
+    xspan(ws, r, 5, 6, l2, { align: XM, font: { bold: true }, fill: 'FFF2F2F2' });
+    xspan(ws, r, 7, n, v2, { align: XM });
+    ws.getRow(r).height = 22; r++;
+  };
+  pair('ชื่อโครงการ / ผลิตภัณฑ์', d.product, 'รหัสสินค้า (Part No.)', d.partno);
+  pair('ผู้รับผิดชอบ (R&D)', d.rdEng, 'Lot ทดลองผลิต', d.lot);
+
+  const head = t => { xspan(ws, r, 1, n, t, { align: XM, font: { bold: true }, fill: 'FFE8E8E8' });
+                      ws.getRow(r).height = 20; r++; };
+
+  head('1. ผลการอนุมัติ (Approval Status)');
+  d.status.forEach(([mark, text]) => {
+    xput(ws, r, 1, mark, { align: XC, font: { bold: true } });
+    xspan(ws, r, 2, n, text, { align: XM });
+    ws.getRow(r).height = 20; r++;
+  });
+  xspan(ws, r, 1, 2, 'เงื่อนไข / เหตุผล', { align: XM, font: { bold: true }, fill: 'FFF2F2F2' });
+  xspan(ws, r, 3, n, d.cond, { align: XM });
+  ws.getRow(r).height = 38; r++;
+
+  head('2. เอกสารแนบและมาตรฐานอ้างอิง');
+  ['แนบ', 'ชื่อเอกสาร', 'เลขที่เอกสาร', 'Rev'].forEach((t, i) => {
+    const c1 = [1, 2, 5, 7][i], c2 = [1, 4, 6, n][i];
+    xspan(ws, r, c1, c2, t, { align: XC, font: { bold: true }, fill: 'FFF2F2F2' });
+  });
+  ws.getRow(r).height = 20; r++;
+  d.attach.forEach(a => {
+    xput(ws, r, 1, a.on ? '✓' : '', { align: XC, font: { bold: true } });
+    xspan(ws, r, 2, 4, a.name, { align: XM });
+    xspan(ws, r, 5, 6, a.no, { align: XM });
+    xspan(ws, r, 7, n, a.rev, { align: XC });
+    ws.getRow(r).height = 22; r++;
+  });
+
+  head('3. สรุปผลการทดลองผลิต (Pilot Run / Trial Summary)');
+  ['หัวข้อทดสอบ', 'เกณฑ์', 'ผลที่ได้', 'สรุป'].forEach((t, i) => {
+    const c1 = [1, 4, 6, 8][i], c2 = [3, 5, 7, n][i];
+    xspan(ws, r, c1, c2, t, { align: XC, font: { bold: true }, fill: 'FFF2F2F2' });
+  });
+  ws.getRow(r).height = 20; r++;
+  d.tests.forEach(t => {
+    xspan(ws, r, 1, 3, t.item, { align: XM });
+    xspan(ws, r, 4, 5, t.spec, { align: XM });
+    xspan(ws, r, 6, 7, t.result, { align: XM });
+    xspan(ws, r, 8, n, t.ok, { align: XC });
+    ws.getRow(r).height = 22; r++;
+  });
+  r = xlNotes(ws, n, r, [['อัตราของเสีย (Defect Rate)', d.defect || '–'],
+                         ['ข้อสังเกต / ข้อควรระวัง', d.obs || '–']]);
+
+  head('4. ลงนามอนุมัติ (Sign-off)');
+  d.signs.forEach((sg, i) => {
+    xspan(ws, r, i * 2 + 1, i * 2 + 2,
+      sg.role + '\n(' + sg.th + ')\n\n….....................................\n( '
+      + (sg.name || '.....................................') + ' )\nวันที่ ......... / ......... / .........',
+      { align: { horizontal: 'center', vertical: 'bottom', wrapText: true } });
+  });
+  ws.getRow(r).height = 104;
+  return ws;
+}
+
+function dataAPV() {
+  const keep = a => a.on || a.name.trim();
+  const used = t => t.item.trim() || t.spec.trim() || t.result.trim();
+  return {
+    product: apv.product, partno: apv.partno, rdEng: apv.rdEng, lot: apv.lot,
+    status: APV_ST.map(([k, t, dsc]) => [apv.status === k ? '✓' : '', t + ' — ' + dsc]),
+    cond: apv.cond,
+    attach: apv.attach.filter(keep).length ? apv.attach.filter(keep)
+            : [{ on: false, name: '', no: '', rev: '' }],
+    tests: apv.tests.filter(used).length ? apv.tests.filter(used)
+           : [{ item: '', spec: '', result: '', ok: '' }],
+    defect: apv.defect, obs: apv.obs,
+    signs: APV_ROLE.map((role, i) => {
+      const [en, th] = role.split('|');
+      return { role: en, th, name: apv.signs[i] };
+    }),
+  };
+}
+
 /** ทางเข้าเดียวของการสร้างไฟล์ทุกประเภท */
 async function buildAnyWorkbook(ExcelJSLib, kind, h, d, paper) {
   const wb = new ExcelJSLib.Workbook();
   wb.creator = 'โปรแกรมสร้างเอกสารสำหรับวิศวกรโรงงาน';
-  ({ TABLE: xlTable, SKILL: xlSkill, OPL: xlOPL, DIAG: xlDiag, SIGN: xlSigns })[kind](wb, h, d, paper);
+  ({ TABLE: xlTable, SKILL: xlSkill, OPL: xlOPL, DIAG: xlDiag, SIGN: xlSigns,
+     APV: xlApv })[kind](wb, h, d, paper);
   return wb.xlsx.writeBuffer();
 }
 
@@ -2625,12 +2970,11 @@ async function dataTABLE() {
 
 async function dataQP(paper) {
   const box = IMG_BOX[paper], wpx = PX(Math.round(QP_COLS[3].pct * 1.5));
-  const rows = [];
-  for (const it of items) rows.push({
+  const rows = await Promise.all(items.map(async it => ({
     cells: [it.desc || '', it.std || '', '',
             (it.method || '') + (it.freq ? '\nความถี่ : ' + it.freq : ''), it.fix || ''],
     img: it.file ? await resize(it.file, box, wpx) : null,
-  });
+  })));
   return {
     sheet: 'QP', title: 'Q-POINT (จุดควบคุมคุณภาพ)',
     info: 'Process : ' + $('qpProcess').value + '        Station : ' + $('qpStation').value
@@ -2658,9 +3002,8 @@ async function dataOPL() {
   const kinds = { basic: 'ความรู้พื้นฐาน', trouble: 'ตัวอย่างปัญหา', kaizen: 'ตัวอย่างการปรับปรุง' };
   const use = items.slice(0, 4);
   const wpx = use.length <= 1 ? PX(150) : PX(75);
-  const cells = [];
-  for (const it of use)
-    cells.push({ desc: it.desc, img: it.file ? await resize(it.file, { h: 300 }, wpx) : null });
+  const cells = await Promise.all(use.map(async it =>
+    ({ desc: it.desc, img: it.file ? await resize(it.file, { h: 300 }, wpx) : null })));
   return { kindText: kinds[$('oplKind').value] || '-', trainer: $('oplTrainer').value,
            cells: cells.length ? cells : [{ desc: '', img: null }], rows: +$('oplRows').value || 8 };
 }
@@ -2668,9 +3011,8 @@ async function dataOPL() {
 async function dataDIAG() {
   const kind = $('diagKind').value;
   const per = +$('diagPer').value;
-  const out = [];
-  for (const it of items)
-    out.push({ desc: it.desc, img: it.file ? await resize(it.file, { h: per === 1 ? 430 : 240 }, 900) : null });
+  const out = await Promise.all(items.map(async it =>
+    ({ desc: it.desc, img: it.file ? await resize(it.file, { h: per === 1 ? 430 : 240 }, 900) : null })));
   return {
     title: kind === '__other' ? ($('diagTitle').value.trim() || 'DIAGRAM') : kind,
     per, items: out.length ? out : [{ desc: '', img: null }],
@@ -2679,16 +3021,15 @@ async function dataDIAG() {
 }
 
 async function dataSIGN() {
-  const out = [];
-  for (const it of items) {
+  const out = await Promise.all(items.map(async it => {
     const k = SIGN_KIND[it.kind || 'warn'];
-    out.push({
+    return {
       kind: k.label + ' / ' + k.en,
       band: 'FF' + k.band.slice(1), fg: 'FF' + (k.fg === '#fff' ? 'FFFFFF' : '000000'),
       th: it.desc || '', en: it.en || '',
       img: it.file ? await resize(it.file, { h: 130 }, 250) : null,
-    });
-  }
+    };
+  }));
   return { items: out.length ? out : [{ kind: '-', band: 'FFFFFFFF', fg: 'FF000000',
                                         th: '', en: '', img: null }] };
 }
@@ -2711,12 +3052,11 @@ $('xls').onclick = async () => {
   const keep = $('msg').textContent;
   $('msg').textContent = 'กำลังสร้างไฟล์ Excel...';
   try {
-    const h = header(), box = IMG_BOX[$('paper').value], steps = [];
+    const h = header(), box = IMG_BOX[$('paper').value];
     if (h.logo) h.logoXl = await prepLogo(h.logo);
     if (h.ppe.length) h.ppeStrip = await ppeStripImage(h.ppe);
-    for (const it of items)
-      steps.push({ desc: it.desc.trim(), ctl: it.ctl.trim(), warn: it.warn.trim(),
-                   img: await resize(it.file, box) });
+    const steps = await Promise.all(items.map(async it => ({ desc: it.desc.trim(),
+      ctl: it.ctl.trim(), warn: it.warn.trim(), img: await resize(it.file, box) })));
     const buf = await buildWorkbook(ExcelJS, h, steps, $('paper').value, pageGroups());
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(new Blob([buf],
@@ -2744,6 +3084,7 @@ async function exportOther() {
     else if (docType === 'SKILL') { kind = 'SKILL'; d = dataSKILL(); }
     else if (docType === 'OPL') { kind = 'OPL'; d = await dataOPL(); }
     else if (docType === 'DIAG') { kind = 'DIAG'; d = await dataDIAG(); }
+    else if (docType === 'APV') { kind = 'APV'; d = dataAPV(); }
     else { kind = 'SIGN'; d = await dataSIGN(); }
     const buf = await buildAnyWorkbook(ExcelJS, kind, h, d, paper);
     saveXlsx(buf, docType + '_' + (h.docno || 'Generated') + '.xlsx');
@@ -2991,6 +3332,7 @@ $('edSave').onclick = () => {
 Object.entries(CONFIG.fields).forEach(([id, v]) => { if ($(id)) $(id).value = v; });
 initPositions();
 renderPPE();
+buildNav();
 render();
 </script>
 </body>

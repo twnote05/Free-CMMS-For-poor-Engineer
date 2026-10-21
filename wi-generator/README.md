@@ -4,7 +4,7 @@
 
 > Built the lazy way, for lazy factory engineers.
 
-**16 kinds of standard factory document, in a single HTML file you double-click to open.**
+**17 kinds of standard factory document, in a single HTML file you double-click to open.**
 No Python, no install, no internet, no server.
 
 Everything runs in the browser on your own machine — nothing leaves the computer. Hand one file to a colleague and they are working.
@@ -55,12 +55,12 @@ Change the text inside the quotes, save, reopen. These are only prefilled defaul
 
 ## What it generates
 
-| Group | Documents |
+| Department | Documents |
 |---|---|
-| Standard work | Work Instruction · Q-Point · OPL · safety signs · flowchart / VSM / layout |
-| Production planning | Routing sheet · BOM · time study · capacity · line balancing |
-| Quality | Check sheet · X̄-R control chart · FMEA |
-| Other | SMED (changeover reduction) · tool & jig register · skill matrix (OJT) |
+| **Technicians** | Work instruction · OPL · safety signs · Q-Point · check sheet |
+| **Engineering** | Routing sheet · BOM · time study · capacity · line balancing · SMED · flowchart / VSM / layout · FMEA · X̄-R control chart |
+| **Maintenance** | Tool & jig register · skill matrix (OJT) |
+| **R&D** | Mass production approval form |
 
 ## What it does for you
 
@@ -86,6 +86,7 @@ Taken from the standards, not invented here.
 | Control chart | `UCL/LCL = X̄̄ ± A₂R̄` · `UCL_R = D₄R̄` · `Cp, Cpk` from `σ̂ = R̄/d₂` · Nelson rules 2–8 |
 | FMEA | `RPN = S × O × D` plus **Action Priority (AP)** per AIAG-VDA, which weights S → O → D |
 | SMED | Changeover time counts **internal** work only (machine stopped), per SMED |
+| Production approval | No formulas — a hand-off form from R&D to production: three approval outcomes, reference documents, pilot-run summary and four sign-off blocks (prints portrait) |
 
 > **About the FMEA AP table** — the authoritative table is in the copyrighted AIAG-VDA handbook, and public sources disagree on the numbers. The table here is the internally consistent one (raising S, O or D never lowers the priority). **Check it against your own licensed copy before you rely on it.** If it differs, `AP_TABLE` in the HTML file is the single place to edit.
 
