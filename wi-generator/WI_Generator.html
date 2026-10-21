@@ -64,9 +64,7 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--font);font
 
 /* ---------- แถบหัวโปรแกรม ---------- */
 .appbar{display:flex;align-items:center;gap:11px;margin:0 0 16px}
-.mark{flex:none;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;
-  background:linear-gradient(140deg,var(--accent),var(--accent-2));color:var(--on-accent);
-  font-weight:700;font-size:13px;letter-spacing:.5px;box-shadow:var(--sh)}
+.mark{flex:none;width:38px;height:38px;border-radius:11px;display:block;box-shadow:var(--sh)}
 .brandtxt{min-width:0;line-height:1.28}
 .brandtxt b{display:block;font-size:15px;letter-spacing:-.1px}
 .brandtxt span{color:var(--txt3);font-size:12px}
@@ -210,13 +208,24 @@ button:focus-visible,.themebtn:focus-visible,.tabs button:focus-visible{outline:
 /* ---------- แท็บเลือกประเภทเอกสาร ---------- */
 .docnav{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
   box-shadow:var(--sh);padding:11px 12px 12px;margin-bottom:14px}
-.navgrp{font-size:12px;color:var(--txt3);font-weight:700;letter-spacing:.6px;
-  text-transform:uppercase;margin:0 0 7px;padding:0 2px}
-.navgrp+.tabs{margin-bottom:0}
-.navgrp span{font-weight:400;letter-spacing:0;text-transform:none}
-#nav .tabs:not(:last-child){margin-bottom:14px}
-.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
-.tabs button{flex:1 1 120px;min-width:88px;max-width:250px;background:var(--surface-2);border:1px solid transparent;
+/* แถบเลือกส่วนงาน (ชั้นบน) — เลือกแล้วด้านล่างจะแตกเป็นเอกสารของส่วนงานนั้น */
+.deptbar{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));
+  grid-auto-rows:1fr;gap:6px;margin:0 0 10px}
+.deptbar button{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px;font-size:13px;
+  font-weight:700;cursor:pointer;font-family:var(--font);color:var(--txt2);line-height:1.35;
+  transition:background .15s,color .15s,box-shadow .15s}
+.deptbar button small{display:block;font-size:12px;font-weight:400;color:var(--txt3);margin-top:2px}
+.deptbar button:hover:not(.on){background:var(--surface-3);color:var(--txt)}
+.deptbar button.on{background:var(--accent);color:var(--on-accent);border-color:transparent;
+  box-shadow:var(--sh)}
+.deptbar button.on small{color:var(--on-accent);opacity:.92}
+/* จุดบอกว่าเอกสารที่กำลังทำอยู่ อยู่ในส่วนงานไหน เผื่อไปเปิดดูส่วนงานอื่นแล้วลืม */
+.deptdot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);
+  margin-left:5px;vertical-align:middle}
+.deptbar button.on .deptdot{background:var(--on-accent)}
+.tabs{display:grid;grid-template-columns:repeat(auto-fill,minmax(152px,1fr));
+  grid-auto-rows:1fr;gap:6px;margin:0 0 14px}
+.tabs button{background:var(--surface-2);border:1px solid transparent;
   border-radius:var(--r-sm);padding:9px 8px;font-size:12px;font-weight:600;cursor:pointer;
   font-family:var(--font);color:var(--txt2);line-height:1.35;
   transition:background .15s,color .15s,box-shadow .15s}
@@ -395,7 +404,49 @@ button:focus-visible,.themebtn:focus-visible,.tabs button:focus-visible{outline:
 <!-- ============================ ฝั่งกรอกข้อมูล ============================ -->
 <div class="noprint">
   <header class="appbar">
-    <div class="mark" aria-hidden="true">WI</div>
+    <svg class="mark" id="appicon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="ic-title ic-desc">
+      <title id="ic-title">WI Generator</title>
+      <desc id="ic-desc">A work instruction document on a blue app tile.</desc>
+      <defs>
+        <linearGradient id="ic-tile" x1="42" y1="28" x2="470" y2="486" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#3478F6"/>
+          <stop offset="1" stop-color="#1746C5"/>
+        </linearGradient>
+        <linearGradient id="ic-paper" x1="146" y1="86" x2="374" y2="426" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#FFFFFF"/>
+          <stop offset="1" stop-color="#EAF1FF"/>
+        </linearGradient>
+        <filter id="ic-shadow" x="94" y="58" width="330" height="414" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+          <feFlood flood-opacity="0" result="background"/>
+          <feColorMatrix in="SourceAlpha" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="alpha"/>
+          <feOffset dy="10"/>
+          <feGaussianBlur stdDeviation="12"/>
+          <feComposite in2="alpha" operator="out"/>
+          <feColorMatrix values="0 0 0 0 0.04 0 0 0 0 0.14 0 0 0 0 0.38 0 0 0 0.2 0"/>
+          <feBlend in2="background" result="shadow"/>
+          <feBlend in="SourceGraphic" in2="shadow" result="shape"/>
+        </filter>
+      </defs>
+      <rect x="24" y="24" width="464" height="464" rx="116" fill="url(#ic-tile)"/>
+      <path d="M101 119C145 68 199 49 258 47" fill="none" stroke="#FFFFFF" stroke-opacity=".12" stroke-width="20" stroke-linecap="round"/>
+      <g filter="url(#ic-shadow)">
+        <path d="M165 82h134l79 79v248c0 14-11 25-25 25H159c-14 0-25-11-25-25V107c0-14 11-25 25-25Z" fill="url(#ic-paper)"/>
+        <path d="M299 82v61c0 10 8 18 18 18h61" fill="#CFE8FF"/>
+        <path d="M299 82v61c0 10 8 18 18 18h61" fill="none" stroke="#D6E7FA" stroke-width="3" stroke-linejoin="round"/>
+        <text x="256" y="257" text-anchor="middle" fill="#1746C5" font-family="Tahoma, Arial, sans-serif" font-size="102" font-weight="800" letter-spacing="-7">WI</text>
+        <rect x="189" y="280" width="134" height="10" rx="5" fill="#49B9D4"/>
+        <g fill="#21A58B">
+          <circle cx="179" cy="329" r="7"/><circle cx="179" cy="361" r="7"/><circle cx="179" cy="393" r="7"/>
+        </g>
+        <g fill="#A8B9D4">
+          <rect x="197" y="324" width="111" height="10" rx="5"/>
+          <rect x="197" y="356" width="139" height="10" rx="5"/>
+          <rect x="197" y="388" width="93" height="10" rx="5"/>
+        </g>
+      </g>
+      <circle cx="407" cy="392" r="23" fill="#FFB84D"/>
+      <path d="m397 392 7 7 14-16" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
     <div class="brandtxt">
       <b>โปรแกรมสร้างเอกสารสำหรับวิศวกรโรงงาน</b>
       <span>ทำงานง่ายๆสไตล์วิศวกรโรงงานจอมขี้เกียจ</span>
@@ -1023,20 +1074,26 @@ const DEPT = [
   ['R&D', 'ส่งมอบงานให้ฝ่ายผลิต', ['APV']],
 ];
 
+let navDept = 0;                     // ส่วนงานที่กำลังเปิดดูอยู่ ไม่ใช่ของเอกสารที่กำลังทำ
+
 function buildNav() {
-  $('nav').innerHTML = DEPT.map(([dept, caption, ids]) =>
-    `<div class="navgrp">${dept} <span>· ${caption}</span></div>
-     <div class="tabs">${ids.map(id => {
-      const [ico, name, sub] = TAB_META[id];
-      return `<button data-t="${id}"${id === docType ? ' class="on"' : ''}>${ico} ${esc(name)}`
-           + `<br><small>${esc(sub)}</small></button>`;
-    }).join('')}</div>`).join('');
+  const cur = DEPT.findIndex(([, , ids]) => ids.includes(docType));
+  const dept = DEPT.map(([name, caption, ids], i) =>
+    `<button data-d="${i}"${i === navDept ? ' class="on"' : ''}>${esc(name)}${
+      i === cur ? '<span class="deptdot" title="เอกสารที่กำลังทำอยู่"></span>' : ''
+    }<br><small>${esc(caption)} · ${ids.length} ชนิด</small></button>`).join('');
+  const docs = DEPT[navDept][2].map(id => {
+    const [ico, name, sub] = TAB_META[id];
+    return `<button data-t="${id}"${id === docType ? ' class="on"' : ''}>${ico} ${esc(name)}`
+         + `<br><small>${esc(sub)}</small></button>`;
+  }).join('');
+  $('nav').innerHTML = `<div class="deptbar">${dept}</div><div class="tabs">${docs}</div>`;
 }
 
 function switchTab(e) {
   const b = e.target.closest('[data-t]'); if (!b) return;
   docType = b.dataset.t;
-  $('nav').querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x === b));
+  buildNav();
   const info = DOC_INFO[docType]
     || (TABLES[docType] ? { h1: TABLES[docType].title, sub: 'กรอกข้อมูลในตาราง ระบบคำนวณและจัดหน้าให้', drop: '' }
                         : { h1: 'ตารางทักษะพนักงาน (Skill Matrix)',
@@ -1057,7 +1114,11 @@ function switchTab(e) {
   setPageCss();                                // แต่ละประเภทใช้แนวกระดาษไม่เหมือนกัน
   render();
 }
-$('nav').onclick = switchTab;
+$('nav').onclick = e => {
+  const d = e.target.closest('[data-d]');
+  if (d) { navDept = +d.dataset.d; buildNav(); return; }   // เปลี่ยนแค่รายการที่เห็น
+  switchTab(e);
+};
 
 /* ---------------------- ช่องกรอกของแต่ละประเภท ---------------------- */
 function stepFields(it, i) {
@@ -3328,6 +3389,10 @@ $('edSave').onclick = () => {
   };
   apply();
 })();
+
+/* favicon ใช้ไอคอนตัวเดียวกับบนหัวโปรแกรม จะได้ไม่ต้องดูแลสองชุด */
+document.head.insertAdjacentHTML('beforeend',
+  '<link rel="icon" href="data:image/svg+xml,' + encodeURIComponent($('appicon').outerHTML) + '">');
 
 Object.entries(CONFIG.fields).forEach(([id, v]) => { if ($(id)) $(id).value = v; });
 initPositions();

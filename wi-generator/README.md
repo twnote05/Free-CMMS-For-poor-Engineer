@@ -55,6 +55,8 @@ Change the text inside the quotes, save, reopen. These are only prefilled defaul
 
 ## What it generates
 
+Pick a department first, then the document types inside it.
+
 | Department | Documents |
 |---|---|
 | **Technicians** | Work instruction · OPL · safety signs · Q-Point · check sheet |
