@@ -60,6 +60,15 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--font);font
 .wrap{max-width:1680px;margin:0 auto;padding:18px;display:grid;
   grid-template-columns:448px minmax(0,1fr);gap:20px;align-items:start}
 @media(max-width:1150px){.wrap{grid-template-columns:minmax(0,1fr);padding:12px;gap:14px}}
+/* ซ่อนแถบซ้ายเพื่อดูเอกสารเต็มจอ — ปุ่มลอยอยู่นอกแถบ จะได้กดกลับได้ตอนซ่อนอยู่ */
+.wrap.wide{grid-template-columns:minmax(0,1fr)}
+.wrap.wide #left{display:none}
+.hidebtn{position:fixed;left:7px;top:50%;transform:translateY(-50%);z-index:30;
+  width:24px;height:58px;border-radius:999px;border:1px solid var(--line);
+  background:var(--surface);color:var(--txt2);cursor:pointer;box-shadow:var(--sh);
+  font-size:13px;font-family:var(--font);padding:0;
+  transition:background .15s,color .15s,box-shadow .15s}
+.hidebtn:hover{background:var(--surface-3);color:var(--txt);box-shadow:var(--sh-lg)}
 #stagewrap{overflow:hidden}
 
 /* ---------- แถบหัวโปรแกรม ---------- */
@@ -412,8 +421,10 @@ button:focus-visible,.themebtn:focus-visible,.tabs button:focus-visible{outline:
 
 <div class="wrap">
 
+<button id="hideL" class="noprint hidebtn" aria-expanded="true" aria-controls="left">⟨</button>
+
 <!-- ============================ ฝั่งกรอกข้อมูล ============================ -->
-<div class="noprint">
+<div class="noprint" id="left">
   <header class="appbar">
     <svg class="mark" id="appicon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="ic-title ic-desc">
       <title id="ic-title">WI Generator</title>
@@ -4056,6 +4067,30 @@ $('edSave').onclick = () => {
     try { localStorage.setItem('wi_theme', mode); } catch (_) { }
     apply();
   };
+  apply();
+})();
+
+/* ---------------------- ซ่อน/แสดงแถบซ้าย ----------------------
+   เอกสารฝั่งขวาคือของที่ต้องตรวจก่อนพิมพ์ ซ่อนแถบกรอกแล้วหน้าเอกสารจะขยายเต็มจอ */
+(() => {
+  const btn = $('hideL'), wrap = document.querySelector('.wrap');
+  const apply = () => {
+    const hidden = wrap.classList.contains('wide');
+    btn.textContent = hidden ? '⟩' : '⟨';
+    btn.title = (hidden ? 'แสดง' : 'ซ่อน') + 'แถบกรอกข้อมูล (Ctrl+\\)';
+    btn.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+    fitStage();                       // ความกว้างเปลี่ยน ต้องย่อ-ขยายเอกสารใหม่
+  };
+  const toggle = () => {
+    wrap.classList.toggle('wide');
+    try { localStorage.setItem('wi_wide', wrap.classList.contains('wide') ? '1' : ''); } catch (_) { }
+    apply();
+  };
+  btn.onclick = toggle;
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === '\\') { e.preventDefault(); toggle(); }
+  });
+  try { if (localStorage.getItem('wi_wide')) wrap.classList.add('wide'); } catch (_) { }
   apply();
 })();
 
