@@ -4,7 +4,7 @@
 
 > Built the lazy way, for lazy factory engineers.
 
-**24 kinds of standard factory document, in a single HTML file you double-click to open.**
+**25 kinds of standard factory document, in a single HTML file you double-click to open.**
 No Python, no install, no internet, no server.
 
 Everything runs in the browser on your own machine — nothing leaves the computer. Hand one file to a colleague and they are working.
@@ -62,7 +62,7 @@ Pick a department first, then the document types inside it.
 | **Technicians** | Work instruction · OPL · safety signs · Q-Point · check sheet · master setting sheet |
 | **Engineering** | Routing sheet · BOM · time study · capacity · line balancing · SMED · flowchart / VSM / layout · FMEA · **control plan** · X̄-R control chart · **gage R&R (MSA)** |
 | **Maintenance** | CIL standard (TPM) · LOTO (energy isolation) · tool & jig register · skill matrix (OJT) |
-| **R&D** | Trial run request · ECR/ECN · mass production approval |
+| **R&D** | Trial run request · ECR/ECN · mass production approval · document action request (DAR) |
 
 ## What it does for you
 

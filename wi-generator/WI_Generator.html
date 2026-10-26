@@ -306,6 +306,9 @@ button:focus-visible,.themebtn:focus-visible,.tabs button:focus-visible{outline:
 .apvlist td.c{text-align:center}
 .apv-note{border:1px solid #000;border-top:0;padding:3px 5px;font-size:.8em;min-height:11mm}
 .apvsign td{width:25%}
+/* หัวฟอร์ม DAR : ฝั่งซ้ายเป็นช่องติ๊ก ฝั่งขวาเป็นรายชื่อผู้รับสำเนา วางคู่กันเหมือนต้นฉบับ */
+.dar2 td{vertical-align:top;padding:0;border:1px solid #000}
+.dar2 .apv-box,.dar2 .apvlist{border:0}
 
 /* ---------- ตารางเอกสาร IE ---------- */
 .rowgrid{width:100%;border-collapse:separate;border-spacing:0;font-size:11.5px;background:var(--surface)}
@@ -600,6 +603,53 @@ button:focus-visible,.themebtn:focus-visible,.tabs button:focus-visible{outline:
       <div class="f"><label>Plant / Factory Director</label><input data-g="3" placeholder="ชื่อ"></div>
     </div>
     <p class="hint">เอกสารนี้พิมพ์เป็น <b>แนวตั้ง</b> เสมอ (A4/A3 ตามที่เลือกด้านล่าง)</p>
+  </div>
+
+  <div class="card only-DAR" id="darCard" hidden>
+    <h2>ใบร้องขอดำเนินการเอกสาร (DAR)</h2>
+    <div class="grid2">
+      <div class="f"><label>DAR No.</label><input data-f="no"></div>
+      <div class="f"><label>ประเภทการขอดำเนินการ</label>
+        <select data-f="act">
+          <option value="edit">ขอแก้ไข</option>
+          <option value="cancel">ขอยกเลิก</option>
+          <option value="destroy">ขออนุมัติทำลายเอกสาร</option>
+          <option value="new">ขึ้นทะเบียนใหม่ และขอสำเนา</option>
+          <option value="copy">ขอทำสำเนา</option>
+          <option value="recall">เรียกคืน / รับคืน</option>
+          <option value="void">ขอยกเลิกสำเนา</option>
+          <option value="other">อื่น ๆ</option>
+        </select></div>
+      <div class="f"><label>จำนวน (ชุด)</label><input data-f="qty"></div>
+      <div class="f"><label>ให้กับ</label><input data-f="to"></div>
+    </div>
+    <div class="f"><label>ระบุเพิ่ม (กรณีเลือก "อื่น ๆ")</label><input data-f="other"></div>
+
+    <h2 style="margin-top:14px">รายชื่อผู้รับสำเนา</h2>
+    <table class="rowgrid"><thead><tr><th>ตำแหน่ง</th><th>ชื่อบุคคล</th>
+      <th style="width:8%"></th></tr></thead><tbody id="darDist"></tbody></table>
+    <button class="ghost" data-addtb="0" style="margin-top:6px">+ เพิ่มผู้รับ</button>
+
+    <h2 style="margin-top:14px">รายการเอกสาร</h2>
+    <table class="rowgrid"><thead><tr><th>รหัส / ชื่อเอกสาร</th><th style="width:11%">Issue</th>
+      <th style="width:11%">Rev.</th><th style="width:12%">หน้าที่แก้ไข</th><th>รายการแก้ไข</th>
+      <th>เหตุผลที่ขอ</th><th style="width:7%"></th></tr></thead><tbody id="darDocs"></tbody></table>
+    <button class="ghost" data-addtb="1" style="margin-top:6px">+ เพิ่มเอกสาร</button>
+
+    <div class="grid2" style="margin-top:10px">
+      <div class="f"><label>เอกสารแนบ</label>
+        <select data-f="attach"><option value="no">ไม่มีเอกสารแนบ</option>
+          <option value="yes">มีเอกสารแนบ</option></select></div>
+      <div class="f"><label>จำนวนแผ่นที่แนบ</label><input data-f="sheets"></div>
+    </div>
+
+    <h2 style="margin-top:14px">ผู้ลงนาม</h2>
+    <div class="grid2">
+      <div class="f"><label>ผู้ขอดำเนินการ</label><input data-g="0" placeholder="ชื่อ"></div>
+      <div class="f"><label>ผู้ทบทวนและรับรอง (รองผจก. ขึ้นไป)</label><input data-g="1" placeholder="ชื่อ"></div>
+      <div class="f"><label>ผู้ดำเนินการ (DCC)</label><input data-g="2" placeholder="ชื่อ"></div>
+      <div class="f"><label>ผู้อนุมัติ (MR)</label><input data-g="3" placeholder="ชื่อ"></div>
+    </div>
   </div>
 
   <div class="card only-ECR" id="ecrCard" hidden>
@@ -1139,6 +1189,9 @@ const DOC_INFO = {
   APV:  { h1: 'ใบอนุมัติผลิต (Mass Production Approval)',
           sub: 'R&D ส่งมอบงานให้ฝ่ายผลิต — สรุปผลทดลองผลิต เอกสารอ้างอิง และลายเซ็นอนุมัติ 4 ฝ่าย',
           drop: '' },
+  DAR:  { h1: 'ใบร้องขอดำเนินการเอกสาร (DAR)',
+          sub: 'ขอแก้ไข ยกเลิก ขึ้นทะเบียน ทำสำเนา หรือเรียกคืนเอกสาร พร้อมรายชื่อผู้รับสำเนา',
+          drop: '' },
   ECR:  { h1: 'ใบขอเปลี่ยนแปลงแบบ / กระบวนการ (ECR)',
           sub: 'ขอแก้แบบ วัตถุดิบ หรือกระบวนการ พร้อมผลกระทบและเอกสารที่ต้องแก้ตาม',
           drop: '' },
@@ -1200,13 +1253,14 @@ const TAB_META = {
   APV:   ['✅', 'ใบอนุมัติผลิต', 'R&D → ฝ่ายผลิต'],
   TRIAL: ['🧪', 'ใบขอทดลองผลิต', 'ขอลองก่อนอนุมัติจริง'],
   ECR:   ['📝', 'ECR / ECN', 'ขอเปลี่ยนแบบหรือกระบวนการ'],
+  DAR:   ['🗂️', 'ใบร้องขอเอกสาร', 'แก้ / ยกเลิก / ทำสำเนา'],
 };
 const DEPT = [
   ['ช่างเทคนิค', 'เอกสารที่ใช้หน้างาน', ['WI', 'OPL', 'SIGN', 'QP', 'CHECK', 'SET']],
   ['วิศวกรรม', 'วิเคราะห์และปรับปรุงกระบวนการ',
    ['ROUTE', 'BOM', 'TIME', 'CAP', 'LINE', 'SMED', 'DIAG', 'FMEA', 'CP', 'QC', 'MSA']],
   ['ซ่อมบำรุง', 'มาตรฐาน ความปลอดภัย และกำลังคน', ['CIL', 'LOTO', 'EQUIP', 'SKILL']],
-  ['R&D', 'ขอทดลอง เปลี่ยนแปลง และส่งมอบงาน', ['TRIAL', 'ECR', 'APV']],
+  ['R&D', 'ขอทดลอง เปลี่ยนแปลง และส่งมอบงาน', ['TRIAL', 'ECR', 'APV', 'DAR']],
 ];
 
 let navDept = 0;                     // ส่วนงานที่กำลังเปิดดูอยู่ ไม่ใช่ของเอกสารที่กำลังทำ
@@ -1520,6 +1574,72 @@ function paginateAPV(h, size, stage) {
 }
 
 /* =======================================================================
+   DAR — ใบร้องขอดำเนินการเอกสาร (ตามฟอร์ม FM-DC-01 ของโรงงาน)
+   ======================================================================= */
+const DAR_ACT = { edit: 'ขอแก้ไข', cancel: 'ขอยกเลิก', destroy: 'ขออนุมัติทำลายเอกสาร',
+                  new: 'ขึ้นทะเบียนใหม่ และขอสำเนา', copy: 'ขอทำสำเนา',
+                  recall: 'เรียกคืน / รับคืน', void: 'ขอยกเลิกสำเนา', other: 'อื่น ๆ' };
+/* ประเภทที่ต้องระบุจำนวนชุดและผู้รับ — อีกสี่ตัวไม่ต้อง */
+const DAR_NEEDQTY = ['new', 'copy', 'recall', 'void'];
+const DAR_ROLE = ['ผู้ขอดำเนินการ|Requester', 'ผู้ทบทวนและรับรอง|ระดับรองผจก. ขึ้นไป',
+                  'ผู้ดำเนินการ|DCC', 'ผู้อนุมัติ|MR'];
+const DAR_NOTE = 'หมายเหตุ : ช่องผู้ทบทวนและรับรอง ผู้เซ็นต้องเป็นระดับรองผจก. ขึ้นไปเท่านั้น';
+const dar = {
+  no: '', act: 'edit', qty: '', to: '', other: '',
+  dist: [0, 0, 0].map(() => ({ pos: '', name: '' })),
+  docs: [0, 0, 0].map(() => ({ code: '', issue: '', rev: '', pages: '', change: '', why: '' })),
+  attach: 'no', sheets: '', signs: ['', '', '', ''],
+};
+
+function renderDarEditor() {
+  fillForm('darCard', dar);
+  $('darDist').innerHTML = formRows(0, dar.dist, [['pos', ''], ['name', '']]);
+  $('darDocs').innerHTML = formRows(1, dar.docs,
+    [['code', 'เช่น WI-PD-003'], ['issue', ''], ['rev', ''], ['pages', ''],
+     ['change', ''], ['why', '']]);
+}
+bindForm('darCard', dar, ['dist', 'docs'], renderDarEditor);
+
+function paginateDAR(h, size, stage) {
+  const { add, block, list } = formPage(h, size, 'ใบร้องขอดำเนินการเอกสาร (DOCUMENT ACTION REQUEST)');
+  const qty = DAR_NEEDQTY.indexOf(dar.act) >= 0;
+  add(`<table class="apvtab">
+      <tr>${fCell('DAR No.', dar.no)}${fCell('จำนวน (ชุด)', qty ? dar.qty : '-')}</tr>
+      <tr>${fCell('ให้กับ', qty ? dar.to : '-')}${fCell('ระบุเพิ่ม', dar.other)}</tr>
+    </table>`);
+
+  /* ฝั่งซ้ายช่องติ๊ก ฝั่งขวารายชื่อผู้รับสำเนา วางคู่กันเหมือนฟอร์มต้นฉบับ */
+  const dist = dar.dist.filter(d => (d.pos || '').trim() || (d.name || '').trim());
+  block(fHead('ประเภทการขอดำเนินการ')
+    + `<table class="apvtab dar2"><tr>
+         <td style="width:55%"><div class="apv-box">${Object.keys(DAR_ACT).map(k =>
+          `<div class="apv-opt"><i class="opl-box">${dar.act === k ? '✓' : ''}</i>
+             <span>${DAR_ACT[k]}${k === 'other' && dar.other ? ' — ' + esc(dar.other) : ''}</span></div>`
+         ).join('')}</div></td>
+         <td><table class="apvlist"><thead><tr><th>ตำแหน่ง</th><th>ชื่อบุคคล</th></tr></thead>
+           <tbody>${(dist.length ? dist : [{}]).map(d =>
+            `<tr><td>${esc(d.pos) || '&nbsp;'}</td><td>${esc(d.name) || '&nbsp;'}</td></tr>`).join('')}
+           </tbody></table></td></tr></table>`);
+
+  const docs = dar.docs.filter(d => (d.code || '').trim() || (d.change || '').trim());
+  list('รายการเอกสาร',
+    `<tr><th>รหัส / ชื่อเอกสาร</th><th style="width:9%">Issue</th><th style="width:9%">Rev.</th>
+       <th style="width:11%">หน้าที่แก้ไข</th><th style="width:23%">รายการแก้ไข</th>
+       <th style="width:20%">เหตุผลที่ขอ</th></tr>`,
+    docs.length ? docs : [{}],
+    d => `<tr><td>${esc(d.code) || '&nbsp;'}</td><td class="c">${esc(d.issue) || '&nbsp;'}</td>
+       <td class="c">${esc(d.rev) || '&nbsp;'}</td><td class="c">${esc(d.pages) || '&nbsp;'}</td>
+       <td>${esc(d.change) || '&nbsp;'}</td><td>${esc(d.why) || '&nbsp;'}</td></tr>`);
+
+  block(`<div class="apv-note"><i class="opl-box">${dar.attach === 'yes' ? '✓' : ''}</i>
+     มีเอกสารแนบ ${esc(dar.sheets) || '......'} แผ่น
+     &nbsp;&nbsp;&nbsp;<i class="opl-box">${dar.attach === 'no' ? '✓' : ''}</i> ไม่มีเอกสารแนบ</div>`);
+
+  block(fHead('ลงนาม') + fSign(fRoles(DAR_ROLE, dar.signs))
+    + `<div class="rulenote">** ${DAR_NOTE}</div>`);
+}
+
+/* =======================================================================
    ECR / ECN — ใบขอเปลี่ยนแปลงแบบหรือกระบวนการ (ISO 9001 ข้อ 8.5.6 ควบคุมการเปลี่ยนแปลง)
    ======================================================================= */
 const ECR_TYPE = { design: 'แก้แบบ / ขนาด', material: 'เปลี่ยนวัตถุดิบ',
@@ -1609,6 +1729,9 @@ bindForm('trialCard', trial, ['pars', 'checks'], renderTrialEditor);
 
 /* เอกสารที่เป็นฟอร์ม : พิมพ์แนวตั้ง ไม่มีรายการรูป และมีการ์ดกรอกของตัวเอง */
 const FORMS = {
+  DAR:   { editor: () => renderDarEditor(), msg: () => 'เอกสาร '
+             + dar.docs.filter(d => (d.code || '').trim()).length + ' ฉบับ · ผู้รับสำเนา '
+             + dar.dist.filter(d => (d.name || '').trim()).length + ' คน' },
   APV:   { editor: () => {}, msg: () => 'เอกสารแนบ ' + apv.attach.filter(a => a.on).length
              + ' รายการ · หัวข้อทดสอบ ' + apv.tests.filter(t => t.item.trim()).length + ' หัวข้อ' },
   ECR:   { editor: () => renderEcrEditor(), msg: () => 'เอกสารที่ต้องแก้ตาม '
@@ -2904,7 +3027,7 @@ function paginate() {
     (TABLES[docType] ? paginateTABLE
       : { QP: paginateQP, OPL: paginateOPL, SIGN: paginateSIGN, DIAG: paginateDIAG,
           SKILL: paginateSKILL, APV: paginateAPV, ECR: paginateECR,
-          TRIAL: paginateTRIAL }[docType])(h, size, stage);
+          TRIAL: paginateTRIAL, DAR: paginateDAR }[docType])(h, size, stage);
     waitImages(stage);
     const pg = stage.querySelectorAll('.page');
     pg.forEach((p, i) => {
@@ -3628,6 +3751,32 @@ function xlForm(wb, h, d, paper) {
   return ws;
 }
 
+function dataDAR() {
+  const qty = DAR_NEEDQTY.indexOf(dar.act) >= 0;
+  const dist = dar.dist.filter(d => (d.pos || '').trim() || (d.name || '').trim());
+  const docs = dar.docs.filter(d => (d.code || '').trim() || (d.change || '').trim());
+  return { sheet: 'DAR', title: 'ใบร้องขอดำเนินการเอกสาร (DOCUMENT ACTION REQUEST)', blocks: [
+    ['pair', 'DAR No.', dar.no, 'จำนวน (ชุด)', qty ? dar.qty : '-'],
+    ['pair', 'ให้กับ', qty ? dar.to : '-', 'ระบุเพิ่ม', dar.other],
+    ['head', 'ประเภทการขอดำเนินการ'],
+    ['pick', Object.keys(DAR_ACT).map(k => [dar.act === k ? '✓' : '',
+      DAR_ACT[k] + (k === 'other' && dar.other ? ' — ' + dar.other : '')])],
+    ['head', 'รายชื่อผู้รับสำเนา'],
+    ['table', ['ตำแหน่ง', 'ชื่อบุคคล'],
+      (dist.length ? dist : [{}]).map(d => [d.pos || '', d.name || '']), [4, 4]],
+    ['head', 'รายการเอกสาร'],
+    ['table', ['รหัส / ชื่อเอกสาร', 'Issue', 'Rev.', 'หน้าที่แก้ไข', 'รายการแก้ไข', 'เหตุผลที่ขอ'],
+      (docs.length ? docs : [{}]).map(d =>
+        [d.code || '', d.issue || '', d.rev || '', d.pages || '', d.change || '', d.why || '']),
+      [2, 1, 1, 1, 2, 1]],
+    ['note', 'เอกสารแนบ', dar.attach === 'yes'
+      ? 'มีเอกสารแนบ ' + (dar.sheets || '......') + ' แผ่น' : 'ไม่มีเอกสารแนบ', 22],
+    ['head', 'ลงนาม'],
+    ['signs', fRoles(DAR_ROLE, dar.signs)],
+    ['note', '', '** ' + DAR_NOTE, 22],
+  ] };
+}
+
 function dataECR() {
   const docs = ecr.docs.filter(d => String(d.name || '').trim() || String(d.no || '').trim());
   return { sheet: 'ECR', title: 'ใบขอเปลี่ยนแปลง (ENGINEERING CHANGE REQUEST)', blocks: [
@@ -3825,6 +3974,7 @@ async function exportOther() {
     else if (docType === 'DIAG') { kind = 'DIAG'; d = await dataDIAG(); }
     else if (docType === 'APV') { kind = 'APV'; d = dataAPV(); }
     else if (docType === 'ECR') { kind = 'FORM'; d = dataECR(); }
+    else if (docType === 'DAR') { kind = 'FORM'; d = dataDAR(); }
     else if (docType === 'TRIAL') { kind = 'FORM'; d = dataTRIAL(); }
     else { kind = 'SIGN'; d = await dataSIGN(); }
     const buf = await buildAnyWorkbook(ExcelJS, kind, h, d, paper);
